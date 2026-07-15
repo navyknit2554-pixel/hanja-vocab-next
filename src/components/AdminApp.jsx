@@ -496,9 +496,9 @@ export function AdminApp() {
         <form className="loginCard" onSubmit={loginAdmin}>
           <Mascot />
           <h1>관리자 로그인</h1>
-          <p>마스터 관리자는 비밀번호로, 강사님은 발급받은 라이선스로 로그인하세요.</p>
-          <label>관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} /></label>
-          <label>강사용 라이선스 키<input value={adminLicenseKey} onChange={(event) => setAdminLicenseKey(event.target.value)} placeholder="예: HANJA-..." /></label>
+          <p>선생님 본인은 관리자 비밀번호를, 다른 강사님은 발급받은 라이선스 키를 입력하면 됩니다.</p>
+          <label>내 관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} placeholder="ADMIN_PASSWORD" /></label>
+          <label>강사용 라이선스 키<input value={adminLicenseKey} onChange={(event) => setAdminLicenseKey(event.target.value)} placeholder="강사님은 여기에 HANJA-... 키 입력" /></label>
           <button className="btn primary" type="submit">관리 화면 열기</button>
           {adminError && <strong className="errorText">{adminError}</strong>}
           <Link className="textLink" href="/student">학생 화면으로</Link>
