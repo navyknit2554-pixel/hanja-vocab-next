@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "crypto";
 
 export const adminCookieName = "hanja_admin_session";
+export const masterScopeKey = "main";
 
 export function adminPassword() {
   return process.env.ADMIN_PASSWORD || "1234";
@@ -22,12 +23,44 @@ export function adminSessionValue() {
   return createHash("sha256").update(`hanja-admin:${secret}`).digest("hex");
 }
 
+export function licenseAdminSessionValue(access) {
+  const payload = Buffer.from(JSON.stringify({
+    role: "license",
+    scopeKey: access.scopeKey,
+    teacherCode: access.teacherCode,
+    licenseHash: access.licenseHash
+  }), "utf8").toString("base64url");
+  const secret = process.env.ADMIN_SESSION_SECRET || adminPassword();
+  const signature = createHash("sha256").update(`hanja-license-admin:${payload}:${secret}`).digest("hex");
+  return `license.${payload}.${signature}`;
+}
+
 export function isValidAdminPassword(password) {
   return safeEqual(String(password || ""), adminPassword());
 }
 
 export function isValidAdminSession(value) {
   return safeEqual(String(value || ""), adminSessionValue());
+}
+
+export function readAdminSession(value) {
+  const session = String(value || "");
+  if (isValidAdminSession(session)) {
+    return { authenticated: true, role: "master", scopeKey: masterScopeKey, teacherCode: "master" };
+  }
+  const parts = session.split(".");
+  if (parts.length !== 3 || parts[0] !== "license") return { authenticated: false };
+  const [, payload, signature] = parts;
+  const secret = process.env.ADMIN_SESSION_SECRET || adminPassword();
+  const expected = createHash("sha256").update(`hanja-license-admin:${payload}:${secret}`).digest("hex");
+  if (!safeEqual(signature, expected)) return { authenticated: false };
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!parsed.scopeKey || !parsed.teacherCode) return { authenticated: false };
+    return { authenticated: true, role: "license", scopeKey: parsed.scopeKey, teacherCode: parsed.teacherCode, licenseHash: parsed.licenseHash };
+  } catch {
+    return { authenticated: false };
+  }
 }
 
 function safeEqual(a, b) {

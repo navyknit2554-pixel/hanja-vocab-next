@@ -10,10 +10,10 @@ export async function GET() {
   if (configError) return NextResponse.json({ authenticated: false, configError });
 
   const cookieStore = await cookies();
-  const studentId = readStudentSession(cookieStore.get(studentCookieName)?.value);
-  if (!studentId) return NextResponse.json({ authenticated: false });
-  const state = await getState();
-  const student = state.students.find((item) => item.id === studentId);
+  const session = readStudentSession(cookieStore.get(studentCookieName)?.value);
+  if (!session?.studentId) return NextResponse.json({ authenticated: false });
+  const state = await getState(session.scopeKey);
+  const student = state.students.find((item) => item.id === session.studentId);
   if (!student) return NextResponse.json({ authenticated: false });
   return NextResponse.json({
     authenticated: true,

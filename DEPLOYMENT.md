@@ -15,7 +15,7 @@ npm.cmd run deploy:check
 npm.cmd run build
 ```
 
-`npm.cmd run secrets:make`가 출력하는 두 줄은 Vercel 환경변수의 `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`에 그대로 넣으면 됩니다.
+`npm.cmd run secrets:make`가 출력하는 `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, `HANJA_LICENSE_SECRET` 값을 Vercel 환경변수에 그대로 넣으면 됩니다.
 
 ## 2. 필수 환경변수
 
@@ -26,6 +26,7 @@ POSTGRES_URL=Neon에서 복사한 연결 문자열
 ADMIN_PASSWORD=선생님이 사용할 관리자 비밀번호
 ADMIN_SESSION_SECRET=길고 무작위인 문자열
 STUDENT_SESSION_SECRET=길고 무작위인 문자열
+HANJA_LICENSE_SECRET=길고 무작위인 문자열
 ```
 
 운영 배포에서는 `ADMIN_PASSWORD=1234`, `ADMIN_SESSION_SECRET=change-this-before-deploy`, `STUDENT_SESSION_SECRET=change-this-before-deploy-too`를 사용하면 로그인이 막힙니다.

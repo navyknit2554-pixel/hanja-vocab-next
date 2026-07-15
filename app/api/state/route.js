@@ -1,31 +1,32 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { adminCookieName, isValidAdminSession } from "../../../src/lib/adminAuth";
+import { adminCookieName, readAdminSession } from "../../../src/lib/adminAuth";
 import { getState, resetState, setState } from "../../../src/lib/serverStore";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-  return NextResponse.json(await getState());
+  const access = await requireAdmin();
+  if (access.denied) return access.denied;
+  return NextResponse.json(await getState(access.scopeKey));
 }
 
 export async function PUT(request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const access = await requireAdmin();
+  if (access.denied) return access.denied;
   const state = await request.json();
-  return NextResponse.json(await setState(state));
+  return NextResponse.json(await setState(state, access.scopeKey));
 }
 
 export async function DELETE() {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-  return NextResponse.json(await resetState());
+  const access = await requireAdmin();
+  if (access.denied) return access.denied;
+  return NextResponse.json(await resetState(access.scopeKey));
 }
 
 async function requireAdmin() {
   const cookieStore = await cookies();
-  if (isValidAdminSession(cookieStore.get(adminCookieName)?.value)) return null;
-  return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
+  const session = readAdminSession(cookieStore.get(adminCookieName)?.value);
+  if (session.authenticated) return session;
+  return { denied: NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 }) };
 }

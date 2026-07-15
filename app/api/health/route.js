@@ -13,6 +13,9 @@ export async function GET() {
 
   if (adminError) warnings.push(adminError);
   if (studentError) warnings.push(studentError);
+  if (process.env.NODE_ENV === "production" && (!process.env.HANJA_LICENSE_SECRET || process.env.HANJA_LICENSE_SECRET === "change-this-license-secret")) {
+    warnings.push("강사용 라이선스를 사용하려면 HANJA_LICENSE_SECRET을 긴 무작위 문자열로 설정해야 합니다.");
+  }
   if (process.env.NODE_ENV === "production" && storage !== "postgres") {
     warnings.push("Vercel 운영 배포에서는 POSTGRES_URL 또는 DATABASE_URL을 설정해야 학습 기록이 안정적으로 저장됩니다.");
   }

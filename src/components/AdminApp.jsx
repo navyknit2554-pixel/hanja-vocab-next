@@ -10,6 +10,8 @@ export function AdminApp() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminPassword, setAdminPassword] = useState("");
+  const [adminLicenseKey, setAdminLicenseKey] = useState("");
+  const [adminInfo, setAdminInfo] = useState(null);
   const [adminError, setAdminError] = useState("");
   const [state, setState] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -30,6 +32,7 @@ export function AdminApp() {
       .then((response) => response.json())
       .then((result) => {
         setAuthenticated(Boolean(result.authenticated));
+        if (result.authenticated) setAdminInfo(result);
         if (result.configError) setAdminError(result.configError);
       })
       .catch(() => setAuthenticated(false))
@@ -91,7 +94,7 @@ export function AdminApp() {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: adminPassword })
+      body: JSON.stringify({ password: adminPassword, licenseKey: adminLicenseKey })
     });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
@@ -99,12 +102,15 @@ export function AdminApp() {
       return;
     }
     setAuthenticated(true);
+    setAdminInfo(await response.json().catch(() => null));
     setAdminPassword("");
+    setAdminLicenseKey("");
   }
 
   async function logoutAdmin() {
     await fetch("/api/admin/session", { method: "DELETE" });
     setAuthenticated(false);
+    setAdminInfo(null);
     setState(null);
   }
 
@@ -490,8 +496,9 @@ export function AdminApp() {
         <form className="loginCard" onSubmit={loginAdmin}>
           <Mascot />
           <h1>관리자 로그인</h1>
-          <p>학생 계정과 학습 자료를 관리하려면 관리자 비밀번호를 입력하세요.</p>
+          <p>마스터 관리자는 비밀번호로, 강사님은 발급받은 라이선스로 로그인하세요.</p>
           <label>관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} /></label>
+          <label>강사용 라이선스 키<input value={adminLicenseKey} onChange={(event) => setAdminLicenseKey(event.target.value)} placeholder="예: HANJA-..." /></label>
           <button className="btn primary" type="submit">관리 화면 열기</button>
           {adminError && <strong className="errorText">{adminError}</strong>}
           <Link className="textLink" href="/student">학생 화면으로</Link>
@@ -506,7 +513,7 @@ export function AdminApp() {
   return (
     <main className="adminFrame">
       <header className="topBar">
-        <div><strong>학습 관리</strong><span>학생 계정 · 한자 구성 · 학습도</span></div>
+        <div><strong>학습 관리</strong><span>학생 계정 · 한자 구성 · 학습도{adminInfo?.role === "license" ? ` · 강사 코드 ${adminInfo.teacherCode}` : ""}</span></div>
         <div className="topActions">
           <Link className="btn ghost" href="/student">학생 화면</Link>
           <button className="btn" type="button" onClick={exportState}>백업</button>

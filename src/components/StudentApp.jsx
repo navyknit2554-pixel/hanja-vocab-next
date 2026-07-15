@@ -11,7 +11,7 @@ export function StudentApp() {
   const [progressRecord, setProgressRecord] = useState({ completed: {}, quiz: {} });
   const [loadError, setLoadError] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
-  const [login, setLogin] = useState({ loginId: "", password: "" });
+  const [login, setLogin] = useState({ teacherCode: "", loginId: "", password: "" });
   const [stage, setStage] = useState("learn");
   const [cardIndex, setCardIndex] = useState(0);
   const [quizIndex, setQuizIndex] = useState(0);
@@ -67,7 +67,7 @@ export function StudentApp() {
     setQueue([]);
     setRetry([]);
     resetStats();
-    setLogin({ loginId: "", password: "" });
+    setLogin({ teacherCode: "", loginId: "", password: "" });
   }
 
   async function logoutStudent() {
@@ -151,7 +151,8 @@ export function StudentApp() {
         <form className="loginCard" onSubmit={handleLogin}>
           <Mascot />
           <h1>한자 어휘 로그인</h1>
-          <p>선생님이 알려 준 아이디와 비밀번호를 입력하세요.</p>
+          <p>선생님이 알려 준 강사 코드, 아이디, 비밀번호를 입력하세요.</p>
+          <label>강사 코드<input value={login.teacherCode} onChange={(event) => setLogin({ ...login, teacherCode: event.target.value })} placeholder="마스터 계정 학생은 비워 두세요" /></label>
           <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
           <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
           <button className="btn primary" type="submit">로그인</button>
