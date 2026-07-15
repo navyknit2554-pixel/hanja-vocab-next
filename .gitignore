@@ -1,0 +1,8 @@
+.next
+node_modules
+out
+.data
+.npm-cache
+.vercel
+.env*
+!.env.example
