@@ -668,6 +668,27 @@ textarea {
   align-content: start;
 }
 
+.criteriaBox {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 2px solid #d9f7c7;
+  border-radius: 14px;
+  background: #f5ffef;
+  color: var(--ink);
+}
+
+.criteriaBox strong {
+  color: var(--green-dark);
+}
+
+.criteriaBox span,
+.criteriaBox small {
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 .contentForm input,
 .contentForm select {
   height: 42px;

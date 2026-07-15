@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { buildAiPrompt, findLesson, lessonVocab, parseAiLessons, upsertLesson, validateAppStateShape, validateLesson } from "../lib/curriculum";
-import { buildSeedCurriculum } from "../lib/data";
+import { buildSeedCurriculum, levelCriteria } from "../lib/data";
 import { loadAppState, resetAppState, saveAppState } from "../lib/store";
 import { Mascot } from "./Mascot";
 
@@ -84,6 +84,7 @@ export function AdminApp() {
       return summary;
     }, { completed: 0, retry: 0, active: 0, idle: 0 });
   }, [state]);
+  const selectedCriteria = levelCriteria[selectedLevel];
   const contentPreview = useMemo(() => {
     if (!lesson) return { hanjaSet: [], errors: [], vocabCount: 0 };
     try {
@@ -697,6 +698,13 @@ export function AdminApp() {
             </div>
           </div>
           <Select label="난이도" value={selectedLevel} onChange={setSelectedLevel} options={["초급", "중급", "고급"]} />
+          {selectedCriteria && (
+            <div className="criteriaBox">
+              <strong>{selectedLevel} 기준 · {selectedCriteria.target}</strong>
+              <span>{selectedCriteria.focus}</span>
+              <small>{selectedCriteria.textRange}</small>
+            </div>
+          )}
           <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
           <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
           <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>

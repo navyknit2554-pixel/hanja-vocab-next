@@ -1,5 +1,26 @@
 export const storageKey = "hanja-vocab-next-state-v1";
 
+export const levelCriteria = {
+  "초급": {
+    target: "초3~초4",
+    focus: "생활 어휘, 기본 반대어와 짝 개념, 학교와 일상에서 바로 만나는 구체어",
+    textRange: "짧은 설명문, 생활문, 초등 저·중학년 독해 지문",
+    rule: "뜻이 눈에 보이거나 경험으로 바로 이해되는 한자를 우선 배치합니다."
+  },
+  "중급": {
+    target: "초5~중1",
+    focus: "교과서 독해 어휘, 사고 활동, 학습 행동, 추상 개념의 기초",
+    textRange: "초등 고학년 설명문, 중학교 입문 독해 지문, 학습 안내문",
+    rule: "뜻이 추상적이지만 학교 수업과 독해에서 자주 만나는 한자를 배치합니다."
+  },
+  "고급": {
+    target: "중2~고1 이상",
+    focus: "비문학 빈출 개념어, 사회·논리·제도·평가 어휘",
+    textRange: "중등 비문학, 사회·과학 설명문, 논증형 글",
+    rule: "개념 관계를 파악해야 이해되는 한자어와 논리적 어휘를 배치합니다."
+  }
+};
+
 const levelGroups = {
   "초급": [
     [
@@ -2053,6 +2074,7 @@ const targetDaysPerLevel = 100;
 function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, index, level) {
   const cycle = Math.floor((day - 1) / levelGroups[level].length) + 1;
   const role = index < 2 ? "서로 관계가 있는 중심 한자" : "같은 소리나 비슷한 소리를 통해 비교하는 확장 한자";
+  const criteria = levelCriteria[level];
   return {
     character,
     sound,
@@ -2060,6 +2082,7 @@ function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, i
     radical: character,
     relation: `${level} ${day}일차 ${index + 1}번 한자입니다. ${role}로 묶어 학습합니다.`,
     origin: `${character}은 '${meaning}'의 뜻을 지닌 한자로, 어휘 속에서 뜻이 어떻게 확장되는지 살펴봅니다.`,
+    difficultyNote: criteria ? `${criteria.target} 기준: ${criteria.focus}` : "",
     vocab: makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }),
     reviewCycle: cycle
   };
@@ -2137,6 +2160,7 @@ export function buildSeedCurriculum() {
         day: index + 1,
         grade: "공통",
         level,
+        criteria: levelCriteria[level],
         dailyCount: 4,
         hanjaSet: source.map((item, itemIndex) => makeHanja(item, index + 1, itemIndex, level))
       };
