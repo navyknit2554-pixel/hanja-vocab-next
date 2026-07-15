@@ -392,7 +392,7 @@ export function AdminApp() {
   }
 
   function applySeedCurriculum() {
-    if (!window.confirm("초급/중급/고급 20일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
+    if (!window.confirm("초급/중급/고급 100일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
     const nextState = structuredClone(state);
     nextState.curriculum = buildSeedCurriculum();
     persist(nextState);
@@ -691,7 +691,7 @@ export function AdminApp() {
           <div className="contentTitle">
             <h2>일차별 한자 관리</h2>
             <div className="contentActions">
-              <button className="miniBtn" type="button" onClick={applySeedCurriculum}>기본 20일차 적용</button>
+              <button className="miniBtn" type="button" onClick={applySeedCurriculum}>기본 100일차 적용</button>
               <button className="miniBtn" type="button" onClick={addLesson}>새 일차</button>
               <button className="miniBtn danger" type="button" onClick={deleteLesson}>일차 삭제</button>
             </div>

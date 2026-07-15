@@ -2048,8 +2048,10 @@ const levelGroups = {
     ]
   ]
 };
+const targetDaysPerLevel = 100;
 
 function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, index, level) {
+  const cycle = Math.floor((day - 1) / levelGroups[level].length) + 1;
   const role = index < 2 ? "서로 관계가 있는 중심 한자" : "같은 소리나 비슷한 소리를 통해 비교하는 확장 한자";
   return {
     character,
@@ -2064,24 +2066,38 @@ function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, i
         word,
         meaning: wordMeaning,
         examples: [
-          `수업 시간에 ${word}의 뜻을 문장 속에서 익혔다.`,
+          `${word}의 뜻을 문장 속에서 익히며 한자 ${character}의 쓰임을 살펴보았다.`,
           `친구가 ${word}이라는 말을 사용해 자기 생각을 설명했다.`,
           `선생님은 ${word}의 예를 들어 어휘의 쓰임을 알려 주었다.`
         ]
+      },
+      {
+        hanja: `${hanja}`,
+        word: `${word} 활용`,
+        meaning: `${wordMeaning}을 실제 상황에 맞게 사용함`,
+        examples: [
+          `우리는 ${word} 활용 문제를 풀며 어휘력을 길렀다.`,
+          `일상 대화에서도 ${word} 활용이 자연스럽게 이루어졌다.`,
+          `글을 쓸 때 ${word} 활용을 하면 표현이 더 분명해진다.`
+        ]
       }
-    ]
+    ],
+    reviewCycle: cycle
   };
 }
 
 export function buildSeedCurriculum() {
   return Object.entries(levelGroups).flatMap(([level, days]) =>
-    days.map((items, index) => ({
-      day: index + 1,
-      grade: "공통",
-      level,
-      dailyCount: 4,
-      hanjaSet: items.map((item, itemIndex) => makeHanja(item, index + 1, itemIndex, level))
-    }))
+    Array.from({ length: targetDaysPerLevel }, (_, index) => {
+      const source = days[index % days.length];
+      return {
+        day: index + 1,
+        grade: "공통",
+        level,
+        dailyCount: 4,
+        hanjaSet: source.map((item, itemIndex) => makeHanja(item, index + 1, itemIndex, level))
+      };
+    })
   );
 }
 

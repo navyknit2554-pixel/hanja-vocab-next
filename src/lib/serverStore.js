@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { dirname, join } from "path";
-import { cloneSeed } from "./data";
+import { buildSeedCurriculum, cloneSeed } from "./data";
 
 const statePath = join(process.cwd(), ".data", "app-state.json");
 const stateKey = "main";
@@ -102,7 +102,7 @@ function safeFileKey(scopeKey) {
 function normalizeState(state, scopeKey = stateKey) {
   const next = { ...seedForScope(scopeKey), ...state };
   next.students = Array.isArray(next.students) ? next.students : [];
-  next.curriculum = Array.isArray(next.curriculum) ? next.curriculum : [];
+  next.curriculum = mergeDefaultCurriculum(Array.isArray(next.curriculum) ? next.curriculum : []);
   next.progress = next.progress || {};
   next.students.forEach((student, index) => {
     student.id ||= `s${index + 1}`;
@@ -117,6 +117,17 @@ function normalizeState(state, scopeKey = stateKey) {
   });
   next.curriculum.sort((a, b) => levelOrder(a.level) - levelOrder(b.level) || Number(a.day) - Number(b.day));
   return next;
+}
+
+function mergeDefaultCurriculum(curriculum) {
+  const byKey = new Map();
+  buildSeedCurriculum().forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
+  curriculum.forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
+  return [...byKey.values()];
+}
+
+function lessonKey(lesson) {
+  return `${String(lesson?.level || "").trim() || "초급"}:${Number(lesson?.day) || 0}`;
 }
 
 function normalizeGradeLabel(grade) {
