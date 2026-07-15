@@ -134,7 +134,7 @@
 
     .layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 18px;
     }
 
@@ -370,8 +370,8 @@
 
     .historyItem {
       display: grid;
-      gap: 10px;
-      padding: 14px;
+      gap: 14px;
+      padding: 18px;
       border: 2px solid #e2edf9;
       border-radius: 16px;
       background: #fff;
@@ -409,6 +409,54 @@
       font-family: Consolas, "Courier New", monospace;
       font-size: 12px;
       word-break: break-all;
+    }
+
+    .historyMetaGrid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .historyEdit {
+      display: none;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 2px dashed #d9e6f7;
+      background: #f8fbff;
+    }
+
+    .historyItem.editing .historyEdit {
+      display: grid;
+    }
+
+    .historyEdit .full {
+      grid-column: 1 / -1;
+    }
+
+    .statusBadge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eaffd9;
+      color: var(--green-dark);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .statusBadge.paused {
+      background: #fff4cf;
+      color: #8a5d00;
+    }
+
+    .statusBadge.expired {
+      background: #ffe8ef;
+      color: #9c1748;
     }
 
     .miniActions {
@@ -480,6 +528,8 @@
         width: 35px;
       }
       .grid,
+      .historyMetaGrid,
+      .historyEdit,
       .metaGrid,
       .secretRow {
         grid-template-columns: 1fr;
@@ -643,6 +693,7 @@
           </div>
           <div class="notice">
             <div>이 파일에서 기록을 삭제해도 이미 발급한 라이선스가 자동 폐기되지는 않습니다.</div>
+            <div>최근 접속 기록은 현재 이 관리 파일에서 수동으로 남기는 기록입니다. 실제 접속 시간을 자동으로 모으려면 서버 저장형 라이선스 관리로 확장해야 합니다.</div>
             <div>나중에 “회수/정지”까지 필요하면 서버에 라이선스 목록을 저장하는 방식으로 확장하면 됩니다.</div>
           </div>
         </section>
@@ -726,6 +777,7 @@
     }
 
     function formatDate(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "-";
       return new Intl.DateTimeFormat("ko-KR", {
         dateStyle: "medium",
         timeStyle: "short",
@@ -806,6 +858,44 @@
       localStorage.setItem(storageKey, JSON.stringify(items));
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function dateInputValue(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return "";
+      return date.toISOString().slice(0, 10);
+    }
+
+    function datetimeInputValue(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return "";
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function parseLocalDatetime(value) {
+      return value ? new Date(value).toISOString() : "";
+    }
+
+    function managedStatusLabel(status, active) {
+      if (!active) return "만료";
+      if (status === "paused") return "보류";
+      return "사용 가능";
+    }
+
+    function managedStatusClass(status, active) {
+      if (!active) return "expired";
+      if (status === "paused") return "paused";
+      return "";
+    }
+
     function escapeCsv(value) {
       const text = String(value ?? "");
       return `"${text.replace(/"/g, '""')}"`;
@@ -816,13 +906,16 @@
         showToast("내보낼 기록이 없습니다.");
         return;
       }
-      const headers = ["강사명", "선생님코드", "라이선스", "만료일", "발급일", "메모"];
+      const headers = ["강사명", "선생님코드", "라이선스", "관리상태", "만료일", "발급일", "최근접속기록", "최근확인일", "메모"];
       const rows = items.map((item) => [
         item.owner,
         item.teacherCode,
         item.licenseKey,
+        item.managedStatus || "active",
         item.expiresAt,
         item.createdAt,
+        item.lastAccessAt || "",
+        item.lastCheckedAt || "",
         item.note
       ]);
       const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
@@ -869,21 +962,51 @@
         const expires = new Date(item.expiresAt);
         const created = new Date(item.createdAt);
         const active = expires.getTime() >= Date.now();
+        const managedStatus = item.managedStatus || "active";
+        const statusLabel = managedStatusLabel(managedStatus, active);
+        const statusClass = managedStatusClass(managedStatus, active);
         const card = document.createElement("article");
         card.className = "historyItem";
         card.innerHTML = `
           <div class="historyTop">
             <div class="historyLabel">
-              <strong>${item.owner || "이름 없는 라이선스"}</strong>
-              <span>${active ? "사용 가능" : "만료됨"} · ${formatDate(expires)} 만료 · ${formatDate(created)} 발급</span>
+              <strong>${escapeHtml(item.owner || "이름 없는 라이선스")}</strong>
+              <span>${escapeHtml(item.note || "메모 없음")}</span>
             </div>
-            <span class="badge">${item.teacherCode}</span>
+            <span class="statusBadge ${statusClass}">${statusLabel}</span>
+          </div>
+          <div class="historyMetaGrid">
+            <div class="meta"><span>선생님 코드</span><strong>${escapeHtml(item.teacherCode)}</strong></div>
+            <div class="meta"><span>발급 날짜</span><strong>${formatDate(created)}</strong></div>
+            <div class="meta"><span>만료 기한</span><strong>${formatDate(expires)}</strong></div>
+            <div class="meta"><span>최근 접속 기록</span><strong>${item.lastAccessAt ? formatDate(new Date(item.lastAccessAt)) : "기록 없음"}</strong></div>
+            <div class="meta"><span>최근 확인</span><strong>${item.lastCheckedAt ? formatDate(new Date(item.lastCheckedAt)) : "기록 없음"}</strong></div>
+            <div class="meta"><span>관리 상태</span><strong>${statusLabel}</strong></div>
+            <div class="meta"><span>라이선스 해시</span><strong>${escapeHtml((item.licenseHash || "").slice(0, 12) || "-")}</strong></div>
+            <div class="meta"><span>저장 위치</span><strong>이 브라우저</strong></div>
           </div>
           <div class="historyKey">${item.licenseKey}</div>
-          ${item.note ? `<p>${item.note}</p>` : ""}
+          <div class="historyEdit">
+            <label>강사명 또는 메모 이름<input data-field="owner" data-index="${index}" value="${escapeHtml(item.owner || "")}" /></label>
+            <label>관리 상태
+              <select data-field="managedStatus" data-index="${index}">
+                <option value="active" ${managedStatus === "active" ? "selected" : ""}>사용 가능</option>
+                <option value="paused" ${managedStatus === "paused" ? "selected" : ""}>보류</option>
+              </select>
+            </label>
+            <label>만료 기한<input type="date" value="${dateInputValue(item.expiresAt)}" disabled title="만료일은 라이선스 키 안에 고정되어 있습니다." /></label>
+            <label>최근 접속 기록<input type="datetime-local" data-field="lastAccessAt" data-index="${index}" value="${datetimeInputValue(item.lastAccessAt)}" /></label>
+            <label class="full">메모<input data-field="note" data-index="${index}" value="${escapeHtml(item.note || "")}" /></label>
+            <div class="miniActions full">
+              <button type="button" data-action="save-edit" data-index="${index}">수정 저장</button>
+              <button class="ghost" type="button" data-action="cancel-edit" data-index="${index}">닫기</button>
+            </div>
+          </div>
           <div class="miniActions">
+            <button class="secondary" type="button" data-action="edit" data-index="${index}">편집</button>
             <button type="button" data-action="copy-key" data-index="${index}">라이선스 복사</button>
             <button class="secondary" type="button" data-action="copy-code" data-index="${index}">선생님 코드 복사</button>
+            <button class="ghost" type="button" data-action="mark-access" data-index="${index}">방금 접속으로 기록</button>
             <button class="danger" type="button" data-action="delete" data-index="${index}">기록 삭제</button>
           </div>
         `;
@@ -979,6 +1102,15 @@
         return;
       }
       const result = await describeLicenseKey(verifyKey.value, secret);
+      if (result.ok) {
+        const items = loadHistory();
+        const index = items.findIndex((item) => normalize(item.licenseKey) === normalize(result.licenseKey));
+        if (index >= 0) {
+          items[index] = { ...items[index], lastCheckedAt: new Date().toISOString() };
+          saveHistory(items);
+          renderHistory();
+        }
+      }
       renderVerify(result);
     });
 
@@ -986,14 +1118,41 @@
       const button = event.target.closest("button[data-action]");
       if (!button) return;
       const items = loadHistory();
-      const item = items[Number(button.dataset.index)];
+      const index = Number(button.dataset.index);
+      const item = items[index];
       if (!item) return;
 
       if (button.dataset.action === "copy-key") copyText(item.licenseKey, "라이선스");
       if (button.dataset.action === "copy-code") copyText(item.teacherCode, "선생님 코드");
+      if (button.dataset.action === "edit") {
+        button.closest(".historyItem")?.classList.add("editing");
+      }
+      if (button.dataset.action === "cancel-edit") {
+        button.closest(".historyItem")?.classList.remove("editing");
+      }
+      if (button.dataset.action === "mark-access") {
+        items[index] = { ...item, lastAccessAt: new Date().toISOString() };
+        saveHistory(items);
+        renderHistory();
+        showToast("최근 접속 기록을 갱신했습니다.");
+      }
+      if (button.dataset.action === "save-edit") {
+        const card = button.closest(".historyItem");
+        const readField = (field) => card?.querySelector(`[data-field="${field}"][data-index="${index}"]`)?.value || "";
+        items[index] = {
+          ...item,
+          owner: normalize(readField("owner")),
+          note: normalize(readField("note")),
+          managedStatus: readField("managedStatus") === "paused" ? "paused" : "active",
+          lastAccessAt: readField("lastAccessAt") ? parseLocalDatetime(readField("lastAccessAt")) : ""
+        };
+        saveHistory(items);
+        renderHistory();
+        showToast("라이선스 기록을 수정했습니다.");
+      }
       if (button.dataset.action === "delete") {
         if (!confirm("이 발급 기록을 삭제할까요? 이미 발급한 라이선스 자체는 폐기되지 않습니다.")) return;
-        items.splice(Number(button.dataset.index), 1);
+        items.splice(index, 1);
         saveHistory(items);
         renderHistory();
         showToast("기록을 삭제했습니다.");
