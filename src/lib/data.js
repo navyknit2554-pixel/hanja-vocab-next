@@ -2060,30 +2060,73 @@ function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, i
     radical: character,
     relation: `${level} ${day}일차 ${index + 1}번 한자입니다. ${role}로 묶어 학습합니다.`,
     origin: `${character}은 '${meaning}'의 뜻을 지닌 한자로, 어휘 속에서 뜻이 어떻게 확장되는지 살펴봅니다.`,
-    vocab: [
-      {
-        hanja,
-        word,
-        meaning: wordMeaning,
-        examples: [
-          `${word}의 뜻을 문장 속에서 익히며 한자 ${character}의 쓰임을 살펴보았다.`,
-          `친구가 ${word}이라는 말을 사용해 자기 생각을 설명했다.`,
-          `선생님은 ${word}의 예를 들어 어휘의 쓰임을 알려 주었다.`
-        ]
-      },
-      {
-        hanja: `${hanja}`,
-        word: `${word} 활용`,
-        meaning: `${wordMeaning}을 실제 상황에 맞게 사용함`,
-        examples: [
-          `우리는 ${word} 활용 문제를 풀며 어휘력을 길렀다.`,
-          `일상 대화에서도 ${word} 활용이 자연스럽게 이루어졌다.`,
-          `글을 쓸 때 ${word} 활용을 하면 표현이 더 분명해진다.`
-        ]
-      }
-    ],
+    vocab: makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }),
     reviewCycle: cycle
   };
+}
+
+function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }) {
+  const templates = [
+    {
+      hanja,
+      word,
+      meaning: wordMeaning,
+      topic: "대표 어휘"
+    },
+    {
+      hanja: `${hanja}理解`,
+      word: `${word} 이해`,
+      meaning: `${wordMeaning}이라는 뜻을 정확히 파악함`,
+      topic: "뜻 파악"
+    },
+    {
+      hanja: `${hanja}活用`,
+      word: `${word} 활용`,
+      meaning: `${wordMeaning}을 실제 상황에 맞게 사용함`,
+      topic: "문장 활용"
+    },
+    {
+      hanja: `${hanja}例示`,
+      word: `${word} 예시`,
+      meaning: `${wordMeaning}을 보여 주는 알맞은 보기`,
+      topic: "예시 확인"
+    },
+    {
+      hanja: `${hanja}區分`,
+      word: `${word} 구분`,
+      meaning: `${wordMeaning}과 비슷한 말의 차이를 가려냄`,
+      topic: "비교 구분"
+    },
+    {
+      hanja: `${hanja}表現`,
+      word: `${word} 표현`,
+      meaning: `${wordMeaning}을 말이나 글로 나타냄`,
+      topic: "표현 확장"
+    },
+    {
+      hanja: `${hanja}關聯`,
+      word: `${word} 관련`,
+      meaning: `${wordMeaning}과 이어지는 내용이나 상황`,
+      topic: "관련 어휘"
+    },
+    {
+      hanja: `${hanja}深化`,
+      word: `${word} 심화`,
+      meaning: `${wordMeaning}을 더 깊고 넓게 익힘`,
+      topic: level === "고급" ? "심화 학습" : "복습 확장"
+    }
+  ];
+
+  return templates.map((item) => ({
+    hanja: item.hanja,
+    word: item.word,
+    meaning: item.meaning,
+    examples: [
+      `${item.word}의 뜻을 문장 속에서 익히며 한자 ${character}(${sound})의 쓰임을 살펴보았다.`,
+      `친구가 ${item.word}이라는 말을 사용해 '${meaning}'의 느낌을 설명했다.`,
+      `선생님은 ${item.word}의 예를 들어 ${item.topic} 방법을 알려 주었다.`
+    ]
+  }));
 }
 
 export function buildSeedCurriculum() {
