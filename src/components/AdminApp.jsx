@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { buildAiPrompt, lessonVocab, parseAiLessons, upsertLesson, validateAppStateShape, validateLesson } from "../lib/curriculum";
+import { buildAiPrompt, findLesson, lessonVocab, parseAiLessons, upsertLesson, validateAppStateShape, validateLesson } from "../lib/curriculum";
+import { buildSeedCurriculum } from "../lib/data";
 import { loadAppState, resetAppState, saveAppState } from "../lib/store";
 import { Mascot } from "./Mascot";
 
@@ -33,6 +34,7 @@ export function AdminApp() {
   const [studentForm, setStudentForm] = useState(defaultStudentForm);
   const [plan, setPlan] = useState({ grade: "초1", level: "초급", startDay: 1, days: 3 });
   const [selectedDay, setSelectedDay] = useState(1);
+  const [selectedLevel, setSelectedLevel] = useState("초급");
   const [hanjaJson, setHanjaJson] = useState("");
   const [dailyCount, setDailyCount] = useState(4);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -59,8 +61,11 @@ export function AdminApp() {
     loadAppState().then(setState).catch((error) => setLoadError(error.message));
   }, [authenticated]);
 
-  const lesson = useMemo(() => state?.curriculum.find((item) => Number(item.day) === Number(selectedDay)) || state?.curriculum[0], [state, selectedDay]);
-  const dayOptions = useMemo(() => state?.curriculum.map((item) => Number(item.day)).sort((a, b) => a - b) || [], [state]);
+  const lesson = useMemo(() => findLesson(state?.curriculum, selectedDay, selectedLevel), [selectedDay, selectedLevel, state]);
+  const dayOptions = useMemo(() => {
+    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
+    return [...new Set(lessons.map((item) => Number(item.day)).filter(Boolean))].sort((a, b) => a - b);
+  }, [selectedLevel, state]);
   const filteredStudents = useMemo(() => {
     if (!state) return [];
     const query = studentSearch.trim().toLowerCase();
@@ -101,6 +106,11 @@ export function AdminApp() {
   useEffect(() => {
     if (!dayOptions.length) return;
     setBulkDay((current) => dayOptions.includes(Number(current)) ? Number(current) : dayOptions[0]);
+  }, [dayOptions]);
+
+  useEffect(() => {
+    if (!dayOptions.length) return;
+    setSelectedDay((current) => dayOptions.includes(Number(current)) ? Number(current) : dayOptions[0]);
   }, [dayOptions]);
 
   async function loginAdmin(event) {
@@ -287,7 +297,7 @@ export function AdminApp() {
       alert("한자 묶음 JSON 형식을 확인해 주세요.");
       return;
     }
-    const nextLesson = { ...lesson, day: Number(selectedDay), dailyCount: Number(dailyCount), hanjaSet };
+    const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
     const errors = validateLesson(nextLesson);
     if (errors.length) {
       alert(errors.slice(0, 8).join("\n"));
@@ -297,7 +307,8 @@ export function AdminApp() {
   }
 
   function addLesson() {
-    const nextDay = Math.max(0, ...state.curriculum.map((item) => Number(item.day) || 0)) + 1;
+    const sameLevelLessons = state.curriculum.filter((item) => String(item.level || "").trim() === plan.level);
+    const nextDay = Math.max(0, ...sameLevelLessons.map((item) => Number(item.day) || 0)) + 1;
     const nextLesson = {
       day: nextDay,
       grade: plan.grade,
@@ -324,6 +335,7 @@ export function AdminApp() {
     };
     persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
     setSelectedDay(nextDay);
+    setSelectedLevel(plan.level);
   }
 
   function deleteLesson() {
@@ -331,9 +343,10 @@ export function AdminApp() {
       alert("최소 1개의 일차는 남아 있어야 합니다.");
       return;
     }
-    if (!window.confirm(`${selectedDay}일차 한자 구성을 삭제할까요?`)) return;
-    const remaining = state.curriculum.filter((item) => Number(item.day) !== Number(selectedDay));
-    const fallbackDay = remaining[0]?.day || 1;
+    if (!window.confirm(`${selectedLevel} ${selectedDay}일차 한자 구성을 삭제할까요?`)) return;
+    const remaining = state.curriculum.filter((item) => !(Number(item.day) === Number(selectedDay) && String(item.level || "").trim() === selectedLevel));
+    const sameLevelRemaining = remaining.filter((item) => String(item.level || "").trim() === selectedLevel);
+    const fallbackDay = sameLevelRemaining[0]?.day || remaining[0]?.day || 1;
     const nextState = structuredClone(state);
     nextState.curriculum = remaining;
     nextState.students.forEach((student) => {
@@ -374,7 +387,17 @@ export function AdminApp() {
     });
     persist(nextState);
     setSelectedDay(lessons[0].day);
+    setSelectedLevel(lessons[0].level || plan.level);
     setAiPreview(lessons.map((item) => `${item.day}일차 적용 완료`).join("\n"));
+  }
+
+  function applySeedCurriculum() {
+    if (!window.confirm("초급/중급/고급 20일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
+    const nextState = structuredClone(state);
+    nextState.curriculum = buildSeedCurriculum();
+    persist(nextState);
+    setSelectedLevel("초급");
+    setSelectedDay(1);
   }
 
   async function resetDemo() {
@@ -572,7 +595,7 @@ export function AdminApp() {
           <label>아이디<input value={studentForm.loginId} onChange={(event) => updateStudentForm({ loginId: event.target.value })} placeholder="이름으로 자동 입력" /></label>
           <label>비밀번호<input value={studentForm.password} onChange={(event) => updateStudentForm({ password: event.target.value })} placeholder="010을 제외한 전화번호로 자동 입력" /></label>
           <Select label="학년" value={studentForm.grade} onChange={(grade) => updateStudentForm({ grade })} options={gradeOptions} />
-          <Select label="난이도" value={studentForm.level} onChange={(level) => setStudentForm({ ...studentForm, level })} options={["초급", "중급", "상급"]} />
+          <Select label="난이도" value={studentForm.level} onChange={(level) => setStudentForm({ ...studentForm, level })} options={["초급", "중급", "고급"]} />
           <button className="btn primary" type="submit">계정 생성</button>
           <div className="buttonRow compact">
             <button className="miniBtn" type="button" onClick={downloadStudentTemplate}>CSV 양식</button>
@@ -651,7 +674,7 @@ export function AdminApp() {
         <section className="panel form">
           <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
           <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={gradeOptions} />
-          <Select label="난이도" value={plan.level} onChange={(level) => setPlan({ ...plan, level })} options={["초급", "중급", "상급"]} />
+          <Select label="난이도" value={plan.level} onChange={(level) => setPlan({ ...plan, level })} options={["초급", "중급", "고급"]} />
           <label>시작 일차<input type="number" min="1" value={plan.startDay} onChange={(event) => setPlan({ ...plan, startDay: Number(event.target.value) })} /></label>
           <label>생성 일수<input type="number" min="1" max="30" value={plan.days} onChange={(event) => setPlan({ ...plan, days: Number(event.target.value) })} /></label>
           <button className="btn blue" type="button" onClick={makePrompt}>AI 프롬프트 만들기</button>
@@ -668,11 +691,13 @@ export function AdminApp() {
           <div className="contentTitle">
             <h2>일차별 한자 관리</h2>
             <div className="contentActions">
+              <button className="miniBtn" type="button" onClick={applySeedCurriculum}>기본 20일차 적용</button>
               <button className="miniBtn" type="button" onClick={addLesson}>새 일차</button>
               <button className="miniBtn danger" type="button" onClick={deleteLesson}>일차 삭제</button>
             </div>
           </div>
-          <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{state.curriculum.map((item) => <option key={item.day} value={item.day}>{item.day}일차</option>)}</select></label>
+          <Select label="난이도" value={selectedLevel} onChange={setSelectedLevel} options={["초급", "중급", "고급"]} />
+          <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
           <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
           <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
           <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
@@ -684,7 +709,7 @@ export function AdminApp() {
 }
 
 function ProgressRow({ state, student }) {
-  const lesson = state.curriculum.find((item) => Number(item.day) === Number(student.day));
+  const lesson = findLesson(state.curriculum, student.day, student.level);
   const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
   const status = getProgressStatus(state, student);
   const totalWords = lessonVocab(lesson).length;

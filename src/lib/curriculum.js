@@ -8,6 +8,17 @@ export function lessonVocab(lesson) {
   return hanjaItems(lesson).flatMap((hanja) => (hanja.vocab || []).map((item) => ({ ...item, parent: hanja })));
 }
 
+export function findLesson(curriculum, day, level) {
+  const lessons = Array.isArray(curriculum) ? curriculum : [];
+  const targetDay = Number(day);
+  const targetLevel = String(level || "").trim();
+  return (
+    lessons.find((item) => Number(item.day) === targetDay && String(item.level || "").trim() === targetLevel) ||
+    lessons.find((item) => Number(item.day) === targetDay) ||
+    lessons[0]
+  );
+}
+
 export function learningCards(lesson) {
   return hanjaItems(lesson).flatMap((hanja) => [
     { type: "hanja", hanja },
@@ -47,10 +58,16 @@ function buildChoices(answer, distractors) {
 
 export function upsertLesson(curriculum, lesson) {
   const next = [...curriculum];
-  const index = next.findIndex((item) => Number(item.day) === Number(lesson.day));
+  const lessonLevel = String(lesson.level || "").trim();
+  const index = next.findIndex((item) => Number(item.day) === Number(lesson.day) && String(item.level || "").trim() === lessonLevel);
   if (index >= 0) next[index] = lesson;
   else next.push(lesson);
-  return next.sort((a, b) => Number(a.day) - Number(b.day));
+  return next.sort((a, b) => levelOrder(a.level) - levelOrder(b.level) || Number(a.day) - Number(b.day));
+}
+
+function levelOrder(level) {
+  const order = { 초급: 1, 중급: 2, 고급: 3 };
+  return order[String(level || "").trim()] || 99;
 }
 
 export function validateHanjaSet(hanjaSet, context = "한자 묶음") {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
+import { findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
 import { Mascot } from "./Mascot";
 
 export function StudentApp() {
@@ -38,7 +38,7 @@ export function StudentApp() {
       .finally(() => setCheckingSession(false));
   }, []);
 
-  const lesson = useMemo(() => curriculum.find((item) => Number(item.day) === Number(student?.day)) || curriculum[0], [curriculum, student]);
+  const lesson = useMemo(() => findLesson(curriculum, student?.day, student?.level), [curriculum, student]);
   const cards = useMemo(() => learningCards(lesson), [lesson]);
   const hanja = useMemo(() => hanjaItems(lesson), [lesson]);
   const vocab = useMemo(() => lessonVocab(lesson), [lesson]);

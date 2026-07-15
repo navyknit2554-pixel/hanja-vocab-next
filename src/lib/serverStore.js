@@ -115,7 +115,7 @@ function normalizeState(state, scopeKey = stateKey) {
     student.day ||= 1;
     next.progress[student.id] ||= { completed: {}, quiz: {} };
   });
-  next.curriculum.sort((a, b) => Number(a.day) - Number(b.day));
+  next.curriculum.sort((a, b) => levelOrder(a.level) - levelOrder(b.level) || Number(a.day) - Number(b.day));
   return next;
 }
 
@@ -124,4 +124,9 @@ function normalizeGradeLabel(grade) {
   const elementaryMatch = value.match(/^([1-6])학년$/);
   if (elementaryMatch) return `초${elementaryMatch[1]}`;
   return ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"].includes(value) ? value : "초1";
+}
+
+function levelOrder(level) {
+  const order = { 초급: 1, 중급: 2, 고급: 3 };
+  return order[String(level || "").trim()] || 99;
 }
