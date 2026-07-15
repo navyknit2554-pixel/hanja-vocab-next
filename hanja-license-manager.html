@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>한자 어휘 라이선스 관리</title>
+  <style>
+    :root {
+      --bg: #f5fbff;
+      --ink: #14213d;
+      --muted: #65738b;
+      --line: #d9e6f7;
+      --surface: #ffffff;
+      --green: #48d300;
+      --green-dark: #32a900;
+      --blue: #1d8cff;
+      --pink: #ff4f91;
+      --yellow: #ffe66d;
+      --shadow: 0 14px 0 rgba(47, 164, 214, 0.12), 0 24px 60px rgba(26, 57, 108, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 28px;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(255, 230, 109, 0.62), transparent 24%),
+        radial-gradient(circle at 90% 12%, rgba(255, 79, 145, 0.22), transparent 26%),
+        radial-gradient(circle at 76% 86%, rgba(29, 140, 255, 0.20), transparent 30%),
+        linear-gradient(145deg, #f8fdff 0%, #eef8ff 48%, #fff7fb 100%);
+    }
+
+    main {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.86);
+      border-radius: 24px;
+      background: rgba(255,255,255,0.82);
+      box-shadow: var(--shadow);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.62;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      max-width: 720px;
+      font-weight: 700;
+    }
+
+    .mascot {
+      position: relative;
+      width: 118px;
+      height: 118px;
+      border-radius: 50%;
+      background: var(--green);
+      border: 8px solid #fff;
+      box-shadow: 0 18px 30px rgba(72, 211, 0, 0.22);
+    }
+
+    .mascot::before,
+    .mascot::after {
+      content: "";
+      position: absolute;
+      top: 40px;
+      width: 15px;
+      height: 24px;
+      border-radius: 999px;
+      background: #182044;
+    }
+
+    .mascot::before { left: 36px; }
+    .mascot::after { right: 36px; }
+
+    .smile {
+      position: absolute;
+      left: 39px;
+      top: 60px;
+      width: 40px;
+      height: 24px;
+      border-bottom: 5px solid #182044;
+      border-radius: 0 0 999px 999px;
+    }
+
+    .spark {
+      position: absolute;
+      right: -4px;
+      top: -4px;
+      min-width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #ffbd00;
+      color: #fff;
+      font-weight: 900;
+      border: 4px solid #fff;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      border: 1px solid rgba(255,255,255,0.9);
+      border-radius: 22px;
+      padding: 20px;
+      background: rgba(255,255,255,0.86);
+      box-shadow: 0 10px 0 rgba(47, 164, 214, 0.08), 0 16px 38px rgba(26, 57, 108, 0.10);
+    }
+
+    .panelHead {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eaffd9;
+      color: var(--green-dark);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: #40506a;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 44px;
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(29, 140, 255, 0.13);
+    }
+
+    .secretRow {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      background: var(--green);
+      color: #102000;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 0 var(--green-dark);
+      transform: translateY(0);
+    }
+
+    button:active {
+      box-shadow: 0 2px 0 var(--green-dark);
+      transform: translateY(4px);
+    }
+
+    .secondary {
+      background: #eef6ff;
+      color: #164a86;
+      box-shadow: 0 6px 0 #c9def5;
+    }
+
+    .danger {
+      background: #ffe8ef;
+      color: #9c1748;
+      box-shadow: 0 6px 0 #ffc0d3;
+    }
+
+    .ghost {
+      background: #fff;
+      color: #31415c;
+      border: 2px solid var(--line);
+      box-shadow: 0 6px 0 #dce8f7;
+    }
+
+    .output {
+      display: none;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 16px;
+      border: 2px solid #baf195;
+      border-radius: 18px;
+      background: #f5ffef;
+    }
+
+    .output.show { display: grid; }
+
+    .keyBox {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 2px solid #d4ebff;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .keyText {
+      word-break: break-all;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 15px;
+      font-weight: 900;
+      color: #13213d;
+    }
+
+    .metaGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .meta {
+      padding: 10px;
+      border-radius: 12px;
+      background: #fff;
+      border: 2px solid #e2edf9;
+    }
+
+    .meta span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 5px;
+    }
+
+    .meta strong {
+      display: block;
+      word-break: break-word;
+      font-size: 14px;
+    }
+
+    .notice {
+      display: grid;
+      gap: 6px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 2px solid #ffe2a3;
+      background: #fff8df;
+      color: #6e4a00;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .notice b { color: #3b2800; }
+
+    .verifyResult {
+      display: none;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 2px solid #d4ebff;
+      background: #f6fbff;
+    }
+
+    .verifyResult.show { display: grid; }
+
+    .verifyResult.bad {
+      border-color: #ffc0d3;
+      background: #fff3f7;
+    }
+
+    .historyTools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .historyList {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .historyItem {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 2px solid #e2edf9;
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .historyTop {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .historyLabel {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .historyLabel strong {
+      overflow-wrap: anywhere;
+      font-size: 15px;
+    }
+
+    .historyLabel span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .historyKey {
+      padding: 10px;
+      border-radius: 12px;
+      background: #f8fbff;
+      color: #26395b;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .miniActions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .miniActions button,
+    .historyTools button,
+    .secretRow button {
+      min-height: 34px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+    }
+
+    .empty {
+      padding: 16px;
+      border: 2px dashed #d9e6f7;
+      border-radius: 16px;
+      color: var(--muted);
+      text-align: center;
+      font-weight: 800;
+      background: rgba(255,255,255,0.62);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 20;
+      transform: translateX(-50%) translateY(120px);
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: #14213d;
+      color: #fff;
+      font-weight: 900;
+      box-shadow: 0 16px 40px rgba(20, 33, 61, 0.24);
+      transition: transform 180ms ease;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 16px; }
+      header,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .mascot {
+        width: 92px;
+        height: 92px;
+      }
+      .mascot::before,
+      .mascot::after {
+        top: 29px;
+        width: 12px;
+        height: 19px;
+      }
+      .mascot::before { left: 27px; }
+      .mascot::after { right: 27px; }
+      .smile {
+        left: 28px;
+        top: 45px;
+        width: 34px;
+      }
+      .grid,
+      .metaGrid,
+      .secretRow {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>한자 어휘 라이선스 관리</h1>
+        <p class="subtitle">다른 강사님에게 줄 관리자 접속용 라이선스를 발급하고, 학생이 입력할 선생님 코드까지 함께 관리합니다.</p>
+      </div>
+      <div class="mascot" aria-label="초록이">
+        <div class="smile"></div>
+        <div class="spark">!</div>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="stack">
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>라이선스 발급</h2>
+              <p>Vercel에 넣은 `HANJA_LICENSE_SECRET`과 같은 값을 사용해야 실제 사이트에서 로그인됩니다.</p>
+            </div>
+            <span class="badge">발급</span>
+          </div>
+
+          <form id="issueForm">
+            <div class="secretRow">
+              <label>
+                HANJA_LICENSE_SECRET
+                <input id="secretInput" type="password" autocomplete="off" placeholder="Vercel에 넣은 HANJA_LICENSE_SECRET 값" required />
+              </label>
+              <button class="ghost" id="toggleSecret" type="button">보기</button>
+            </div>
+
+            <div class="grid">
+              <label>
+                강사님 이름 또는 메모
+                <input id="ownerInput" type="text" placeholder="예: 김민주 선생님" />
+              </label>
+              <label>
+                유효 기간
+                <select id="durationSelect">
+                  <option value="365">1년</option>
+                  <option value="180">6개월</option>
+                  <option value="90">3개월</option>
+                  <option value="30">30일</option>
+                  <option value="custom">직접 날짜 선택</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid">
+              <label>
+                만료일 직접 선택
+                <input id="expiresInput" type="date" disabled />
+              </label>
+              <label>
+                메모
+                <input id="noteInput" type="text" placeholder="예: 중2 어휘반 / 2026 여름" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">라이선스 생성</button>
+              <button class="secondary" id="saveSecret" type="button">이 브라우저에 비밀값 저장</button>
+              <button class="ghost" id="forgetSecret" type="button">비밀값 지우기</button>
+            </div>
+          </form>
+
+          <div class="output" id="outputBox">
+            <div class="keyBox">
+              <h3>생성된 라이선스</h3>
+              <div class="keyText" id="licenseText"></div>
+              <div class="actions">
+                <button id="copyLicense" type="button">라이선스 복사</button>
+                <button class="secondary" id="copyTeacherCode" type="button">선생님 코드 복사</button>
+              </div>
+            </div>
+            <div class="metaGrid">
+              <div class="meta">
+                <span>선생님 코드</span>
+                <strong id="teacherCodeText">-</strong>
+              </div>
+              <div class="meta">
+                <span>만료일</span>
+                <strong id="expiresText">-</strong>
+              </div>
+              <div class="meta">
+                <span>상태</span>
+                <strong id="statusText">-</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>기존 라이선스 확인</h2>
+              <p>발급된 키가 현재 비밀값으로 만든 유효한 키인지 확인합니다.</p>
+            </div>
+            <span class="badge">검증</span>
+          </div>
+
+          <label>
+            확인할 라이선스
+            <textarea id="verifyKey" placeholder="HANJA-..."></textarea>
+          </label>
+          <div class="actions">
+            <button id="verifyButton" type="button">라이선스 확인</button>
+          </div>
+
+          <div class="verifyResult" id="verifyResult"></div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>사용 방법</h2>
+              <p>발급 후 강사님과 학생에게 각각 다른 값을 전달합니다.</p>
+            </div>
+            <span class="badge">안내</span>
+          </div>
+          <div class="notice">
+            <div><b>강사님:</b> `/admin`에서 라이선스 키로 로그인합니다.</div>
+            <div><b>학생:</b> `/student`에서 아이디, 비밀번호와 함께 선생님 코드를 입력합니다.</div>
+            <div><b>나:</b> 기존 `ADMIN_PASSWORD`로 로그인하면 전체 기본 관리자 공간을 사용합니다.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>발급 기록</h2>
+              <p>이 기록은 현재 브라우저에만 저장됩니다.</p>
+            </div>
+            <span class="badge" id="historyCount">0개</span>
+          </div>
+
+          <div class="historyTools">
+            <button class="secondary" id="exportCsv" type="button">CSV 내보내기</button>
+            <button class="danger" id="clearHistory" type="button">기록 전체 삭제</button>
+          </div>
+          <div class="historyList" id="historyList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>주의</h2>
+              <p>라이선스는 서명된 키라서 발급 후에는 키 자체가 권한이 됩니다.</p>
+            </div>
+          </div>
+          <div class="notice">
+            <div>이 파일에서 기록을 삭제해도 이미 발급한 라이선스가 자동 폐기되지는 않습니다.</div>
+            <div>나중에 “회수/정지”까지 필요하면 서버에 라이선스 목록을 저장하는 방식으로 확장하면 됩니다.</div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const storageKey = "hanja-license-manager-v1";
+    const secretStorageKey = "hanja-license-secret-v1";
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const encoder = new TextEncoder();
+
+    const issueForm = document.getElementById("issueForm");
+    const secretInput = document.getElementById("secretInput");
+    const toggleSecret = document.getElementById("toggleSecret");
+    const saveSecret = document.getElementById("saveSecret");
+    const forgetSecret = document.getElementById("forgetSecret");
+    const ownerInput = document.getElementById("ownerInput");
+    const durationSelect = document.getElementById("durationSelect");
+    const expiresInput = document.getElementById("expiresInput");
+    const noteInput = document.getElementById("noteInput");
+    const outputBox = document.getElementById("outputBox");
+    const licenseText = document.getElementById("licenseText");
+    const teacherCodeText = document.getElementById("teacherCodeText");
+    const expiresText = document.getElementById("expiresText");
+    const statusText = document.getElementById("statusText");
+    const copyLicense = document.getElementById("copyLicense");
+    const copyTeacherCode = document.getElementById("copyTeacherCode");
+    const verifyKey = document.getElementById("verifyKey");
+    const verifyButton = document.getElementById("verifyButton");
+    const verifyResult = document.getElementById("verifyResult");
+    const historyList = document.getElementById("historyList");
+    const historyCount = document.getElementById("historyCount");
+    const exportCsv = document.getElementById("exportCsv");
+    const clearHistory = document.getElementById("clearHistory");
+    const toast = document.getElementById("toast");
+
+    let latestIssued = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1600);
+    }
+
+    function normalize(value) {
+      return String(value || "").trim();
+    }
+
+    function base64Url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    async function hmacSha256(secret, payload) {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+      return base64Url(signature);
+    }
+
+    async function sha256Base64Url(text) {
+      const hash = await crypto.subtle.digest("SHA-256", encoder.encode(normalize(text)));
+      return base64Url(hash);
+    }
+
+    function randomNonce() {
+      const bytes = crypto.getRandomValues(new Uint8Array(8));
+      return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+    }
+
+    function formatDate(date) {
+      return new Intl.DateTimeFormat("ko-KR", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Seoul"
+      }).format(date);
+    }
+
+    function endOfKoreanDate(dateValue) {
+      return new Date(`${dateValue}T23:59:59+09:00`);
+    }
+
+    function resolveExpiresAt() {
+      if (durationSelect.value === "custom") {
+        if (!expiresInput.value) throw new Error("만료일을 선택해 주세요.");
+        return endOfKoreanDate(expiresInput.value);
+      }
+      const days = Number(durationSelect.value || "365");
+      return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    }
+
+    async function createLicenseKey(secret, expiresAt) {
+      const exp36 = Math.floor(expiresAt.getTime() / 1000).toString(36).toUpperCase();
+      const nonce = randomNonce();
+      const payload = `${exp36}.${nonce}`;
+      const signature = (await hmacSha256(secret, payload)).slice(0, 22);
+      const licenseKey = `HANJA-${exp36}-${nonce}-${signature}`;
+      const licenseHash = await sha256Base64Url(licenseKey);
+      const teacherCode = `t_${licenseHash.slice(0, 10)}`;
+      return {
+        licenseKey,
+        licenseHash,
+        teacherCode,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    async function describeLicenseKey(licenseKey, secret) {
+      const cleanKey = normalize(licenseKey);
+      const parts = cleanKey.split("-");
+      if (parts.length !== 4 || parts[0] !== "HANJA") {
+        return { ok: false, reason: "HANJA 라이선스 형식이 아닙니다." };
+      }
+
+      const [, exp36, nonce, signature] = parts;
+      const seconds = Number.parseInt(exp36, 36);
+      if (!Number.isFinite(seconds)) {
+        return { ok: false, reason: "만료일 정보를 읽을 수 없습니다." };
+      }
+
+      const expected = (await hmacSha256(secret, `${exp36}.${nonce}`)).slice(0, 22);
+      if (signature !== expected) {
+        return { ok: false, reason: "비밀값이 다르거나 손상된 라이선스입니다." };
+      }
+
+      const expiresAt = new Date(seconds * 1000);
+      const licenseHash = await sha256Base64Url(cleanKey);
+      return {
+        ok: true,
+        active: expiresAt.getTime() >= Date.now(),
+        licenseKey: cleanKey,
+        licenseHash,
+        teacherCode: `t_${licenseHash.slice(0, 10)}`,
+        expiresAt: expiresAt.toISOString()
+      };
+    }
+
+    function loadHistory() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(items) {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+    }
+
+    function escapeCsv(value) {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    function downloadCsv(items) {
+      if (!items.length) {
+        showToast("내보낼 기록이 없습니다.");
+        return;
+      }
+      const headers = ["강사명", "선생님코드", "라이선스", "만료일", "발급일", "메모"];
+      const rows = items.map((item) => [
+        item.owner,
+        item.teacherCode,
+        item.licenseKey,
+        item.expiresAt,
+        item.createdAt,
+        item.note
+      ]);
+      const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `hanja-licenses-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyText(value, label) {
+      const text = normalize(value);
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const input = document.createElement("textarea");
+        input.value = text;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
+      showToast(`${label} 복사 완료`);
+    }
+
+    function renderHistory() {
+      const items = loadHistory();
+      historyCount.textContent = `${items.length}개`;
+      historyList.innerHTML = "";
+
+      if (!items.length) {
+        historyList.innerHTML = '<div class="empty">아직 발급 기록이 없습니다.</div>';
+        return;
+      }
+
+      items.forEach((item, index) => {
+        const expires = new Date(item.expiresAt);
+        const created = new Date(item.createdAt);
+        const active = expires.getTime() >= Date.now();
+        const card = document.createElement("article");
+        card.className = "historyItem";
+        card.innerHTML = `
+          <div class="historyTop">
+            <div class="historyLabel">
+              <strong>${item.owner || "이름 없는 라이선스"}</strong>
+              <span>${active ? "사용 가능" : "만료됨"} · ${formatDate(expires)} 만료 · ${formatDate(created)} 발급</span>
+            </div>
+            <span class="badge">${item.teacherCode}</span>
+          </div>
+          <div class="historyKey">${item.licenseKey}</div>
+          ${item.note ? `<p>${item.note}</p>` : ""}
+          <div class="miniActions">
+            <button type="button" data-action="copy-key" data-index="${index}">라이선스 복사</button>
+            <button class="secondary" type="button" data-action="copy-code" data-index="${index}">선생님 코드 복사</button>
+            <button class="danger" type="button" data-action="delete" data-index="${index}">기록 삭제</button>
+          </div>
+        `;
+        historyList.appendChild(card);
+      });
+    }
+
+    function renderIssued(result) {
+      latestIssued = result;
+      licenseText.textContent = result.licenseKey;
+      teacherCodeText.textContent = result.teacherCode;
+      expiresText.textContent = formatDate(new Date(result.expiresAt));
+      statusText.textContent = "사용 가능";
+      outputBox.classList.add("show");
+    }
+
+    function renderVerify(result) {
+      verifyResult.className = `verifyResult show${result.ok ? "" : " bad"}`;
+      if (!result.ok) {
+        verifyResult.innerHTML = `<h3>확인 실패</h3><p>${result.reason}</p>`;
+        return;
+      }
+      verifyResult.innerHTML = `
+        <h3>${result.active ? "사용 가능한 라이선스입니다." : "만료된 라이선스입니다."}</h3>
+        <div class="metaGrid">
+          <div class="meta"><span>선생님 코드</span><strong>${result.teacherCode}</strong></div>
+          <div class="meta"><span>만료일</span><strong>${formatDate(new Date(result.expiresAt))}</strong></div>
+          <div class="meta"><span>상태</span><strong>${result.active ? "사용 가능" : "만료"}</strong></div>
+        </div>
+      `;
+    }
+
+    durationSelect.addEventListener("change", () => {
+      expiresInput.disabled = durationSelect.value !== "custom";
+      if (durationSelect.value === "custom" && !expiresInput.value) {
+        const date = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        expiresInput.value = date.toISOString().slice(0, 10);
+      }
+    });
+
+    toggleSecret.addEventListener("click", () => {
+      const isPassword = secretInput.type === "password";
+      secretInput.type = isPassword ? "text" : "password";
+      toggleSecret.textContent = isPassword ? "숨기기" : "보기";
+    });
+
+    saveSecret.addEventListener("click", () => {
+      const secret = normalize(secretInput.value);
+      if (!secret) {
+        showToast("비밀값을 먼저 입력해 주세요.");
+        return;
+      }
+      localStorage.setItem(secretStorageKey, secret);
+      showToast("비밀값 저장 완료");
+    });
+
+    forgetSecret.addEventListener("click", () => {
+      localStorage.removeItem(secretStorageKey);
+      secretInput.value = "";
+      showToast("비밀값을 지웠습니다.");
+    });
+
+    issueForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const secret = normalize(secretInput.value);
+        if (!secret) throw new Error("HANJA_LICENSE_SECRET 값을 입력해 주세요.");
+        const expiresAt = resolveExpiresAt();
+        if (Number.isNaN(expiresAt.getTime())) throw new Error("만료일을 확인해 주세요.");
+
+        const result = await createLicenseKey(secret, expiresAt);
+        result.owner = normalize(ownerInput.value);
+        result.note = normalize(noteInput.value);
+        renderIssued(result);
+
+        const items = loadHistory();
+        items.unshift(result);
+        saveHistory(items);
+        renderHistory();
+        showToast("라이선스를 생성했습니다.");
+      } catch (error) {
+        showToast(error.message || "라이선스 생성에 실패했습니다.");
+      }
+    });
+
+    copyLicense.addEventListener("click", () => copyText(latestIssued?.licenseKey, "라이선스"));
+    copyTeacherCode.addEventListener("click", () => copyText(latestIssued?.teacherCode, "선생님 코드"));
+
+    verifyButton.addEventListener("click", async () => {
+      const secret = normalize(secretInput.value);
+      if (!secret) {
+        showToast("먼저 HANJA_LICENSE_SECRET 값을 입력해 주세요.");
+        return;
+      }
+      const result = await describeLicenseKey(verifyKey.value, secret);
+      renderVerify(result);
+    });
+
+    historyList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const items = loadHistory();
+      const item = items[Number(button.dataset.index)];
+      if (!item) return;
+
+      if (button.dataset.action === "copy-key") copyText(item.licenseKey, "라이선스");
+      if (button.dataset.action === "copy-code") copyText(item.teacherCode, "선생님 코드");
+      if (button.dataset.action === "delete") {
+        if (!confirm("이 발급 기록을 삭제할까요? 이미 발급한 라이선스 자체는 폐기되지 않습니다.")) return;
+        items.splice(Number(button.dataset.index), 1);
+        saveHistory(items);
+        renderHistory();
+        showToast("기록을 삭제했습니다.");
+      }
+    });
+
+    exportCsv.addEventListener("click", () => downloadCsv(loadHistory()));
+
+    clearHistory.addEventListener("click", () => {
+      if (!confirm("발급 기록을 모두 삭제할까요? 이미 발급한 라이선스 자체는 폐기되지 않습니다.")) return;
+      saveHistory([]);
+      renderHistory();
+      showToast("발급 기록을 모두 삭제했습니다.");
+    });
+
+    const savedSecret = localStorage.getItem(secretStorageKey);
+    if (savedSecret) secretInput.value = savedSecret;
+    renderHistory();
+  </script>
+</body>
+</html>
