@@ -6,6 +6,21 @@ import { buildAiPrompt, lessonVocab, parseAiLessons, upsertLesson, validateAppSt
 import { loadAppState, resetAppState, saveAppState } from "../lib/store";
 import { Mascot } from "./Mascot";
 
+const gradeOptions = ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
+const defaultStudentForm = { name: "", phone: "", loginId: "", password: "", grade: "초1", level: "초급" };
+
+function passwordFromPhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return digits.startsWith("010") ? digits.slice(3) : digits;
+}
+
+function normalizeGradeLabel(grade) {
+  const value = String(grade || "").trim();
+  const elementaryMatch = value.match(/^([1-6])학년$/);
+  if (elementaryMatch) return `초${elementaryMatch[1]}`;
+  return gradeOptions.includes(value) ? value : "초1";
+}
+
 export function AdminApp() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -15,8 +30,8 @@ export function AdminApp() {
   const [adminError, setAdminError] = useState("");
   const [state, setState] = useState(null);
   const [loadError, setLoadError] = useState("");
-  const [studentForm, setStudentForm] = useState({ name: "", loginId: "", password: "1234", grade: "3학년", level: "초급" });
-  const [plan, setPlan] = useState({ grade: "3학년", level: "초급", startDay: 1, days: 3 });
+  const [studentForm, setStudentForm] = useState(defaultStudentForm);
+  const [plan, setPlan] = useState({ grade: "초1", level: "초급", startDay: 1, days: 3 });
   const [selectedDay, setSelectedDay] = useState(1);
   const [hanjaJson, setHanjaJson] = useState("");
   const [dailyCount, setDailyCount] = useState(4);
@@ -124,22 +139,41 @@ export function AdminApp() {
     }
   }
 
+  function updateStudentForm(patch) {
+    setStudentForm((current) => {
+      const next = { ...current, ...patch };
+      if (Object.prototype.hasOwnProperty.call(patch, "name")) {
+        next.loginId = String(patch.name || "").trim();
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, "phone")) {
+        next.password = passwordFromPhone(patch.phone);
+      }
+      return next;
+    });
+  }
+
   function addStudent(event) {
     event.preventDefault();
     const nextStudent = {
       id: `s${Date.now()}`,
       ...studentForm,
-      loginId: studentForm.loginId.trim(),
-      password: studentForm.password.trim(),
+      phone: String(studentForm.phone || "").replace(/\D/g, ""),
+      loginId: (studentForm.loginId || studentForm.name).trim(),
+      password: (studentForm.password || passwordFromPhone(studentForm.phone)).trim(),
       name: studentForm.name.trim(),
+      grade: normalizeGradeLabel(studentForm.grade),
       day: 1
     };
     if (!nextStudent.name || !nextStudent.loginId || !nextStudent.password) return;
+    if (state.students.some((student) => student.loginId === nextStudent.loginId)) {
+      alert("이미 같은 아이디를 사용하는 학생이 있습니다. 동명이인은 아이디에 반/번호를 붙여 주세요.");
+      return;
+    }
     const nextState = structuredClone(state);
     nextState.students.push(nextStudent);
     nextState.progress[nextStudent.id] = { completed: {}, quiz: {} };
     persist(nextState);
-    setStudentForm({ name: "", loginId: "", password: "1234", grade: "3학년", level: "초급" });
+    setStudentForm(defaultStudentForm);
   }
 
   async function importStudentsCsv(event) {
@@ -168,14 +202,15 @@ export function AdminApp() {
       if (!row.some((cell) => String(cell || "").trim())) return;
       const entry = Object.fromEntries(headers.map((header, headerIndex) => [header, row[headerIndex] || ""]));
       const name = String(entry.name || "").trim();
-      const loginId = String(entry.loginId || "").trim();
-      const password = String(entry.password || "1234").trim();
-      const grade = String(entry.grade || "3학년").trim();
+      const phone = String(entry.phone || "").replace(/\D/g, "");
+      const loginId = String(entry.loginId || name).trim();
+      const password = String(entry.password || passwordFromPhone(phone)).trim();
+      const grade = normalizeGradeLabel(entry.grade || "초1");
       const level = String(entry.level || "초급").trim();
       const day = Number(entry.day || 1);
 
       if (!name || !loginId || !password) {
-        errors.push(`${index + 2}행: 이름, 아이디, 비밀번호가 필요합니다.`);
+        errors.push(`${index + 2}행: 이름과 전화번호 또는 비밀번호가 필요합니다.`);
         return;
       }
       if (loginIds.has(loginId)) {
@@ -184,7 +219,7 @@ export function AdminApp() {
       }
 
       loginIds.add(loginId);
-      nextStudents.push({ id: `s${Date.now()}-${index}`, name, loginId, password, grade, level, day: day || 1 });
+      nextStudents.push({ id: `s${Date.now()}-${index}`, name, phone, loginId, password, grade, level, day: day || 1 });
     });
 
     if (errors.length) {
@@ -427,9 +462,10 @@ export function AdminApp() {
   }
 
   function exportStudentCsv() {
-    const headers = ["이름", "아이디", "비밀번호", "학년", "난이도", "일차"];
+    const headers = ["이름", "전화번호", "아이디", "비밀번호", "학년", "난이도", "일차"];
     const rows = state.students.map((student) => [
       student.name,
+      student.phone || "",
       student.loginId,
       student.password,
       student.grade,
@@ -442,9 +478,9 @@ export function AdminApp() {
 
   function downloadStudentTemplate() {
     const rows = [
-      ["이름", "아이디", "비밀번호", "학년", "난이도", "일차"],
-      ["김민준", "minjun01", "1234", "3학년", "초급", "1"],
-      ["박하린", "harin01", "1234", "3학년", "초급", "1"]
+      ["이름", "전화번호", "아이디", "비밀번호", "학년", "난이도", "일차"],
+      ["김민준", "010-1234-5678", "", "", "초3", "초급", "1"],
+      ["박하린", "010-2345-6789", "", "", "초4", "초급", "1"]
     ];
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
     downloadFile("hanja-student-template.csv", `\uFEFF${csv}`, "text/csv;charset=utf-8");
@@ -531,10 +567,11 @@ export function AdminApp() {
       <section className="adminGrid">
         <form className="panel form" onSubmit={addStudent}>
           <h2>학생 계정</h2>
-          <label>이름<input value={studentForm.name} onChange={(event) => setStudentForm({ ...studentForm, name: event.target.value })} placeholder="예: 이서연" /></label>
-          <label>아이디<input value={studentForm.loginId} onChange={(event) => setStudentForm({ ...studentForm, loginId: event.target.value })} placeholder="예: seoyeon01" /></label>
-          <label>비밀번호<input value={studentForm.password} onChange={(event) => setStudentForm({ ...studentForm, password: event.target.value })} /></label>
-          <Select label="학년" value={studentForm.grade} onChange={(grade) => setStudentForm({ ...studentForm, grade })} options={["3학년", "4학년", "5학년", "6학년"]} />
+          <label>이름<input value={studentForm.name} onChange={(event) => updateStudentForm({ name: event.target.value })} placeholder="예: 이서연" /></label>
+          <label>전화번호<input value={studentForm.phone} onChange={(event) => updateStudentForm({ phone: event.target.value })} placeholder="예: 010-1234-5678" /></label>
+          <label>아이디<input value={studentForm.loginId} onChange={(event) => updateStudentForm({ loginId: event.target.value })} placeholder="이름으로 자동 입력" /></label>
+          <label>비밀번호<input value={studentForm.password} onChange={(event) => updateStudentForm({ password: event.target.value })} placeholder="010을 제외한 전화번호로 자동 입력" /></label>
+          <Select label="학년" value={studentForm.grade} onChange={(grade) => updateStudentForm({ grade })} options={gradeOptions} />
           <Select label="난이도" value={studentForm.level} onChange={(level) => setStudentForm({ ...studentForm, level })} options={["초급", "중급", "상급"]} />
           <button className="btn primary" type="submit">계정 생성</button>
           <div className="buttonRow compact">
@@ -565,7 +602,7 @@ export function AdminApp() {
               <div className="studentRow" key={student.id}>
                 <div>
                   <strong>{student.name}</strong>
-                  <span>{student.loginId} / {student.password} · {student.grade} · {student.level}</span>
+                  <span>{student.loginId} / {student.password} · {student.phone ? `${student.phone} · ` : ""}{student.grade} · {student.level}</span>
                 </div>
                 <label className="dayPicker">현재 일차
                   <select value={student.day} onChange={(event) => updateStudentDay(student.id, event.target.value)}>
@@ -613,7 +650,7 @@ export function AdminApp() {
 
         <section className="panel form">
           <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
-          <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={["3학년", "4학년", "5학년", "6학년"]} />
+          <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={gradeOptions} />
           <Select label="난이도" value={plan.level} onChange={(level) => setPlan({ ...plan, level })} options={["초급", "중급", "상급"]} />
           <label>시작 일차<input type="number" min="1" value={plan.startDay} onChange={(event) => setPlan({ ...plan, startDay: Number(event.target.value) })} /></label>
           <label>생성 일수<input type="number" min="1" max="30" value={plan.days} onChange={(event) => setPlan({ ...plan, days: Number(event.target.value) })} /></label>
@@ -762,6 +799,10 @@ function normalizeHeader(header) {
     "아이디": "loginId",
     id: "loginId",
     loginid: "loginId",
+    "전화번호": "phone",
+    "휴대폰": "phone",
+    phone: "phone",
+    tel: "phone",
     "비밀번호": "password",
     password: "password",
     "학년": "grade",

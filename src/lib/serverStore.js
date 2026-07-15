@@ -108,12 +108,20 @@ function normalizeState(state, scopeKey = stateKey) {
     student.id ||= `s${index + 1}`;
     student.loginId ||= student.id;
     student.password ||= "1234";
+    student.phone ||= "";
     student.name ||= `학생 ${index + 1}`;
-    student.grade ||= "3학년";
+    student.grade = normalizeGradeLabel(student.grade);
     student.level ||= "초급";
     student.day ||= 1;
     next.progress[student.id] ||= { completed: {}, quiz: {} };
   });
   next.curriculum.sort((a, b) => Number(a.day) - Number(b.day));
   return next;
+}
+
+function normalizeGradeLabel(grade) {
+  const value = String(grade || "").trim();
+  const elementaryMatch = value.match(/^([1-6])학년$/);
+  if (elementaryMatch) return `초${elementaryMatch[1]}`;
+  return ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"].includes(value) ? value : "초1";
 }
