@@ -96,9 +96,10 @@ export function StudentApp() {
   function choose(choice) {
     if (!currentQuiz || feedback) return;
     const correct = choice === currentQuiz.answer;
+    const wrongKey = currentQuiz.item?.word || currentQuiz.answer;
     setStats((prev) => {
-      const wrong = correct ? prev.wrong.filter((word) => word !== currentQuiz.item.word) : [...new Set([...prev.wrong, currentQuiz.item.word])];
-      const wrongHistory = correct ? prev.wrongHistory : [...new Set([...prev.wrongHistory, currentQuiz.item.word])];
+      const wrong = correct ? prev.wrong.filter((word) => word !== wrongKey) : [...new Set([...prev.wrong, wrongKey])];
+      const wrongHistory = correct ? prev.wrongHistory : [...new Set([...prev.wrongHistory, wrongKey])];
       const nextStats = { correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1, wrong, wrongHistory };
       latestStatsRef.current = nextStats;
       return nextStats;
@@ -256,12 +257,13 @@ function LearningCard({ card, index, total, onPrev, onNext }) {
 }
 
 function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRetryRound }) {
+  const quizTypeLabel = quiz.type === "blank" ? "문장 빈칸" : quiz.type === "relation" ? "관계 한자" : quiz.type === "homophone" ? "동음이의 한자" : "뜻 고르기";
   return (
     <section className="quizStage">
       <article className={`questionCard ${quiz.type === "blank" ? "blankQuestion" : ""}`}>
         <p className="eyebrow">{isRetryRound ? `오답 다시 풀기 · ${index + 1} / ${total}` : `퀴즈 · ${index + 1} / ${total}`}</p>
         {remainingWrong > 0 && <span className="retryCount">남은 오답 {remainingWrong}개</span>}
-        <span className="quizType">{quiz.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
+        <span className="quizType">{quizTypeLabel}</span>
         <h1>{quiz.prompt}</h1>
         <p className="smallText">{quiz.helper}</p>
         <p>{quiz.sub}</p>

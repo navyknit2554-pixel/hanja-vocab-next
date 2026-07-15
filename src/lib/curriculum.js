@@ -28,7 +28,8 @@ export function learningCards(lesson) {
 
 export function quizItems(lesson) {
   const words = lessonVocab(lesson);
-  return words.map((item, index) => {
+  const structureItems = structureQuizItems(lesson);
+  const vocabItems = words.map((item, index) => {
     const meaningPool = words.filter((candidate) => candidate.word !== item.word).map((candidate) => candidate.meaning);
     const wordPool = words.filter((candidate) => candidate.word !== item.word).map((candidate) => candidate.word);
     const fallback = ["어떤 일을 믿고 맡김", "뜻을 전달하는 표시", "새롭게 만들어 냄", "자세히 읽음"];
@@ -49,11 +50,60 @@ export function quizItems(lesson) {
       choices: buildChoices(answer, distractors)
     };
   });
+  return [...structureItems, ...vocabItems];
 }
 
 function buildChoices(answer, distractors) {
   const uniqueDistractors = [...new Set(distractors.filter((item) => item && item !== answer))];
   return shuffle([answer, ...shuffle(uniqueDistractors).slice(0, 3)]);
+}
+
+function structureQuizItems(lesson) {
+  const hanja = hanjaItems(lesson);
+  if (hanja.length < 4) return [];
+  const [first, second, firstHomophone, secondHomophone] = hanja;
+  const pairLabel = (left, right) => `${left.character}(${left.sound} · ${left.meaning}) - ${right.character}(${right.sound} · ${right.meaning})`;
+  return [
+    {
+      id: `relation-${lesson.day}-${lesson.level}`,
+      type: "relation",
+      answer: pairLabel(first, second),
+      prompt: "서로 의미적으로 관계가 있는 두 한자는?",
+      helper: "오늘의 1번, 2번 한자는 서로 반대되거나 짝을 이루는 관계입니다.",
+      sub: hanja.map((item) => `${item.character}(${item.sound})`).join(" · "),
+      choices: buildChoices(pairLabel(first, second), [
+        pairLabel(first, firstHomophone),
+        pairLabel(second, secondHomophone),
+        pairLabel(firstHomophone, secondHomophone)
+      ])
+    },
+    {
+      id: `homophone-first-${lesson.day}-${lesson.level}`,
+      type: "homophone",
+      answer: pairLabel(first, firstHomophone),
+      prompt: `${first.character}(${first.sound} · ${first.meaning})와 음이 같은 다른 뜻의 한자는?`,
+      helper: "소리는 같지만 뜻이 다른 한자를 고르세요.",
+      sub: `기준 한자: ${first.character}(${first.sound})`,
+      choices: buildChoices(pairLabel(first, firstHomophone), [
+        pairLabel(first, second),
+        pairLabel(first, secondHomophone),
+        pairLabel(second, secondHomophone)
+      ])
+    },
+    {
+      id: `homophone-second-${lesson.day}-${lesson.level}`,
+      type: "homophone",
+      answer: pairLabel(second, secondHomophone),
+      prompt: `${second.character}(${second.sound} · ${second.meaning})와 음이 같은 다른 뜻의 한자는?`,
+      helper: "소리는 같지만 뜻이 다른 한자를 고르세요.",
+      sub: `기준 한자: ${second.character}(${second.sound})`,
+      choices: buildChoices(pairLabel(second, secondHomophone), [
+        pairLabel(first, second),
+        pairLabel(second, firstHomophone),
+        pairLabel(firstHomophone, secondHomophone)
+      ])
+    }
+  ];
 }
 
 export function upsertLesson(curriculum, lesson) {
