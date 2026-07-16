@@ -676,7 +676,7 @@ export function AdminApp() {
       </header>
 
       <section className="adminGrid">
-        <form className="panel form" onSubmit={addStudent}>
+        <form className="panel form studentAccountForm" onSubmit={addStudent}>
           <h2>학생 계정</h2>
           <label>이름<input value={studentForm.name} onChange={(event) => updateStudentForm({ name: event.target.value })} placeholder="예: 이서연" /></label>
           <label>전화번호<input value={studentForm.phone} onChange={(event) => updateStudentForm({ phone: event.target.value })} placeholder="예: 010-1234-5678" /></label>

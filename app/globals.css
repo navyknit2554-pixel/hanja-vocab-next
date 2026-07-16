@@ -684,6 +684,31 @@ textarea {
 .panel.form {
   display: grid;
   gap: 14px;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.studentAccountForm {
+  align-self: start;
+  height: fit-content;
+}
+
+.studentAccountForm label,
+.studentAccountForm .selectWrap,
+.studentAccountForm .buttonRow {
+  min-height: 0;
+  align-content: start;
+}
+
+.studentAccountForm input,
+.studentAccountForm select {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+}
+
+.studentAccountForm .btn {
+  min-height: 48px;
 }
 
 .contentForm {
