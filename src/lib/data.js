@@ -2267,11 +2267,70 @@ function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, lev
 }
 
 function makeDictionaryLikeExamples(word, meaning) {
+  const subjectParticle = particle(word, "이", "가");
+  const objectParticle = particle(word, "을", "를");
+  const topicParticle = particle(word, "은", "는");
+  const connectParticle = particle(word, "과", "와");
+  if (word.endsWith("력")) {
+    return [
+      `전문가는 ${word}${objectParticle} 키우기 위한 방법을 제안했다.`,
+      `이번 계획에서는 ${word}${subjectParticle} 중요한 요소로 꼽혔다.`,
+      `${word}${topicParticle} 꾸준한 노력으로 길러질 수 있다.`
+    ];
+  }
+  if (word.endsWith("성")) {
+    return [
+      `이번 연구에서 ${word}${subjectParticle} 분명히 드러났다.`,
+      `전문가들은 ${word}${objectParticle} 높이는 방법을 논의했다.`,
+      `${word}${topicParticle} 결과를 판단하는 중요한 기준이 된다.`
+    ];
+  }
+  if (word.endsWith("도")) {
+    return [
+      `기계의 ${word}${objectParticle} 일정하게 유지했다.`,
+      `조사 결과 ${word}${subjectParticle} 이전보다 높아졌다.`,
+      `전문가는 ${word}${objectParticle} 낮추기 위한 방법을 제안했다.`
+    ];
+  }
+  if (word.endsWith("화")) {
+    return [
+      `도시의 ${word}${subjectParticle} 빠르게 진행되었다.`,
+      `학교는 ${word}${objectParticle} 막기 위한 계획을 세웠다.`,
+      `${word}${topicParticle} 생활 방식에도 영향을 주었다.`
+    ];
+  }
+  if (word.endsWith("자")) {
+    return [
+      `${word}${subjectParticle} 회의에 참석했다.`,
+      `담당자는 ${word}${objectParticle} 위해 안내문을 준비했다.`,
+      `${word}${topicParticle} 자신의 의견을 차분히 밝혔다.`
+    ];
+  }
+  if (word.endsWith("물")) {
+    return [
+      `창고에는 ${word}${subjectParticle} 가지런히 보관되어 있었다.`,
+      `관리자는 ${word}${objectParticle} 조심스럽게 옮겼다.`,
+      `${word}${topicParticle} 습기에 약해 따로 보관해야 한다.`
+    ];
+  }
+  if (word.endsWith("심")) {
+    return [
+      `그 일 이후 아이에게 ${word}${subjectParticle} 생겼다.`,
+      `선생님은 학생들의 ${word}${objectParticle} 북돋아 주었다.`,
+      `${word}${topicParticle} 어려운 일을 계속하게 하는 힘이 된다.`
+    ];
+  }
   return [
-    `글쓴이는 ${word}의 의미를 구체적인 사례로 설명했다.`,
-    `그 문장에서는 ${word}가 '${meaning}'의 뜻으로 쓰였다.`,
-    `학생들은 ${word}라는 말을 넣어 짧은 문장을 만들었다.`
+    `최근 ${word}에 대한 관심이 높아졌다.`,
+    `신문 기사에서는 ${word} 문제를 자세히 다루었다.`,
+    `지역 사회는 ${word}${connectParticle} 관련한 대책을 마련했다.`
   ];
+}
+
+function particle(word, withBatchim, withoutBatchim) {
+  const last = String(word || "").charCodeAt(String(word || "").length - 1);
+  if (last < 0xac00 || last > 0xd7a3) return withoutBatchim;
+  return (last - 0xac00) % 28 === 0 ? withoutBatchim : withBatchim;
 }
 
 function uniqueVocabTemplates(items) {

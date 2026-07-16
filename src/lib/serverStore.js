@@ -162,6 +162,8 @@ function isValidExample(example, word) {
   if (!text.includes(word)) return false;
   return ![
     "한자",
+    "글쓴이는",
+    "그 문장에서는",
     "쓰임을 살펴보았다",
     "느낌을 설명했다",
     "방법을 알려 주었다",
