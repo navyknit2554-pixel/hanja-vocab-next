@@ -49,27 +49,42 @@ export function createLicenseKey({ expiresAt, nonce, secret } = {}) {
 }
 
 export function describeLicenseKey(licenseKey) {
+  const result = inspectLicenseKey(licenseKey);
+  return result.ok ? result.description : null;
+}
+
+export function inspectLicenseKey(licenseKey) {
   const parts = normalize(licenseKey).split("-");
-  if (parts.length < 4 || parts[0] !== prefix) return null;
+  if (parts.length < 4 || parts[0] !== prefix) {
+    return { ok: false, reason: "format" };
+  }
   const [, exp36, nonce, ...signatureParts] = parts;
   const signature = signatureParts.join("-");
   const payload = `${exp36}.${nonce}`;
   const expected = signLicensePayload(payload).slice(0, 22);
-  if (!safeEqual(signature, expected)) return null;
+  if (!safeEqual(signature, expected)) {
+    return { ok: false, reason: "signature" };
+  }
   const expiresAt = new Date(Number.parseInt(exp36, 36) * 1000);
-  if (Number.isNaN(expiresAt.getTime())) return null;
+  if (Number.isNaN(expiresAt.getTime())) {
+    return { ok: false, reason: "date" };
+  }
   const hash = licenseHash(licenseKey);
-  return {
+  const description = {
     active: expiresAt.getTime() >= Date.now(),
     expiresAt: expiresAt.toISOString(),
     licenseHash: hash,
     teacherCode: teacherCodeFromHash(hash),
     scopeKey: scopeKeyFromHash(hash)
   };
+  if (!description.active) {
+    return { ok: false, reason: "expired", description };
+  }
+  return { ok: true, description };
 }
 
 export function getLicenseAccess(licenseKey) {
-  const description = describeLicenseKey(licenseKey);
-  if (!description || !description.active) return { allowed: false };
-  return { allowed: true, role: "license", ...description };
+  const result = inspectLicenseKey(licenseKey);
+  if (!result.ok) return { allowed: false, reason: result.reason, ...result.description };
+  return { allowed: true, role: "license", ...result.description };
 }

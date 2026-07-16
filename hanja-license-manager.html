@@ -818,11 +818,12 @@
     async function describeLicenseKey(licenseKey, secret) {
       const cleanKey = normalize(licenseKey);
       const parts = cleanKey.split("-");
-      if (parts.length !== 4 || parts[0] !== "HANJA") {
+      if (parts.length < 4 || parts[0] !== "HANJA") {
         return { ok: false, reason: "HANJA 라이선스 형식이 아닙니다." };
       }
 
-      const [, exp36, nonce, signature] = parts;
+      const [, exp36, nonce, ...signatureParts] = parts;
+      const signature = signatureParts.join("-");
       const seconds = Number.parseInt(exp36, 36);
       if (!Number.isFinite(seconds)) {
         return { ok: false, reason: "만료일 정보를 읽을 수 없습니다." };
