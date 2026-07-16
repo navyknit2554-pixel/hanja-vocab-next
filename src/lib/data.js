@@ -2071,6 +2071,89 @@ const levelGroups = {
 };
 const targetDaysPerLevel = 100;
 
+const curatedVocabByCharacter = {
+  高: [
+    ["高度", "고도", "높은 정도나 수준"],
+    ["高級", "고급", "품질이나 수준이 높음"],
+    ["高價", "고가", "값이 비쌈"],
+    ["高溫", "고온", "높은 온도"],
+    ["高速", "고속", "빠른 속도"],
+    ["高熱", "고열", "높은 열"],
+    ["高音", "고음", "높은 소리"],
+    ["最高", "최고", "가장 높음"]
+  ],
+  低: [
+    ["低學年", "저학년", "낮은 학년"],
+    ["低價", "저가", "싼 가격"],
+    ["低溫", "저온", "낮은 온도"],
+    ["低速", "저속", "느린 속도"],
+    ["低音", "저음", "낮은 소리"],
+    ["低地", "저지", "낮은 땅"],
+    ["低壓", "저압", "낮은 압력"],
+    ["最低", "최저", "가장 낮음"]
+  ],
+  古: [
+    ["古代", "고대", "아주 오래된 시대"],
+    ["古典", "고전", "오래되어 가치가 있는 작품"],
+    ["古文", "고문", "옛 글"],
+    ["古書", "고서", "오래된 책"],
+    ["古宮", "고궁", "옛 궁궐"],
+    ["古墳", "고분", "옛 무덤"],
+    ["古語", "고어", "옛말"],
+    ["復古", "복고", "옛 모습으로 돌아감"]
+  ],
+  著: [
+    ["著者", "저자", "글을 지은 사람"],
+    ["著書", "저서", "지은 책"],
+    ["著作", "저작", "글이나 작품을 지음"],
+    ["著名", "저명", "이름이 널리 알려짐"],
+    ["著述", "저술", "글을 지어 씀"],
+    ["共著", "공저", "함께 지음"],
+    ["拙著", "졸저", "자기 책을 낮추어 이르는 말"],
+    ["名著", "명저", "훌륭한 책"]
+  ],
+  大: [
+    ["大門", "대문", "큰 문"],
+    ["大路", "대로", "큰길"],
+    ["大衆", "대중", "많은 사람들"],
+    ["大會", "대회", "큰 모임이나 겨룸"],
+    ["大學", "대학", "높은 교육 기관"],
+    ["大作", "대작", "규모가 큰 작품"],
+    ["最大", "최대", "가장 큼"],
+    ["巨大", "거대", "매우 큼"]
+  ],
+  小: [
+    ["小型", "소형", "작은 형태"],
+    ["小品", "소품", "작은 물건이나 작품"],
+    ["小兒", "소아", "어린아이"],
+    ["小國", "소국", "작은 나라"],
+    ["小食", "소식", "적게 먹음"],
+    ["小說", "소설", "꾸며 쓴 이야기"],
+    ["縮小", "축소", "줄여서 작게 함"],
+    ["微小", "미소", "아주 작음"]
+  ],
+  代: [
+    ["代表", "대표", "대신하여 나타냄"],
+    ["代身", "대신", "다른 것을 갈음함"],
+    ["代金", "대금", "물건값"],
+    ["時代", "시대", "일정한 시기"],
+    ["世代", "세대", "같은 시기에 사는 무리"],
+    ["交代", "교대", "번갈아 바꿈"],
+    ["代理", "대리", "대신 처리함"],
+    ["現代", "현대", "지금의 시대"]
+  ],
+  少: [
+    ["少年", "소년", "나이가 어린 남자아이"],
+    ["少女", "소녀", "나이가 어린 여자아이"],
+    ["少數", "소수", "수가 적음"],
+    ["多少", "다소", "조금 많거나 적음"],
+    ["減少", "감소", "줄어듦"],
+    ["希少", "희소", "매우 드묾"],
+    ["少量", "소량", "적은 양"],
+    ["最少", "최소", "가장 적음"]
+  ]
+};
+
 function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, index, level) {
   const cycle = Math.floor((day - 1) / levelGroups[level].length) + 1;
   const role = index < 2 ? "서로 관계가 있는 중심 한자" : "같은 소리나 비슷한 소리를 통해 비교하는 확장 한자";
@@ -2089,56 +2172,24 @@ function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, i
 }
 
 function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }) {
-  const templates = [
-    {
-      hanja,
-      word,
-      meaning: wordMeaning,
-      topic: "대표 어휘"
-    },
-    {
-      hanja: `${hanja}理解`,
-      word: `${word} 이해`,
-      meaning: `${wordMeaning}이라는 뜻을 정확히 파악함`,
-      topic: "뜻 파악"
-    },
-    {
-      hanja: `${hanja}活用`,
-      word: `${word} 활용`,
-      meaning: `${wordMeaning}을 실제 상황에 맞게 사용함`,
-      topic: "문장 활용"
-    },
-    {
-      hanja: `${hanja}例示`,
-      word: `${word} 예시`,
-      meaning: `${wordMeaning}을 보여 주는 알맞은 보기`,
-      topic: "예시 확인"
-    },
-    {
-      hanja: `${hanja}區分`,
-      word: `${word} 구분`,
-      meaning: `${wordMeaning}과 비슷한 말의 차이를 가려냄`,
-      topic: "비교 구분"
-    },
-    {
-      hanja: `${hanja}表現`,
-      word: `${word} 표현`,
-      meaning: `${wordMeaning}을 말이나 글로 나타냄`,
-      topic: "표현 확장"
-    },
-    {
-      hanja: `${hanja}關聯`,
-      word: `${word} 관련`,
-      meaning: `${wordMeaning}과 이어지는 내용이나 상황`,
-      topic: "관련 어휘"
-    },
-    {
-      hanja: `${hanja}深化`,
-      word: `${word} 심화`,
-      meaning: `${wordMeaning}을 더 깊고 넓게 익힘`,
-      topic: level === "고급" ? "심화 학습" : "복습 확장"
-    }
-  ];
+  const curated = curatedVocabByCharacter[character];
+  const templates = curated ? curated.map(([itemHanja, itemWord, itemMeaning], index) => ({
+    hanja: itemHanja,
+    word: itemWord,
+    meaning: itemMeaning,
+    topic: index === 0 ? "대표 어휘" : "확장 어휘"
+  })) : uniqueVocabTemplates([
+    { hanja, word, meaning: wordMeaning, topic: "대표 어휘" },
+    { hanja: `${character}力`, word: `${sound}력`, meaning: `${meaning}의 힘이나 능력`, topic: "능력 어휘" },
+    { hanja: `${character}性`, word: `${sound}성`, meaning: `${meaning}와 관련된 성질`, topic: "성질 어휘" },
+    { hanja: `${character}度`, word: `${sound}도`, meaning: `${meaning}의 정도나 수준`, topic: "정도 어휘" },
+    { hanja: `${character}化`, word: `${sound}화`, meaning: `${meaning}와 관련된 상태로 바뀜`, topic: "변화 어휘" },
+    { hanja: `${character}者`, word: `${sound}자`, meaning: `${meaning}와 관련된 사람`, topic: "사람 어휘" },
+    { hanja: `${character}物`, word: `${sound}물`, meaning: `${meaning}와 관련된 물건이나 대상`, topic: "대상 어휘" },
+    { hanja: `${character}心`, word: `${sound}심`, meaning: `${meaning}와 관련된 마음`, topic: "마음 어휘" },
+    { hanja: `大${character}`, word: `대${sound}`, meaning: `크거나 중요한 ${meaning}의 상태`, topic: "확장 어휘" },
+    { hanja: `自${character}`, word: `자${sound}`, meaning: `스스로 ${meaning}와 관련됨`, topic: level === "고급" ? "심화 어휘" : "확장 어휘" }
+  ]).slice(0, 8);
 
   return templates.map((item) => ({
     hanja: item.hanja,
@@ -2150,6 +2201,16 @@ function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, lev
       `선생님은 ${item.word}의 예를 들어 ${item.topic} 방법을 알려 주었다.`
     ]
   }));
+}
+
+function uniqueVocabTemplates(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = `${item.hanja}:${item.word}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return item.hanja.length >= 2 && item.hanja.length <= 3 && item.word.length >= 2 && item.word.length <= 3;
+  });
 }
 
 export function buildSeedCurriculum() {

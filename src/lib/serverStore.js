@@ -136,7 +136,23 @@ function isIncompleteLesson(lesson) {
   const dailyCount = Number(lesson?.dailyCount || 4);
   const hanjaSet = Array.isArray(lesson?.hanjaSet) ? lesson.hanjaSet : [];
   if (dailyCount < 4 || hanjaSet.length < dailyCount) return true;
-  return hanjaSet.slice(0, dailyCount).some((hanja) => !Array.isArray(hanja?.vocab) || hanja.vocab.length < 8);
+  return hanjaSet.slice(0, dailyCount).some((hanja) => {
+    if (!Array.isArray(hanja?.vocab) || hanja.vocab.length < 8) return true;
+    return hanja.vocab.some((word) => !isValidVocabWord(word, hanja.character));
+  });
+}
+
+function isValidVocabWord(word, character) {
+  const hanjaWord = String(word?.hanja || "").trim();
+  const plainWord = String(word?.word || "").trim();
+  return (
+    hanjaWord.includes(character) &&
+    hanjaWord.length >= 2 &&
+    hanjaWord.length <= 3 &&
+    plainWord.length >= 2 &&
+    plainWord.length <= 3 &&
+    !/\s/.test(plainWord)
+  );
 }
 
 function normalizeGradeLabel(grade) {

@@ -144,6 +144,14 @@ export function validateHanjaSet(hanjaSet, context = "한자 묶음") {
       ["hanja", "word", "meaning"].forEach((field) => {
         if (!String(word?.[field] || "").trim()) errors.push(`${wordLabel}: ${field} 항목이 필요합니다.`);
       });
+      const hanjaWord = String(word?.hanja || "").trim();
+      const plainWord = String(word?.word || "").trim();
+      if (hanjaWord && (!hanjaWord.includes(hanja.character) || hanjaWord.length < 2 || hanjaWord.length > 3)) {
+        errors.push(`${wordLabel}: 한자어는 학습 한자를 포함한 2~3글자여야 합니다.`);
+      }
+      if (plainWord && (/\s/.test(plainWord) || plainWord.length < 2 || plainWord.length > 3)) {
+        errors.push(`${wordLabel}: 단어는 띄어쓰기 없는 2~3음절이어야 합니다.`);
+      }
 
       const examples = word?.examples || (word?.example ? [word.example] : []);
       if (!Array.isArray(examples) || !examples.some((item) => String(item || "").trim())) {
