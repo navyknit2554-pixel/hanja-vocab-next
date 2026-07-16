@@ -669,6 +669,12 @@ textarea {
   display: grid;
   grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.2fr);
   gap: 18px;
+  align-items: start;
+}
+
+.adminGrid > .panel {
+  align-self: start;
+  min-height: 0;
 }
 
 .panel h2 {
@@ -1061,6 +1067,9 @@ textarea {
 .studentList {
   display: grid;
   gap: 10px;
+  max-height: 540px;
+  overflow: auto;
+  padding-right: 3px;
 }
 
 .studentRow {
@@ -1486,6 +1495,10 @@ td span {
   .statusFilters button {
     flex: 0 0 auto;
     padding: 7px 11px;
+  }
+
+  .studentList {
+    max-height: 430px;
   }
 
   .tableScroller {
