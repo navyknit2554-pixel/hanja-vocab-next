@@ -182,6 +182,24 @@ textarea {
   margin-top: 10px;
 }
 
+.rememberLogin {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 9px !important;
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 900;
+  text-align: center !important;
+}
+
+.rememberLogin input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
 .appFrame, .adminFrame {
   width: min(1180px, calc(100% - 28px));
   margin: 0 auto;

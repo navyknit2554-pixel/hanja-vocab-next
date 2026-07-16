@@ -7,6 +7,7 @@ import { buildSeedCurriculum, levelCriteria } from "../lib/data";
 import { loadAppState, resetAppState, saveAppState } from "../lib/store";
 import { Mascot } from "./Mascot";
 
+const adminLoginStorageKey = "chologihanzi-admin-login";
 const gradeOptions = ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
 const defaultStudentForm = { name: "", phone: "", loginId: "", password: "", grade: "초1", level: "초급" };
 
@@ -27,6 +28,7 @@ export function AdminApp() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminLicenseKey, setAdminLicenseKey] = useState("");
+  const [rememberAdminLogin, setRememberAdminLogin] = useState(true);
   const [adminInfo, setAdminInfo] = useState(null);
   const [adminError, setAdminError] = useState("");
   const [state, setState] = useState(null);
@@ -43,6 +45,19 @@ export function AdminApp() {
   const [studentSearch, setStudentSearch] = useState("");
   const [progressFilter, setProgressFilter] = useState("all");
   const [bulkDay, setBulkDay] = useState(1);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(adminLoginStorageKey) || "null");
+      if (saved) {
+        setAdminLicenseKey(saved.licenseKey || "");
+        setAdminPassword(saved.password || "");
+        setRememberAdminLogin(saved.remember !== false);
+      }
+    } catch {
+      window.localStorage.removeItem(adminLoginStorageKey);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/session", { cache: "no-store" })
@@ -139,8 +154,13 @@ export function AdminApp() {
     }
     setAuthenticated(true);
     setAdminInfo(await response.json().catch(() => null));
-    setAdminPassword("");
-    setAdminLicenseKey("");
+    if (rememberAdminLogin) {
+      window.localStorage.setItem(adminLoginStorageKey, JSON.stringify({ licenseKey: adminLicenseKey, password: adminPassword, remember: true }));
+    } else {
+      window.localStorage.removeItem(adminLoginStorageKey);
+      setAdminPassword("");
+      setAdminLicenseKey("");
+    }
   }
 
   async function logoutAdmin() {
@@ -624,6 +644,7 @@ export function AdminApp() {
             <summary>소유자 비밀번호로 로그인</summary>
             <label>내 관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} placeholder="ADMIN_PASSWORD" /></label>
           </details>
+          <label className="rememberLogin"><input type="checkbox" checked={rememberAdminLogin} onChange={(event) => setRememberAdminLogin(event.target.checked)} />라이선스 키와 비밀번호 저장</label>
           <button className="btn primary" type="submit">관리 화면 열기</button>
           {adminError && <strong className="errorText">{adminError}</strong>}
           <Link className="textLink" href="/student">학생 화면으로</Link>

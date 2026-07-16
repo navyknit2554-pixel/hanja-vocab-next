@@ -5,6 +5,8 @@ import Link from "next/link";
 import { findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
 import { Mascot } from "./Mascot";
 
+const studentLoginStorageKey = "chologihanzi-student-login";
+
 export function StudentApp() {
   const [student, setStudent] = useState(null);
   const [curriculum, setCurriculum] = useState([]);
@@ -12,6 +14,7 @@ export function StudentApp() {
   const [loadError, setLoadError] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   const [login, setLogin] = useState({ teacherCode: "", loginId: "", password: "" });
+  const [rememberLogin, setRememberLogin] = useState(true);
   const [stage, setStage] = useState("learn");
   const [cardIndex, setCardIndex] = useState(0);
   const [quizIndex, setQuizIndex] = useState(0);
@@ -21,6 +24,22 @@ export function StudentApp() {
   const latestStatsRef = useRef(stats);
   const [feedback, setFeedback] = useState(null);
   const [loginError, setLoginError] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(studentLoginStorageKey) || "null");
+      if (saved) {
+        setLogin({
+          teacherCode: saved.teacherCode || "",
+          loginId: saved.loginId || "",
+          password: saved.password || ""
+        });
+        setRememberLogin(saved.remember !== false);
+      }
+    } catch {
+      window.localStorage.removeItem(studentLoginStorageKey);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/student/session", { cache: "no-store" })
@@ -67,7 +86,12 @@ export function StudentApp() {
     setQueue([]);
     setRetry([]);
     resetStats();
-    setLogin({ teacherCode: "", loginId: "", password: "" });
+    if (rememberLogin) {
+      window.localStorage.setItem(studentLoginStorageKey, JSON.stringify({ ...login, remember: true }));
+    } else {
+      window.localStorage.removeItem(studentLoginStorageKey);
+      setLogin({ teacherCode: "", loginId: "", password: "" });
+    }
   }
 
   async function logoutStudent() {
@@ -156,6 +180,7 @@ export function StudentApp() {
           <label>강사 코드<input value={login.teacherCode} onChange={(event) => setLogin({ ...login, teacherCode: event.target.value })} placeholder="마스터 계정 학생은 비워 두세요" /></label>
           <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
           <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
+          <label className="rememberLogin"><input type="checkbox" checked={rememberLogin} onChange={(event) => setRememberLogin(event.target.checked)} />강사 코드, 아이디, 비밀번호 저장</label>
           <button className="btn primary" type="submit">로그인</button>
           {loginError && <strong className="errorText">{loginError}</strong>}
           <Link className="textLink" href="/admin">관리 화면</Link>
