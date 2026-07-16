@@ -849,28 +849,36 @@ export function AdminApp() {
               <button className="miniBtn danger" type="button" onClick={deleteLesson}>일차 삭제</button>
             </div>
           </div>
-          <Select label="난이도" value={selectedLevel} onChange={setSelectedLevel} options={["초급", "중급", "고급"]} />
-          {selectedCriteria && (
-            <div className="criteriaBox">
-              <strong>{selectedLevel} 기준 · {selectedCriteria.target}</strong>
-              <span>{selectedCriteria.focus}</span>
-              <small>{selectedCriteria.textRange}</small>
+          <div className="curriculumWorkspace">
+            <div className="curriculumSidebar">
+              <Select label="난이도" value={selectedLevel} onChange={setSelectedLevel} options={["초급", "중급", "고급"]} />
+              {selectedCriteria && (
+                <div className="criteriaBox">
+                  <strong>{selectedLevel} 기준 · {selectedCriteria.target}</strong>
+                  <span>{selectedCriteria.focus}</span>
+                  <small>{selectedCriteria.textRange}</small>
+                </div>
+              )}
+              <LevelDayOverview lessons={levelLessonSummary} selectedDay={selectedDay} onSelect={setSelectedDay} />
             </div>
-          )}
-          <LevelDayOverview lessons={levelLessonSummary} selectedDay={selectedDay} onSelect={setSelectedDay} />
-          <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
-          <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
-          <HanjaQuickEditor
-            hanjaSet={contentPreview.hanjaSet}
-            dailyCount={dailyCount}
-            onHanjaChange={updateHanjaField}
-            onVocabChange={updateVocabField}
-            onAddVocab={addVocab}
-            onRemoveVocab={removeVocab}
-          />
-          <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
-          <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
-          <button className="btn primary" type="submit">저장</button>
+            <div className="curriculumEditor">
+              <div className="editorControls">
+                <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
+                <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
+              </div>
+              <HanjaQuickEditor
+                hanjaSet={contentPreview.hanjaSet}
+                dailyCount={dailyCount}
+                onHanjaChange={updateHanjaField}
+                onVocabChange={updateVocabField}
+                onAddVocab={addVocab}
+                onRemoveVocab={removeVocab}
+              />
+              <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
+              <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
+              <button className="btn primary" type="submit">저장</button>
+            </div>
+          </div>
         </form>
         )}
       </section>

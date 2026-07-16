@@ -746,6 +746,7 @@ textarea {
   align-content: start;
   gap: 10px;
   grid-auto-rows: max-content;
+  grid-column: 1 / -1;
 }
 
 .contentTitle {
@@ -764,6 +765,31 @@ textarea {
   gap: 7px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.curriculumWorkspace {
+  display: grid;
+  grid-template-columns: minmax(280px, .78fr) minmax(520px, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.curriculumSidebar,
+.curriculumEditor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.curriculumSidebar {
+  position: sticky;
+  top: 12px;
+}
+
+.editorControls {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(130px, .6fr);
+  gap: 10px;
 }
 
 .contentForm label {
@@ -1690,9 +1716,15 @@ td span {
   }
 
   .levelDayList,
+  .curriculumWorkspace,
+  .editorControls,
   .quickHanjaFields,
   .quickVocabRow {
     grid-template-columns: 1fr;
+  }
+
+  .curriculumSidebar {
+    position: static;
   }
 
   .quickEditorHead,
