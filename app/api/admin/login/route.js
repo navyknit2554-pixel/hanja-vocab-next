@@ -9,12 +9,16 @@ export async function POST(request) {
   if (configError) return NextResponse.json({ ok: false, message: configError }, { status: 500 });
 
   const body = await request.json().catch(() => ({}));
+  const password = String(body.password || "").trim();
   const licenseKey = String(body.licenseKey || "").trim();
   const licenseAccess = licenseKey ? getLicenseAccess(licenseKey) : null;
-  const isMaster = isValidAdminPassword(body.password);
+  const isMaster = password ? isValidAdminPassword(password) : false;
+
   if (!isMaster && !licenseAccess?.allowed) {
-    return NextResponse.json({ ok: false, message: "관리자 비밀번호를 확인해 주세요." }, { status: 401 });
+    const message = licenseKey ? "라이선스 키가 올바르지 않거나 만료되었습니다." : "라이선스 키를 입력해 주세요.";
+    return NextResponse.json({ ok: false, message }, { status: 401 });
   }
+
   const response = NextResponse.json({
     ok: true,
     role: isMaster ? "master" : "license",

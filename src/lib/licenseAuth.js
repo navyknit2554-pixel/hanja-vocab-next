@@ -50,8 +50,9 @@ export function createLicenseKey({ expiresAt, nonce, secret } = {}) {
 
 export function describeLicenseKey(licenseKey) {
   const parts = normalize(licenseKey).split("-");
-  if (parts.length !== 4 || parts[0] !== prefix) return null;
-  const [, exp36, nonce, signature] = parts;
+  if (parts.length < 4 || parts[0] !== prefix) return null;
+  const [, exp36, nonce, ...signatureParts] = parts;
+  const signature = signatureParts.join("-");
   const payload = `${exp36}.${nonce}`;
   const expected = signLicensePayload(payload).slice(0, 22);
   if (!safeEqual(signature, expected)) return null;
