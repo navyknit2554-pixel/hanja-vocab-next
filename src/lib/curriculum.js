@@ -135,6 +135,9 @@ export function validateHanjaSet(hanjaSet, context = "한자 묶음") {
       errors.push(`${label}: 어휘가 1개 이상 필요합니다.`);
       return;
     }
+    if (hanja.vocab.length < 8) {
+      errors.push(`${label}: 어휘가 8개 이상 필요합니다.`);
+    }
 
     hanja.vocab.forEach((word, wordIndex) => {
       const wordLabel = `${label}의 ${wordIndex + 1}번째 어휘`;

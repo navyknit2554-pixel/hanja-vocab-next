@@ -2140,7 +2140,7 @@ function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, lev
     }
   ];
 
-  return templates.slice(0, 5).map((item) => ({
+  return templates.map((item) => ({
     hanja: item.hanja,
     word: item.word,
     meaning: item.meaning,

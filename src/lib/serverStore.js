@@ -122,12 +122,21 @@ function normalizeState(state, scopeKey = stateKey) {
 function mergeDefaultCurriculum(curriculum) {
   const byKey = new Map();
   buildSeedCurriculum().forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
-  curriculum.forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
+  curriculum.forEach((lesson) => {
+    if (!isIncompleteLesson(lesson)) byKey.set(lessonKey(lesson), lesson);
+  });
   return [...byKey.values()];
 }
 
 function lessonKey(lesson) {
   return `${String(lesson?.level || "").trim() || "초급"}:${Number(lesson?.day) || 0}`;
+}
+
+function isIncompleteLesson(lesson) {
+  const dailyCount = Number(lesson?.dailyCount || 4);
+  const hanjaSet = Array.isArray(lesson?.hanjaSet) ? lesson.hanjaSet : [];
+  if (dailyCount < 4 || hanjaSet.length < dailyCount) return true;
+  return hanjaSet.slice(0, dailyCount).some((hanja) => !Array.isArray(hanja?.vocab) || hanja.vocab.length < 8);
 }
 
 function normalizeGradeLabel(grade) {
