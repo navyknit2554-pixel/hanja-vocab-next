@@ -8,5 +8,4 @@
   <circle cx="372" cy="116" r="50" fill="#ffd43b"/>
   <path d="M372 86v48" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
   <circle cx="372" cy="153" r="9" fill="#fff"/>
-  <text x="256" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="900" fill="#3aa600">초록이</text>
 </svg>

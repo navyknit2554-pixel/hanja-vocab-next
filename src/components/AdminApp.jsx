@@ -44,6 +44,9 @@ export function AdminApp() {
   const [aiPreview, setAiPreview] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
   const [progressFilter, setProgressFilter] = useState("all");
+  const [studentGradeFilter, setStudentGradeFilter] = useState("all");
+  const [studentDayFilter, setStudentDayFilter] = useState("all");
+  const [adminView, setAdminView] = useState("students");
   const [bulkDay, setBulkDay] = useState(1);
 
   useEffect(() => {
@@ -91,28 +94,36 @@ export function AdminApp() {
       .filter((item) => item.day)
       .sort((a, b) => a.day - b.day);
   }, [selectedLevel, state]);
-  const filteredStudents = useMemo(() => {
+  const baseFilteredStudents = useMemo(() => {
     if (!state) return [];
     const query = studentSearch.trim().toLowerCase();
     return state.students.filter((student) => {
       const matchesText = !query || [student.name, student.loginId, student.grade, student.level, `${student.day}일차`]
         .some((value) => String(value || "").toLowerCase().includes(query));
-      const matchesStatus = progressFilter === "all" || getProgressStatus(state, student).key === progressFilter;
-      return matchesText && matchesStatus;
+      const matchesGrade = studentGradeFilter === "all" || String(student.grade || "") === studentGradeFilter;
+      const matchesDay = studentDayFilter === "all" || Number(student.day) === Number(studentDayFilter);
+      return matchesText && matchesGrade && matchesDay;
     });
-  }, [progressFilter, state, studentSearch]);
+  }, [state, studentDayFilter, studentGradeFilter, studentSearch]);
+  const filteredStudents = useMemo(() => {
+    if (!state) return [];
+    return baseFilteredStudents.filter((student) => progressFilter === "all" || getProgressStatus(state, student).key === progressFilter);
+  }, [baseFilteredStudents, progressFilter, state]);
   const progressSummary = useMemo(() => {
     if (!state) return { completed: 0, retry: 0, active: 0, idle: 0 };
-    return state.students.reduce((summary, student) => {
+    return baseFilteredStudents.reduce((summary, student) => {
       const status = getProgressStatus(state, student).key;
       summary[status] += 1;
       return summary;
     }, { completed: 0, retry: 0, active: 0, idle: 0 });
-  }, [state]);
+  }, [baseFilteredStudents, state]);
   const progressDays = useMemo(() => {
     const days = state?.curriculum.map((lesson) => Number(lesson.day)).filter(Boolean) || [];
     return [...new Set(days)].sort((a, b) => a - b).slice(0, 100);
   }, [state]);
+  const matrixDays = useMemo(() => {
+    return studentDayFilter === "all" ? progressDays : [Number(studentDayFilter)];
+  }, [progressDays, studentDayFilter]);
   const selectedCriteria = levelCriteria[selectedLevel];
   const contentPreview = useMemo(() => {
     if (!lesson) return { hanjaSet: [], errors: [], vocabCount: 0 };
@@ -294,11 +305,11 @@ export function AdminApp() {
   }
 
   function assignFilteredStudentsDay() {
-    if (!filteredStudents.length) return;
+    if (!baseFilteredStudents.length) return;
     const targetDay = Number(bulkDay);
     const label = studentSearch.trim() ? "검색된 학생" : "전체 학생";
-    if (!window.confirm(`${label} ${filteredStudents.length}명을 ${targetDay}일차로 배정할까요?`)) return;
-    const targetIds = new Set(filteredStudents.map((student) => student.id));
+    if (!window.confirm(`${label} ${baseFilteredStudents.length}명을 ${targetDay}일차로 배정할까요?`)) return;
+    const targetIds = new Set(baseFilteredStudents.map((student) => student.id));
     const nextState = structuredClone(state);
     nextState.students.forEach((student) => {
       if (targetIds.has(student.id)) student.day = targetDay;
@@ -675,7 +686,23 @@ export function AdminApp() {
         </div>
       </header>
 
+      <nav className="adminTabs" aria-label="관리 메뉴">
+        {[
+          ["students", "학생 관리"],
+          ["progress", "학생별 학습도"],
+          ["matrix", "일차별 진행도"],
+          ["ai", "AI 생성"],
+          ["curriculum", "한자 관리"]
+        ].map(([key, label]) => (
+          <button className={adminView === key ? "active" : ""} type="button" key={key} onClick={() => setAdminView(key)}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <section className="adminGrid">
+        {adminView === "students" && (
+          <>
         <form className="panel form studentAccountForm" onSubmit={addStudent}>
           <h2>학생 계정</h2>
           <label>이름<input value={studentForm.name} onChange={(event) => updateStudentForm({ name: event.target.value })} placeholder="예: 이서연" /></label>
@@ -695,21 +722,28 @@ export function AdminApp() {
         <section className="panel">
           <div className="studentPanelHead">
             <h2>학생 목록</h2>
-            <span>{filteredStudents.length}명 표시</span>
+            <span>{baseFilteredStudents.length}명 표시</span>
           </div>
           <label className="searchBox">학생 검색
             <input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="이름, 아이디, 학년, 난이도" />
           </label>
+          <StudentFilters
+            gradeFilter={studentGradeFilter}
+            dayFilter={studentDayFilter}
+            onGradeChange={setStudentGradeFilter}
+            onDayChange={setStudentDayFilter}
+            dayOptions={progressDays}
+          />
           <div className="bulkAssign">
             <label>검색 결과 일괄 배정
               <select value={bulkDay} onChange={(event) => setBulkDay(Number(event.target.value))}>
                 {dayOptions.map((day) => <option key={day} value={day}>{day}일차</option>)}
               </select>
             </label>
-            <button className="miniBtn" type="button" onClick={assignFilteredStudentsDay} disabled={!filteredStudents.length}>배정</button>
+            <button className="miniBtn" type="button" onClick={assignFilteredStudentsDay} disabled={!baseFilteredStudents.length}>배정</button>
           </div>
           <div className="studentList">
-            {filteredStudents.map((student) => (
+            {baseFilteredStudents.map((student) => (
               <div className="studentRow" key={student.id}>
                 <div>
                   <strong>{student.name}</strong>
@@ -726,14 +760,24 @@ export function AdminApp() {
                 </div>
               </div>
             ))}
-            {!filteredStudents.length && <p className="emptyText">검색 결과가 없습니다.</p>}
+            {!baseFilteredStudents.length && <p className="emptyText">검색 결과가 없습니다.</p>}
           </div>
         </section>
+          </>
+        )}
 
+        {adminView === "progress" && (
         <section className="panel wide">
           <h2>학생별 학습도</h2>
+          <StudentFilters
+            gradeFilter={studentGradeFilter}
+            dayFilter={studentDayFilter}
+            onGradeChange={setStudentGradeFilter}
+            onDayChange={setStudentDayFilter}
+            dayOptions={progressDays}
+          />
           <div className="summaryStrip">
-            <span><b>{state.students.length}</b>전체</span>
+            <span><b>{baseFilteredStudents.length}</b>전체</span>
             <span className="complete"><b>{progressSummary.completed}</b>완성</span>
             <span className="retry"><b>{progressSummary.retry}</b>복습 필요</span>
             <span className="active"><b>{progressSummary.active}</b>진행 중</span>
@@ -741,7 +785,7 @@ export function AdminApp() {
           </div>
           <div className="statusFilters">
             {[
-              ["all", "전체", state.students.length],
+              ["all", "전체", baseFilteredStudents.length],
               ["completed", "완성", progressSummary.completed],
               ["retry", "복습 필요", progressSummary.retry],
               ["active", "진행 중", progressSummary.active],
@@ -752,7 +796,7 @@ export function AdminApp() {
               </button>
             ))}
           </div>
-          {(studentSearch.trim() || progressFilter !== "all") && <p className="filterNote">현재 조건에 맞는 학생 {filteredStudents.length}명만 표시 중입니다.</p>}
+          {(studentSearch.trim() || studentGradeFilter !== "all" || studentDayFilter !== "all" || progressFilter !== "all") && <p className="filterNote">현재 조건에 맞는 학생 {filteredStudents.length}명만 표시 중입니다.</p>}
           <div className="tableScroller">
           <table className="progressTable">
             <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
@@ -760,13 +804,24 @@ export function AdminApp() {
           </table>
           </div>
         </section>
+        )}
 
+        {adminView === "matrix" && (
         <section className="panel wide">
           <h2>일차별 학습 진행도</h2>
           <p className="filterNote">학생별로 각 일차의 완료, 복습 필요, 진행 중, 잠금 상태를 한눈에 확인합니다.</p>
-          <ProgressMatrix state={state} students={filteredStudents} days={progressDays} />
+          <StudentFilters
+            gradeFilter={studentGradeFilter}
+            dayFilter={studentDayFilter}
+            onGradeChange={setStudentGradeFilter}
+            onDayChange={setStudentDayFilter}
+            dayOptions={progressDays}
+          />
+          <ProgressMatrix state={state} students={filteredStudents} days={matrixDays} />
         </section>
+        )}
 
+        {adminView === "ai" && (
         <section className="panel form">
           <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
           <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={gradeOptions} />
@@ -782,7 +837,9 @@ export function AdminApp() {
           </div>
           {aiPreview && <pre className="previewBox">{aiPreview}</pre>}
         </section>
+        )}
 
+        {adminView === "curriculum" && (
         <form className="panel form contentForm" onSubmit={saveLesson}>
           <div className="contentTitle">
             <h2>일차별 한자 관리</h2>
@@ -815,6 +872,7 @@ export function AdminApp() {
           <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
           <button className="btn primary" type="submit">저장</button>
         </form>
+        )}
       </section>
     </main>
   );
@@ -843,6 +901,25 @@ function ProgressRow({ state, student }) {
       <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
       <td data-label="오답/복습">{wrongText}</td>
     </tr>
+  );
+}
+
+function StudentFilters({ gradeFilter, dayFilter, onGradeChange, onDayChange, dayOptions }) {
+  return (
+    <div className="advancedFilters">
+      <label>학년
+        <select value={gradeFilter} onChange={(event) => onGradeChange(event.target.value)}>
+          <option value="all">전체 학년</option>
+          {gradeOptions.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+        </select>
+      </label>
+      <label>일차
+        <select value={dayFilter} onChange={(event) => onDayChange(event.target.value)}>
+          <option value="all">전체 일차</option>
+          {dayOptions.map((day) => <option key={day} value={day}>{day}일차</option>)}
+        </select>
+      </label>
+    </div>
   );
 }
 

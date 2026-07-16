@@ -672,6 +672,36 @@ textarea {
   align-items: start;
 }
 
+.adminTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: min(1180px, 100%);
+  margin: 0 auto 16px;
+  padding: 8px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 4px 0 #dcecf7;
+}
+
+.adminTabs button {
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: #eef6ff;
+  color: var(--muted);
+  padding: 9px 13px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminTabs button.active {
+  border-color: #b6ec99;
+  background: #58cc02;
+  color: #fff;
+  box-shadow: 0 3px 0 var(--green-dark);
+}
+
 .adminGrid > .panel {
   align-self: start;
   min-height: 0;
@@ -1077,6 +1107,31 @@ textarea {
   height: 36px;
 }
 
+.advancedFilters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 2px solid #dff1ff;
+  border-radius: 14px;
+  background: #f8fcff;
+}
+
+.advancedFilters label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 900;
+}
+
+.advancedFilters select {
+  height: 40px;
+  border-radius: 11px;
+  padding: 7px 10px;
+}
+
 .filterNote {
   margin: -4px 0 14px;
 }
@@ -1338,7 +1393,7 @@ td span {
 .progressMatrix .stickyStudent {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 4;
   min-width: 150px;
   background: #fff;
   text-align: left;
@@ -1346,6 +1401,7 @@ td span {
 }
 
 .progressMatrix thead .stickyStudent {
+  z-index: 6;
   background: #f6fbff;
 }
 
@@ -1480,6 +1536,19 @@ td span {
     grid-template-columns: 1fr;
   }
 
+  .adminTabs {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adminTabs button {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+  }
+
   .lessonOverview {
     grid-template-columns: 1fr;
   }
@@ -1524,6 +1593,12 @@ td span {
 
   .studentList {
     max-height: 430px;
+  }
+
+  .advancedFilters {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
   }
 
   .tableScroller {
