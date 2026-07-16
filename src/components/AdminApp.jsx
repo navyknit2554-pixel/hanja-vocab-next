@@ -16,6 +16,22 @@ function passwordFromPhone(phone) {
   return digits.startsWith("010") ? digits.slice(3) : digits;
 }
 
+function makeParentToken() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
+function parentLinkForStudent(student, adminInfo) {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const teacherCode = adminInfo?.teacherCode || "master";
+  const params = new URLSearchParams({
+    teacher: teacherCode,
+    student: student.id,
+    token: student.parentToken || ""
+  });
+  return `${origin}/parent?${params.toString()}`;
+}
+
 function normalizeGradeLabel(grade) {
   const value = String(grade || "").trim();
   const elementaryMatch = value.match(/^([1-6])학년$/);
@@ -78,6 +94,15 @@ export function AdminApp() {
     if (!authenticated) return;
     loadAppState().then(setState).catch((error) => setLoadError(error.message));
   }, [authenticated]);
+
+  useEffect(() => {
+    if (!state?.students?.some((student) => !student.parentToken)) return;
+    const nextState = structuredClone(state);
+    nextState.students.forEach((student) => {
+      student.parentToken ||= makeParentToken();
+    });
+    persist(nextState);
+  }, [state]);
 
   const lesson = useMemo(() => findLesson(state?.curriculum, selectedDay, selectedLevel), [selectedDay, selectedLevel, state]);
   const dayOptions = useMemo(() => {
@@ -218,7 +243,8 @@ export function AdminApp() {
       password: (studentForm.password || passwordFromPhone(studentForm.phone)).trim(),
       name: studentForm.name.trim(),
       grade: normalizeGradeLabel(studentForm.grade),
-      day: 1
+      day: 1,
+      parentToken: makeParentToken()
     };
     if (!nextStudent.name || !nextStudent.loginId || !nextStudent.password) return;
     if (state.students.some((student) => student.loginId === nextStudent.loginId)) {
@@ -275,7 +301,7 @@ export function AdminApp() {
       }
 
       loginIds.add(loginId);
-      nextStudents.push({ id: `s${Date.now()}-${index}`, name, phone, loginId, password, grade, level, day: day || 1 });
+      nextStudents.push({ id: `s${Date.now()}-${index}`, name, phone, loginId, password, grade, level, day: day || 1, parentToken: makeParentToken() });
     });
 
     if (errors.length) {
@@ -315,6 +341,25 @@ export function AdminApp() {
       if (targetIds.has(student.id)) student.day = targetDay;
     });
     persist(nextState);
+  }
+
+  async function copyParentLink(student) {
+    let targetStudent = student;
+    if (!targetStudent.parentToken) {
+      const nextState = structuredClone(state);
+      const nextStudent = nextState.students.find((item) => item.id === student.id);
+      if (!nextStudent) return;
+      nextStudent.parentToken = makeParentToken();
+      targetStudent = nextStudent;
+      await persist(nextState);
+    }
+    const link = parentLinkForStudent(targetStudent, adminInfo);
+    try {
+      await navigator.clipboard.writeText(link);
+      alert(`${student.name} 학생의 학부모 확인 링크를 복사했습니다.`);
+    } catch {
+      window.prompt("학부모님께 보낼 링크입니다.", link);
+    }
   }
 
   function resetStudentProgress(studentId) {
@@ -755,6 +800,7 @@ export function AdminApp() {
                   </select>
                 </label>
                 <div className="studentActions">
+                  <button className="miniBtn" type="button" onClick={() => copyParentLink(student)}>학부모 링크</button>
                   <button className="miniBtn" type="button" onClick={() => resetStudentProgress(student.id)}>진도 초기화</button>
                   <button className="miniBtn danger" type="button" onClick={() => deleteStudent(student.id)}>삭제</button>
                 </div>

@@ -108,6 +108,7 @@ function normalizeState(state, scopeKey = stateKey) {
     student.id ||= `s${index + 1}`;
     student.loginId ||= student.id;
     student.password ||= "1234";
+    student.parentToken ||= "";
     student.phone ||= "";
     student.name ||= `학생 ${index + 1}`;
     student.grade = normalizeGradeLabel(student.grade);

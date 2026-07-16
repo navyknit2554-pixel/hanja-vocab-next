@@ -231,6 +231,14 @@ textarea {
   padding: 20px 0 60px;
 }
 
+.parentFrame {
+  display: grid;
+  gap: 18px;
+  width: min(920px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 20px 0 60px;
+}
+
 .topBar {
   display: flex;
   align-items: center;
@@ -709,6 +717,114 @@ textarea {
 
 .panel h2 {
   margin-top: 0;
+}
+
+.parentHero,
+.parentPanel {
+  border: 2px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.parentHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.parentHero h1 {
+  margin: 8px 0 10px;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+}
+
+.parentHero p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.parentSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parentSummary article {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  align-content: center;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: 0 5px 0 #dcecf7;
+}
+
+.parentSummary b {
+  color: var(--ink);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.parentSummary span,
+.parentCurrent span,
+.parentHistory p {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.parentPanel h2 {
+  margin: 0 0 14px;
+}
+
+.parentCurrent {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 2px solid #dff1ff;
+  border-radius: 16px;
+  background: #f8fcff;
+}
+
+.parentCurrent div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.parentCurrent span {
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 11px;
+}
+
+.parentHistory {
+  display: grid;
+  gap: 10px;
+}
+
+.parentHistory article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.parentHistory article > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.parentHistory p {
+  margin: 0;
 }
 
 .panel.form {
@@ -1577,6 +1693,15 @@ td span {
 
   .lessonOverview {
     grid-template-columns: 1fr;
+  }
+
+  .parentHero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .parentSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lessonStats {
