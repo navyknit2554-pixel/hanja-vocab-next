@@ -1215,6 +1215,46 @@ table {
   border-radius: 16px;
 }
 
+.tableScroller {
+  width: 100%;
+  overflow-x: auto;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.progressTable {
+  min-width: 760px;
+  table-layout: auto;
+}
+
+.progressTable th,
+.progressTable td {
+  vertical-align: middle;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.progressTable th:first-child,
+.progressTable td:first-child {
+  min-width: 180px;
+}
+
+.progressTable th:nth-child(2),
+.progressTable td:nth-child(2) {
+  min-width: 120px;
+}
+
+.progressTable th:nth-child(3),
+.progressTable td:nth-child(3) {
+  min-width: 170px;
+}
+
+.progressTable th:nth-child(4),
+.progressTable td:nth-child(4) {
+  min-width: 170px;
+}
+
 th, td {
   text-align: left;
   padding: 14px;
@@ -1420,6 +1460,120 @@ td span {
 
   .summaryStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .summaryStrip span {
+    min-height: 58px;
+    padding: 9px 11px;
+    border-radius: 15px;
+  }
+
+  .summaryStrip b {
+    font-size: 1.35rem;
+  }
+
+  .statusFilters {
+    flex-wrap: nowrap;
+    margin-right: -18px;
+    padding-right: 18px;
+    padding-bottom: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .statusFilters button {
+    flex: 0 0 auto;
+    padding: 7px 11px;
+  }
+
+  .tableScroller {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .progressTable,
+  .progressTable tbody,
+  .progressTable tr,
+  .progressTable td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .progressTable {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .progressTable thead {
+    display: none;
+  }
+
+  .progressTable tr {
+    margin-bottom: 12px;
+    padding: 14px;
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 5px 0 #dcecf7;
+  }
+
+  .progressTable td {
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border: 0;
+    font-size: .96rem;
+  }
+
+  .progressTable td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 1000;
+  }
+
+  .progressTable td:first-child {
+    display: block;
+    padding-top: 0;
+  }
+
+  .progressTable td:first-child::before {
+    display: none;
+  }
+
+  .progressTable td:last-child {
+    padding-bottom: 0;
+  }
+
+  .progressTable td span {
+    overflow-wrap: anywhere;
+  }
+
+  .progressMatrix {
+    min-width: 720px;
+  }
+
+  .progressMatrix .stickyStudent {
+    min-width: 108px;
+  }
+
+  .progressMatrix th,
+  .progressMatrix td {
+    min-width: 34px;
+    padding: 7px 5px;
+  }
+
+  .matrixCell {
+    width: 24px;
+    height: 24px;
+    font-size: .68rem;
   }
 
   .levelDayList,

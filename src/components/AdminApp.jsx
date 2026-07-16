@@ -753,10 +753,12 @@ export function AdminApp() {
             ))}
           </div>
           {(studentSearch.trim() || progressFilter !== "all") && <p className="filterNote">현재 조건에 맞는 학생 {filteredStudents.length}명만 표시 중입니다.</p>}
-          <table>
+          <div className="tableScroller">
+          <table className="progressTable">
             <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
             <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} />)}</tbody>
           </table>
+          </div>
         </section>
 
         <section className="panel wide">
@@ -832,14 +834,14 @@ function ProgressRow({ state, student }) {
 
   return (
     <tr>
-      <td><strong>{student.name}</strong><br /><span>{student.loginId} / {student.password}</span></td>
-      <td><b>{student.day}일차</b><br /><span>{student.grade} · {student.level}</span></td>
-      <td>
+      <td data-label="학생"><strong>{student.name}</strong><br /><span>{student.loginId} / {student.password}</span></td>
+      <td data-label="배정"><b>{student.day}일차</b><br /><span>{student.grade} · {student.level}</span></td>
+      <td data-label="상태">
         <span className={`statusPill ${status.key}`}>{status.label}</span>
         <div className="miniProgress"><i style={{ width: `${progress}%` }} /></div>
       </td>
-      <td><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
-      <td>{wrongText}</td>
+      <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
+      <td data-label="오답/복습">{wrongText}</td>
     </tr>
   );
 }
