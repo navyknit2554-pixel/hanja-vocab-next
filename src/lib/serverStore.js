@@ -145,14 +145,28 @@ function isIncompleteLesson(lesson) {
 function isValidVocabWord(word, character) {
   const hanjaWord = String(word?.hanja || "").trim();
   const plainWord = String(word?.word || "").trim();
+  const examples = Array.isArray(word?.examples) ? word.examples : [];
   return (
     hanjaWord.includes(character) &&
     hanjaWord.length >= 2 &&
     hanjaWord.length <= 3 &&
     plainWord.length >= 2 &&
     plainWord.length <= 3 &&
-    !/\s/.test(plainWord)
+    !/\s/.test(plainWord) &&
+    examples.some((example) => isValidExample(example, plainWord))
   );
+}
+
+function isValidExample(example, word) {
+  const text = String(example || "").trim();
+  if (!text.includes(word)) return false;
+  return ![
+    "한자",
+    "쓰임을 살펴보았다",
+    "느낌을 설명했다",
+    "방법을 알려 주었다",
+    "짧은 문장을 만들었다"
+  ].some((phrase) => text.includes(phrase));
 }
 
 function normalizeGradeLabel(grade) {
