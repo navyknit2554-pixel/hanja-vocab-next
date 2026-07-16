@@ -22,6 +22,7 @@ export async function PUT(request) {
   state.progress[student.id] ||= { completed: {}, quiz: {} };
   const previousRecord = state.progress[student.id].quiz?.[lessonDay] || {};
   state.progress[student.id].completed[lessonDay] = mastered;
+  state.progress[student.id].unlocks ||= {};
   state.progress[student.id].quiz[lessonDay] = {
     correct: Number(body.stats.correct || 0),
     total: Number(body.stats.total || 0),
@@ -31,7 +32,27 @@ export async function PUT(request) {
     mastered,
     finishedAt: new Date().toISOString()
   };
+  if (mastered) {
+    const nextDay = lessonDay + 1;
+    const hasNextLesson = state.curriculum.some((lesson) => Number(lesson.day) === nextDay && String(lesson.level || "").trim() === String(student.level || "").trim());
+    if (hasNextLesson) {
+      state.progress[student.id].unlocks[nextDay] ||= nextKoreanMidnightIso();
+      if (Number(student.day || 1) <= lessonDay) student.day = nextDay;
+    }
+  }
 
   await setState(state, session.scopeKey);
-  return NextResponse.json({ ok: true, progress: state.progress[student.id] });
+  return NextResponse.json({ ok: true, student: withoutPassword(student), progress: state.progress[student.id] });
+}
+
+function nextKoreanMidnightIso() {
+  const now = new Date();
+  const koreanNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const nextMidnightUtcMs = Date.UTC(koreanNow.getUTCFullYear(), koreanNow.getUTCMonth(), koreanNow.getUTCDate() + 1, -9, 0, 0, 0);
+  return new Date(nextMidnightUtcMs).toISOString();
+}
+
+function withoutPassword(student) {
+  const { password, ...safeStudent } = student;
+  return safeStudent;
 }

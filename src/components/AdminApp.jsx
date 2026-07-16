@@ -109,6 +109,10 @@ export function AdminApp() {
       return summary;
     }, { completed: 0, retry: 0, active: 0, idle: 0 });
   }, [state]);
+  const progressDays = useMemo(() => {
+    const days = state?.curriculum.map((lesson) => Number(lesson.day)).filter(Boolean) || [];
+    return [...new Set(days)].sort((a, b) => a - b).slice(0, 100);
+  }, [state]);
   const selectedCriteria = levelCriteria[selectedLevel];
   const contentPreview = useMemo(() => {
     if (!lesson) return { hanjaSet: [], errors: [], vocabCount: 0 };
@@ -755,6 +759,12 @@ export function AdminApp() {
           </table>
         </section>
 
+        <section className="panel wide">
+          <h2>일차별 학습 진행도</h2>
+          <p className="filterNote">학생별로 각 일차의 완료, 복습 필요, 진행 중, 잠금 상태를 한눈에 확인합니다.</p>
+          <ProgressMatrix state={state} students={filteredStudents} days={progressDays} />
+        </section>
+
         <section className="panel form">
           <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
           <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={gradeOptions} />
@@ -832,6 +842,55 @@ function ProgressRow({ state, student }) {
       <td>{wrongText}</td>
     </tr>
   );
+}
+
+function ProgressMatrix({ state, students, days }) {
+  return (
+    <div className="progressMatrixWrap">
+      <table className="progressMatrix">
+        <thead>
+          <tr>
+            <th className="stickyStudent">학생</th>
+            {days.map((day) => <th key={day}>{day}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((student) => (
+            <tr key={student.id}>
+              <td className="stickyStudent">
+                <strong>{student.name}</strong>
+                <span>{student.grade} · {student.level}</span>
+              </td>
+              {days.map((day) => {
+                const status = getDayProgressStatus(state, student, day);
+                return (
+                  <td key={`${student.id}-${day}`}>
+                    <span className={`matrixCell ${status.key}`} title={status.title}>{status.label}</span>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!students.length && <p className="emptyText">표시할 학생이 없습니다.</p>}
+    </div>
+  );
+}
+
+function getDayProgressStatus(state, student, day) {
+  const record = state.progress[student.id]?.quiz?.[day];
+  const completed = state.progress[student.id]?.completed?.[day] && !record?.wrong?.length;
+  const unlockAt = state.progress[student.id]?.unlocks?.[day];
+  if (completed) return { key: "completed", label: "완", title: `${day}일차 학습 완성` };
+  if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요: ${record.wrong.join(", ")}` };
+  if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}` };
+  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
+    const unlockText = new Date(unlockAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };
+  }
+  if (Number(student.day) === Number(day)) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
+  return { key: "idle", label: "-", title: `${day}일차 시작 전` };
 }
 
 function getProgressStatus(state, student) {

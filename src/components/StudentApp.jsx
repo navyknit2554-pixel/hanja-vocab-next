@@ -21,6 +21,7 @@ export function StudentApp() {
   const [queue, setQueue] = useState([]);
   const [retry, setRetry] = useState([]);
   const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+  const [pendingStudent, setPendingStudent] = useState(null);
   const latestStatsRef = useRef(stats);
   const [feedback, setFeedback] = useState(null);
   const [loginError, setLoginError] = useState("");
@@ -85,6 +86,7 @@ export function StudentApp() {
     setQuizIndex(0);
     setQueue([]);
     setRetry([]);
+    setPendingStudent(null);
     resetStats();
     if (rememberLogin) {
       window.localStorage.setItem(studentLoginStorageKey, JSON.stringify({ ...login, remember: true }));
@@ -101,12 +103,14 @@ export function StudentApp() {
     setProgressRecord({ completed: {}, quiz: {} });
     resetStats();
     setStage("learn");
+    setPendingStudent(null);
   }
 
   function startQuiz() {
     setQueue(quizItems(lesson));
     setRetry([]);
     setQuizIndex(0);
+    setPendingStudent(null);
     resetStats();
     setStage("quiz");
   }
@@ -161,6 +165,7 @@ export function StudentApp() {
         throw new Error(result.message || "학습 결과를 저장하지 못했습니다.");
       }
       const result = await response.json();
+      if (result.student) setPendingStudent(result.student);
       if (result.progress) setProgressRecord(result.progress);
     } catch (error) {
       setLoadError(error.message);
@@ -196,6 +201,8 @@ export function StudentApp() {
   const progress = stage === "learn" ? ((cardIndex + 1) / Math.max(1, cards.length)) * 100 : stage === "quiz" ? (quizIndex / quizTotal) * 100 : 100;
   const lessonProgress = progressRecord.quiz?.[lesson.day] || null;
   const lessonCompleted = Boolean(progressRecord.completed?.[lesson.day]) && !lessonProgress?.wrong?.length;
+  const unlockAt = progressRecord.unlocks?.[lesson.day];
+  const lessonLocked = Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime() && !lessonCompleted);
 
   return (
     <main className="appFrame">
@@ -207,6 +214,10 @@ export function StudentApp() {
         </div>
       </header>
       <LessonOverview lesson={lesson} hanja={hanja} vocab={vocab} stage={stage} cardIndex={cardIndex} quizIndex={quizIndex} lessonProgress={lessonProgress} lessonCompleted={lessonCompleted} />
+      {lessonLocked ? (
+        <LockedLesson lesson={lesson} unlockAt={unlockAt} />
+      ) : (
+        <>
       <div className="progress"><span style={{ width: `${Math.max(8, Math.min(100, progress))}%` }} /></div>
       {stage === "learn" && <LearningCard card={cards[cardIndex]} index={cardIndex} total={cards.length} onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))} onNext={() => cardIndex + 1 >= cards.length ? startQuiz() : setCardIndex(cardIndex + 1)} />}
       {stage === "quiz" && currentQuiz && <QuizCard quiz={currentQuiz} feedback={feedback} onChoose={choose} remainingWrong={stats.wrong.length} index={quizIndex} total={queue.length} isRetryRound={isRetryRound} />}
@@ -216,9 +227,26 @@ export function StudentApp() {
           vocab={vocab}
           onRestart={() => { setStage("learn"); setCardIndex(0); }}
           onRetryQuiz={startQuiz}
+          onNextDay={pendingStudent ? () => { setStudent(pendingStudent); setPendingStudent(null); setStage("learn"); setCardIndex(0); } : null}
         />
       )}
+        </>
+      )}
     </main>
+  );
+}
+
+function LockedLesson({ lesson, unlockAt }) {
+  const unlockDate = new Date(unlockAt);
+  const unlockText = unlockDate.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return (
+    <section className="lockedLesson">
+      <Mascot mood="happy" />
+      <p className="eyebrow">{lesson.day}일차 준비 중</p>
+      <h2>다음 학습은 {unlockText}부터 열려요.</h2>
+      <p>오늘 학습을 잘 끝냈어요. 내일 00:00 이후에 다음 일차를 시작할 수 있습니다.</p>
+      <Link className="btn ghost" href="/">홈으로</Link>
+    </section>
   );
 }
 
@@ -299,7 +327,7 @@ function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRe
   );
 }
 
-function Review({ stats, vocab, onRestart, onRetryQuiz }) {
+function Review({ stats, vocab, onRestart, onRetryQuiz, onNextDay }) {
   const rate = stats.total ? Math.round((stats.correct / stats.total) * 100) : 0;
   const wrongHistory = new Set(stats.wrongHistory || []);
   return (
@@ -323,6 +351,7 @@ function Review({ stats, vocab, onRestart, onRetryQuiz }) {
       <div className="buttonRow">
         <button className="btn" onClick={onRestart}>카드 다시 보기</button>
         <button className="btn primary" onClick={onRetryQuiz}>퀴즈 다시 풀기</button>
+        {onNextDay && <button className="btn blue" onClick={onNextDay}>다음 일차 확인</button>}
       </div>
     </section>
   );

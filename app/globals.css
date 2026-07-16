@@ -57,6 +57,31 @@ button:disabled {
   width: min(760px, 100%);
 }
 
+.lockedLesson {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(640px, 100%);
+  margin: 18px auto 0;
+  padding: 28px;
+  border: 2px solid #d8f0d2;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.lockedLesson h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+}
+
+.lockedLesson p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 900;
+}
+
 .homeHero h1, .loginCard h1, .reviewCard h1 {
   margin: 12px 0 18px;
   font-size: clamp(2rem, 5vw, 3.3rem);
@@ -1203,6 +1228,100 @@ th {
 
 td span {
   color: var(--muted);
+}
+
+.progressMatrixWrap {
+  max-width: 100%;
+  overflow: auto;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.progressMatrix {
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.progressMatrix th,
+.progressMatrix td {
+  min-width: 42px;
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #e8f0fb;
+}
+
+.progressMatrix th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f6fbff;
+  color: var(--muted);
+  font-size: .74rem;
+}
+
+.progressMatrix .stickyStudent {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 150px;
+  background: #fff;
+  text-align: left;
+  box-shadow: 4px 0 0 rgba(217, 230, 247, .45);
+}
+
+.progressMatrix thead .stickyStudent {
+  background: #f6fbff;
+}
+
+.progressMatrix .stickyStudent strong,
+.progressMatrix .stickyStudent span {
+  display: block;
+}
+
+.progressMatrix .stickyStudent span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.matrixCell {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 1000;
+}
+
+.matrixCell.completed {
+  background: #58cc02;
+  color: #fff;
+}
+
+.matrixCell.retry {
+  background: #ff4b6e;
+  color: #fff;
+}
+
+.matrixCell.active {
+  background: #ffd43b;
+  color: #785600;
+}
+
+.matrixCell.ready {
+  background: #1cb0f6;
+  color: #fff;
+}
+
+.matrixCell.locked {
+  background: #dde5ef;
+  color: #65708a;
 }
 
 .statusPill {
