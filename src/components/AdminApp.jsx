@@ -66,6 +66,16 @@ export function AdminApp() {
     const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
     return [...new Set(lessons.map((item) => Number(item.day)).filter(Boolean))].sort((a, b) => a - b);
   }, [selectedLevel, state]);
+  const levelLessonSummary = useMemo(() => {
+    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
+    return lessons
+      .map((item) => ({
+        day: Number(item.day),
+        label: (item.hanjaSet || []).slice(0, Number(item.dailyCount || 4)).map((hanja) => `${hanja.character}(${hanja.sound})`).join(" · ")
+      }))
+      .filter((item) => item.day)
+      .sort((a, b) => a.day - b.day);
+  }, [selectedLevel, state]);
   const filteredStudents = useMemo(() => {
     if (!state) return [];
     const query = studentSearch.trim().toLowerCase();
@@ -359,6 +369,58 @@ export function AdminApp() {
     });
     persist(nextState);
     setSelectedDay(fallbackDay);
+  }
+
+  function updateHanjaJson(mutator) {
+    let hanjaSet;
+    try {
+      hanjaSet = JSON.parse(hanjaJson || "[]");
+    } catch {
+      hanjaSet = contentPreview.hanjaSet || [];
+    }
+    const nextHanjaSet = structuredClone(Array.isArray(hanjaSet) ? hanjaSet : []);
+    mutator(nextHanjaSet);
+    setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
+  }
+
+  function updateHanjaField(hanjaIndex, field, value) {
+    updateHanjaJson((hanjaSet) => {
+      if (!hanjaSet[hanjaIndex]) return;
+      hanjaSet[hanjaIndex][field] = value;
+      if (field === "character") hanjaSet[hanjaIndex].radical = value;
+    });
+  }
+
+  function updateVocabField(hanjaIndex, vocabIndex, field, value) {
+    updateHanjaJson((hanjaSet) => {
+      const hanja = hanjaSet[hanjaIndex];
+      if (!hanja) return;
+      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
+      if (!hanja.vocab[vocabIndex]) return;
+      hanja.vocab[vocabIndex][field] = value;
+    });
+  }
+
+  function addVocab(hanjaIndex) {
+    updateHanjaJson((hanjaSet) => {
+      const hanja = hanjaSet[hanjaIndex];
+      if (!hanja) return;
+      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
+      hanja.vocab.push({
+        hanja: "",
+        word: "",
+        meaning: "",
+        examples: ["", "", ""]
+      });
+    });
+  }
+
+  function removeVocab(hanjaIndex, vocabIndex) {
+    updateHanjaJson((hanjaSet) => {
+      const hanja = hanjaSet[hanjaIndex];
+      if (!hanja || !Array.isArray(hanja.vocab)) return;
+      hanja.vocab.splice(vocabIndex, 1);
+    });
   }
 
   function makePrompt() {
@@ -705,8 +767,17 @@ export function AdminApp() {
               <small>{selectedCriteria.textRange}</small>
             </div>
           )}
+          <LevelDayOverview lessons={levelLessonSummary} selectedDay={selectedDay} onSelect={setSelectedDay} />
           <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
           <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
+          <HanjaQuickEditor
+            hanjaSet={contentPreview.hanjaSet}
+            dailyCount={dailyCount}
+            onHanjaChange={updateHanjaField}
+            onVocabChange={updateVocabField}
+            onAddVocab={addVocab}
+            onRemoveVocab={removeVocab}
+          />
           <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
           <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
           <button className="btn primary" type="submit">저장</button>
@@ -749,6 +820,85 @@ function getProgressStatus(state, student) {
   if (record?.wrong?.length) return { key: "retry", label: "복습 필요" };
   if (record?.total) return { key: "active", label: "진행 중" };
   return { key: "idle", label: "시작 전" };
+}
+
+function LevelDayOverview({ lessons, selectedDay, onSelect }) {
+  return (
+    <section className="levelDayOverview">
+      <div className="quickEditorHead">
+        <strong>난이도별 일차 구성</strong>
+        <span>일차를 누르면 아래 편집 카드가 바뀝니다.</span>
+      </div>
+      <div className="levelDayList">
+        {lessons.map((lesson) => (
+          <button
+            className={Number(selectedDay) === Number(lesson.day) ? "active" : ""}
+            type="button"
+            key={lesson.day}
+            onClick={() => onSelect(lesson.day)}
+          >
+            <b>{lesson.day}일차</b>
+            <span>{lesson.label}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, onAddVocab, onRemoveVocab }) {
+  const visibleHanja = hanjaSet.slice(0, Number(dailyCount) || hanjaSet.length);
+
+  if (!visibleHanja.length) {
+    return (
+      <section className="quickEditor">
+        <div className="quickEditorHead">
+          <strong>일차별 한자 구성</strong>
+          <span>JSON을 확인해 주세요.</span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="quickEditor">
+      <div className="quickEditorHead">
+        <strong>일차별 한자 구성</strong>
+        <span>카드에서 수정하면 아래 JSON에 바로 반영됩니다.</span>
+      </div>
+      <div className="quickHanjaGrid">
+        {visibleHanja.map((hanja, hanjaIndex) => (
+          <article className="quickHanjaCard" key={`${hanja.character}-${hanjaIndex}`}>
+            <div className="quickHanjaTop">
+              <b>{hanjaIndex + 1}번</b>
+              <span>{hanjaIndex < 2 ? "관계 한자" : `${hanjaIndex === 2 ? "1번" : "2번"}과 동음`}</span>
+            </div>
+            <div className="quickHanjaFields">
+              <label>한자<input value={hanja.character || ""} onChange={(event) => onHanjaChange(hanjaIndex, "character", event.target.value)} /></label>
+              <label>음<input value={hanja.sound || ""} onChange={(event) => onHanjaChange(hanjaIndex, "sound", event.target.value)} /></label>
+              <label>뜻<input value={hanja.meaning || ""} onChange={(event) => onHanjaChange(hanjaIndex, "meaning", event.target.value)} /></label>
+            </div>
+            <label>형성 원리<textarea value={hanja.origin || ""} onChange={(event) => onHanjaChange(hanjaIndex, "origin", event.target.value)} /></label>
+            <label>관계 설명<textarea value={hanja.relation || ""} onChange={(event) => onHanjaChange(hanjaIndex, "relation", event.target.value)} /></label>
+            <div className="quickVocabHead">
+              <strong>어휘 {hanja.vocab?.length || 0}개</strong>
+              <button className="miniBtn" type="button" onClick={() => onAddVocab(hanjaIndex)}>어휘 추가</button>
+            </div>
+            <div className="quickVocabList">
+              {(hanja.vocab || []).map((vocab, vocabIndex) => (
+                <div className="quickVocabRow" key={`${vocab.word}-${vocabIndex}`}>
+                  <input aria-label="한자어" value={vocab.hanja || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "hanja", event.target.value)} />
+                  <input aria-label="단어" value={vocab.word || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "word", event.target.value)} />
+                  <input aria-label="뜻" value={vocab.meaning || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "meaning", event.target.value)} />
+                  <button className="miniBtn danger" type="button" onClick={() => onRemoveVocab(hanjaIndex, vocabIndex)}>삭제</button>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function ContentPreview({ preview, dailyCount }) {

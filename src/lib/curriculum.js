@@ -28,7 +28,6 @@ export function learningCards(lesson) {
 
 export function quizItems(lesson) {
   const words = lessonVocab(lesson);
-  const structureItems = structureQuizItems(lesson);
   const vocabItems = words.map((item, index) => {
     const meaningPool = words.filter((candidate) => candidate.word !== item.word).map((candidate) => candidate.meaning);
     const wordPool = words.filter((candidate) => candidate.word !== item.word).map((candidate) => candidate.word);
@@ -50,7 +49,7 @@ export function quizItems(lesson) {
       choices: buildChoices(answer, distractors)
     };
   });
-  return [...structureItems, ...vocabItems];
+  return vocabItems;
 }
 
 function buildChoices(answer, distractors) {

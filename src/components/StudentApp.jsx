@@ -257,7 +257,7 @@ function LearningCard({ card, index, total, onPrev, onNext }) {
 }
 
 function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRetryRound }) {
-  const quizTypeLabel = quiz.type === "blank" ? "문장 빈칸" : quiz.type === "relation" ? "관계 한자" : quiz.type === "homophone" ? "동음이의 한자" : "뜻 고르기";
+  const quizTypeLabel = quiz.type === "blank" ? "문장 빈칸" : "뜻 고르기";
   return (
     <section className="quizStage">
       <article className={`questionCard ${quiz.type === "blank" ? "blankQuestion" : ""}`}>
