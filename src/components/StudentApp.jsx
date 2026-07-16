@@ -237,8 +237,7 @@ export function StudentApp() {
 }
 
 function LockedLesson({ lesson, unlockAt }) {
-  const unlockDate = new Date(unlockAt);
-  const unlockText = unlockDate.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const unlockText = formatKoreanUnlockTime(unlockAt, "long");
   return (
     <section className="lockedLesson">
       <Mascot mood="happy" />
@@ -248,6 +247,19 @@ function LockedLesson({ lesson, unlockAt }) {
       <Link className="btn ghost" href="/">홈으로</Link>
     </section>
   );
+}
+
+function formatKoreanUnlockTime(value, monthStyle = "numeric") {
+  const date = new Date(value);
+  const koreanDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const month = koreanDate.getUTCMonth() + 1;
+  const day = koreanDate.getUTCDate();
+  const hour = koreanDate.getUTCHours();
+  const minute = String(koreanDate.getUTCMinutes()).padStart(2, "0");
+  const period = hour < 12 ? "오전" : "오후";
+  const displayHour = hour < 12 ? hour : hour - 12;
+  const monthText = monthStyle === "long" ? `${month}월` : `${month}.`;
+  return `${monthText} ${day}일 ${period} ${String(displayHour).padStart(2, "0")}:${minute}`;
 }
 
 function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, lessonProgress, lessonCompleted }) {

@@ -888,11 +888,23 @@ function getDayProgressStatus(state, student, day) {
   if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요: ${record.wrong.join(", ")}` };
   if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}` };
   if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
-    const unlockText = new Date(unlockAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const unlockText = formatKoreanUnlockTime(unlockAt);
     return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };
   }
   if (Number(student.day) === Number(day)) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
   return { key: "idle", label: "-", title: `${day}일차 시작 전` };
+}
+
+function formatKoreanUnlockTime(value) {
+  const date = new Date(value);
+  const koreanDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const month = koreanDate.getUTCMonth() + 1;
+  const day = koreanDate.getUTCDate();
+  const hour = koreanDate.getUTCHours();
+  const minute = String(koreanDate.getUTCMinutes()).padStart(2, "0");
+  const period = hour < 12 ? "오전" : "오후";
+  const displayHour = hour < 12 ? hour : hour - 12;
+  return `${month}. ${day}일 ${period} ${String(displayHour).padStart(2, "0")}:${minute}`;
 }
 
 function getProgressStatus(state, student) {
