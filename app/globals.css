@@ -571,6 +571,251 @@ textarea {
   box-shadow: var(--shadow);
 }
 
+.archeryGame {
+  display: grid;
+  gap: 16px;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+  border: 2px solid #cbeeff;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: var(--shadow);
+}
+
+.archeryHud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.archeryHud h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.7rem, 4vw, 2.6rem);
+}
+
+.archeryScore {
+  display: grid;
+  gap: 4px;
+  min-width: 118px;
+  padding: 12px 14px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+  box-shadow: 0 5px 0 #d9edf7;
+}
+
+.archeryScore span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.archeryScore b {
+  font-size: 1.45rem;
+}
+
+.archeryPrompt {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 2px solid #b6ec99;
+  border-radius: 20px;
+  background: #f2ffe8;
+  text-align: center;
+}
+
+.archeryPrompt span,
+.archeryPrompt small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.archeryPrompt strong {
+  color: var(--ink);
+  font-size: clamp(1.45rem, 4vw, 2.3rem);
+  line-height: 1.25;
+}
+
+.archeryField {
+  --aim-x: 50%;
+  --aim-y: 50%;
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border: 2px solid #d8f0d2;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, #e9fbff 0%, #f9ffef 70%, #fff8d9 100%);
+  touch-action: none;
+  user-select: none;
+}
+
+.wordBlock {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 112px;
+  min-height: 66px;
+  padding: 9px 12px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 6px 0 #d6eafb;
+  transform: translate(-50%, -50%);
+  animation: blockFloat 5.5s ease-in-out infinite;
+}
+
+.wordBlock strong {
+  font-size: 1.05rem;
+  font-weight: 1000;
+}
+
+.wordBlock small {
+  color: var(--muted);
+  font-family: serif;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.wordBlock.broken {
+  border-color: #b6ec99;
+  background: #f1ffe7;
+  animation: blockBreak .65s ease forwards;
+}
+
+.aimLine {
+  position: absolute;
+  left: var(--aim-x);
+  top: var(--aim-y);
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border: 4px solid rgba(255, 75, 110, .72);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .42);
+  transform: translate(-50%, -50%);
+  opacity: .85;
+}
+
+.aimLine::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 120px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--rose), var(--yellow));
+  transform: translate(-50%, -100%);
+}
+
+.archerKid {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 96px;
+  transform: translateX(-50%);
+}
+
+.kidFace {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 8px 0 #bee9ff;
+}
+
+.kidFace i {
+  position: absolute;
+  top: 23px;
+  width: 8px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.kidFace i:first-child { left: 18px; }
+.kidFace i:last-child { right: 18px; }
+
+.bowShape {
+  position: absolute;
+  right: 6px;
+  top: 20px;
+  width: 34px;
+  height: 58px;
+  border-right: 5px solid #a56b22;
+  border-radius: 0 999px 999px 0;
+}
+
+.arrowShape {
+  position: absolute;
+  left: 46px;
+  top: 44px;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.shotResult {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, .62);
+  pointer-events: none;
+}
+
+.shotResult strong {
+  padding: 10px 18px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 1.35rem;
+  font-weight: 1000;
+  box-shadow: 0 5px 0 #d9edf7;
+}
+
+.shotResult.correct strong {
+  color: var(--green-dark);
+}
+
+.shotResult.wrong strong {
+  color: var(--rose);
+}
+
+.archeryControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.archeryControls p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.emptyGame {
+  justify-items: center;
+  text-align: center;
+}
+
 .mascot {
   display: inline-grid;
   justify-items: center;
@@ -1668,6 +1913,17 @@ td span {
   100% { opacity: 0; }
 }
 
+@keyframes blockFloat {
+  0% { translate: 0 -16px; }
+  50% { translate: 0 20px; }
+  100% { translate: 0 -16px; }
+}
+
+@keyframes blockBreak {
+  0% { opacity: 1; scale: 1; rotate: 0deg; }
+  100% { opacity: 0; scale: .35; rotate: 10deg; }
+}
+
 @media (max-width: 760px) {
   .topBar {
     align-items: flex-start;
@@ -1710,6 +1966,36 @@ td span {
 
   .reviewWords {
     grid-template-columns: 1fr;
+  }
+
+  .archeryGame {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .archeryHud,
+  .archeryControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .archeryScore {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+  }
+
+  .archeryField {
+    min-height: 390px;
+  }
+
+  .wordBlock {
+    min-width: 92px;
+    min-height: 58px;
+    padding: 8px 10px;
+  }
+
+  .wordBlock strong {
+    font-size: .95rem;
   }
 
   .summaryStrip {

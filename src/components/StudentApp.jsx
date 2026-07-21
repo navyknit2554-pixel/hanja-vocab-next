@@ -25,6 +25,7 @@ export function StudentApp() {
   const latestStatsRef = useRef(stats);
   const [feedback, setFeedback] = useState(null);
   const [loginError, setLoginError] = useState("");
+  const [archeryGame, setArcheryGame] = useState(null);
 
   useEffect(() => {
     try {
@@ -62,6 +63,7 @@ export function StudentApp() {
   const cards = useMemo(() => learningCards(lesson), [lesson]);
   const hanja = useMemo(() => hanjaItems(lesson), [lesson]);
   const vocab = useMemo(() => lessonVocab(lesson), [lesson]);
+  const reviewGame = useMemo(() => buildReviewGame(curriculum, lesson, student?.level, progressRecord), [curriculum, lesson, student, progressRecord]);
   const currentQuiz = queue[quizIndex];
 
   async function handleLogin(event) {
@@ -86,6 +88,7 @@ export function StudentApp() {
     setQuizIndex(0);
     setQueue([]);
     setRetry([]);
+    setArcheryGame(null);
     setPendingStudent(null);
     resetStats();
     if (rememberLogin) {
@@ -103,6 +106,7 @@ export function StudentApp() {
     setProgressRecord({ completed: {}, quiz: {} });
     resetStats();
     setStage("learn");
+    setArcheryGame(null);
     setPendingStudent(null);
   }
 
@@ -111,6 +115,7 @@ export function StudentApp() {
     setRetry([]);
     setQuizIndex(0);
     setPendingStudent(null);
+    setArcheryGame(null);
     resetStats();
     setStage("quiz");
   }
@@ -172,6 +177,37 @@ export function StudentApp() {
     }
   }
 
+  async function saveGameProgress(result) {
+    if (!archeryGame || !lesson) return;
+    try {
+      const response = await fetch("/api/student/progress", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonDay: lesson.day,
+          game: {
+            ...result,
+            type: "archery",
+            key: archeryGame.key,
+            rangeStart: archeryGame.rangeStart,
+            rangeEnd: archeryGame.rangeEnd,
+            level: archeryGame.level
+          }
+        })
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "게임 결과를 저장하지 못했습니다.");
+      }
+      const payload = await response.json();
+      if (payload.progress) setProgressRecord(payload.progress);
+      setArcheryGame(null);
+      setStage("review");
+    } catch (error) {
+      setLoadError(error.message);
+    }
+  }
+
   if (loadError) return <main className="centerPage"><strong className="errorText">{loadError}</strong></main>;
   if (checkingSession) return <main className="centerPage">확인하는 중...</main>;
 
@@ -221,10 +257,22 @@ export function StudentApp() {
       <div className="progress"><span style={{ width: `${Math.max(8, Math.min(100, progress))}%` }} /></div>
       {stage === "learn" && <LearningCard card={cards[cardIndex]} index={cardIndex} total={cards.length} onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))} onNext={() => cardIndex + 1 >= cards.length ? startQuiz() : setCardIndex(cardIndex + 1)} />}
       {stage === "quiz" && currentQuiz && <QuizCard quiz={currentQuiz} feedback={feedback} onChoose={choose} remainingWrong={stats.wrong.length} index={quizIndex} total={queue.length} isRetryRound={isRetryRound} />}
+      {stage === "archery" && archeryGame && (
+        <ArcheryGame
+          game={archeryGame}
+          onComplete={saveGameProgress}
+          onExit={() => {
+            setArcheryGame(null);
+            setStage("review");
+          }}
+        />
+      )}
       {stage === "review" && (
         <Review
           stats={stats}
           vocab={vocab}
+          reviewGame={reviewGame}
+          onStartGame={reviewGame ? () => { setArcheryGame(reviewGame); setStage("archery"); } : null}
           onRestart={() => { setStage("learn"); setCardIndex(0); }}
           onRetryQuiz={startQuiz}
           onNextDay={pendingStudent ? () => { setStudent(pendingStudent); setPendingStudent(null); setStage("learn"); setCardIndex(0); } : null}
@@ -263,8 +311,8 @@ function formatKoreanUnlockTime(value, monthStyle = "numeric") {
 }
 
 function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, lessonProgress, lessonCompleted }) {
-  const stageLabel = stage === "learn" ? "카드 학습" : stage === "quiz" ? "퀴즈" : "학습 완성";
-  const current = stage === "learn" ? `${cardIndex + 1}번째 카드` : stage === "quiz" ? `${quizIndex + 1}번째 문제` : "완료";
+  const stageLabel = stage === "learn" ? "카드 학습" : stage === "quiz" ? "퀴즈" : stage === "archery" ? "복습 게임" : "학습 완성";
+  const current = stage === "learn" ? `${cardIndex + 1}번째 카드` : stage === "quiz" ? `${quizIndex + 1}번째 문제` : stage === "archery" ? "활쏘기" : "완료";
   const savedRate = lessonProgress?.total ? Math.round((lessonProgress.correct / lessonProgress.total) * 100) : 0;
   const savedStatus = lessonCompleted ? "학습 완성" : lessonProgress?.wrong?.length ? "복습 필요" : lessonProgress?.total ? "진행 중" : "시작 전";
   const attempts = lessonProgress?.attempts || (lessonProgress?.total ? 1 : 0);
@@ -339,7 +387,7 @@ function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRe
   );
 }
 
-function Review({ stats, vocab, onRestart, onRetryQuiz, onNextDay }) {
+function Review({ stats, vocab, reviewGame, onStartGame, onRestart, onRetryQuiz, onNextDay }) {
   const rate = stats.total ? Math.round((stats.correct / stats.total) * 100) : 0;
   const wrongHistory = new Set(stats.wrongHistory || []);
   return (
@@ -361,12 +409,215 @@ function Review({ stats, vocab, onRestart, onRetryQuiz, onNextDay }) {
         })}
       </div>
       <div className="buttonRow">
+        {reviewGame && (
+          <button className="btn blue" onClick={onStartGame}>
+            {reviewGame.completed ? "복습 활쏘기 다시 하기" : `${reviewGame.rangeStart}-${reviewGame.rangeEnd}일차 복습 활쏘기`}
+          </button>
+        )}
         <button className="btn" onClick={onRestart}>카드 다시 보기</button>
         <button className="btn primary" onClick={onRetryQuiz}>퀴즈 다시 풀기</button>
         {onNextDay && <button className="btn blue" onClick={onNextDay}>다음 일차 확인</button>}
       </div>
     </section>
   );
+}
+
+function ArcheryGame({ game, onComplete, onExit }) {
+  const fieldRef = useRef(null);
+  const questions = useMemo(() => buildArcheryQuestions(game.items), [game.items]);
+  const [index, setIndex] = useState(0);
+  const [hits, setHits] = useState(0);
+  const [missed, setMissed] = useState(0);
+  const [aim, setAim] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [shot, setShot] = useState(null);
+  const current = questions[index];
+  const blocks = useMemo(() => buildArcheryBlocks(current, game.items), [current, game.items]);
+
+  if (!questions.length) {
+    return (
+      <section className="archeryGame emptyGame">
+        <Mascot />
+        <h2>복습 게임을 만들 어휘가 아직 부족해요.</h2>
+        <button className="btn" onClick={onExit}>돌아가기</button>
+      </section>
+    );
+  }
+
+  function pointFromEvent(event) {
+    const rect = fieldRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+      y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
+      width: rect.width,
+      height: rect.height
+    };
+  }
+
+  function handlePointerDown(event) {
+    if (shot) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDragging(true);
+    setAim(pointFromEvent(event));
+  }
+
+  function handlePointerMove(event) {
+    if (!dragging || shot) return;
+    setAim(pointFromEvent(event));
+  }
+
+  function handlePointerUp(event) {
+    if (!dragging || shot || !current) return;
+    const point = pointFromEvent(event);
+    setDragging(false);
+    setAim(point);
+    const target = findTargetBlock(point, blocks);
+    const correct = target?.word === current.word;
+    setShot({ correct, targetWord: target?.word || "" });
+    window.setTimeout(() => finishQuestion(correct), 700);
+  }
+
+  function finishQuestion(correct) {
+    const nextHits = hits + (correct ? 1 : 0);
+    const nextMissed = missed + (correct ? 0 : 1);
+    setHits(nextHits);
+    setMissed(nextMissed);
+    setShot(null);
+    setAim(null);
+    if (index + 1 >= questions.length) {
+      const accuracy = Math.round((nextHits / questions.length) * 100);
+      onComplete({
+        score: nextHits * 100,
+        hits: nextHits,
+        total: questions.length,
+        missed: nextMissed,
+        accuracy,
+        cleared: accuracy >= 80
+      });
+      return;
+    }
+    setIndex((value) => value + 1);
+  }
+
+  const aimStyle = aim ? {
+    "--aim-x": `${aim.x}px`,
+    "--aim-y": `${aim.y}px`
+  } : undefined;
+
+  return (
+    <section className="archeryGame">
+      <div className="archeryHud">
+        <div>
+          <p className="eyebrow">{game.rangeStart}-{game.rangeEnd}일차 복습</p>
+          <h2>뜻에 맞는 단어 블록을 맞혀요</h2>
+        </div>
+        <div className="archeryScore">
+          <span>{index + 1}/{questions.length}</span>
+          <b>{hits * 100}점</b>
+        </div>
+      </div>
+      <article className="archeryPrompt">
+        <span>이번 뜻</span>
+        <strong>{current.meaning}</strong>
+        <small>{current.parent?.character}({current.parent?.sound}) 한자가 들어간 어휘예요.</small>
+      </article>
+      <div
+        ref={fieldRef}
+        className={`archeryField ${shot ? shot.correct ? "hit" : "miss" : ""}`}
+        style={aimStyle}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => setDragging(false)}
+      >
+        {blocks.map((block, blockIndex) => (
+          <div
+            className={`wordBlock ${shot?.correct && block.word === current.word ? "broken" : ""}`}
+            key={`${block.word}-${blockIndex}`}
+            style={{ left: `${block.x}%`, top: `${block.y}%`, animationDelay: `${blockIndex * 0.28}s` }}
+          >
+            <strong>{block.word}</strong>
+            <small>{block.hanja}</small>
+          </div>
+        ))}
+        {aim && <span className="aimLine" />}
+        <div className="archerKid">
+          <span className="kidFace"><i /><i /></span>
+          <span className="bowShape" />
+          <span className="arrowShape" />
+        </div>
+        {shot && (
+          <div className={`shotResult ${shot.correct ? "correct" : "wrong"}`}>
+            <Mascot mood={shot.correct ? "happy" : "sad"} small />
+            <strong>{shot.correct ? "명중!" : "아쉬워요"}</strong>
+          </div>
+        )}
+      </div>
+      <div className="archeryControls">
+        <p>아래 궁수에서 단어 블록 쪽으로 드래그한 뒤 손을 떼세요.</p>
+        <button className="btn ghost" onClick={onExit}>그만하기</button>
+      </div>
+    </section>
+  );
+}
+
+function buildReviewGame(curriculum, lesson, level, progressRecord) {
+  if (!lesson || Number(lesson.day) % 5 !== 0) return null;
+  const rangeEnd = Number(lesson.day);
+  const rangeStart = Math.max(1, rangeEnd - 4);
+  const lessons = [];
+  for (let day = rangeStart; day <= rangeEnd; day += 1) {
+    const target = findLesson(curriculum, day, level);
+    if (target && Number(target.day) === day) lessons.push(target);
+  }
+  const items = lessons.flatMap((item) => lessonVocab(item)).filter((item) => item.word && item.meaning);
+  if (items.length < 4) return null;
+  const key = `archery:${level}:${rangeStart}-${rangeEnd}`;
+  return {
+    key,
+    level,
+    rangeStart,
+    rangeEnd,
+    items,
+    completed: Boolean(progressRecord.games?.[key]?.cleared)
+  };
+}
+
+function buildArcheryQuestions(items) {
+  return shuffleLocal(items).slice(0, Math.min(10, items.length));
+}
+
+function buildArcheryBlocks(current, items) {
+  if (!current) return [];
+  const options = [current, ...shuffleLocal(items.filter((item) => item.word !== current.word)).slice(0, 3)];
+  const positions = [
+    { x: 18, y: 18 },
+    { x: 48, y: 12 },
+    { x: 75, y: 24 },
+    { x: 36, y: 35 }
+  ];
+  return shuffleLocal(options).map((item, index) => ({ ...item, ...positions[index] }));
+}
+
+function findTargetBlock(point, blocks) {
+  if (!point) return null;
+  let nearest = null;
+  let nearestDistance = Infinity;
+  blocks.forEach((block) => {
+    const blockX = (point.width * block.x) / 100;
+    const blockY = (point.height * block.y) / 100;
+    const distance = Math.hypot(point.x - blockX, point.y - blockY);
+    if (distance < nearestDistance) {
+      nearest = block;
+      nearestDistance = distance;
+    }
+  });
+  return nearestDistance <= 120 ? nearest : null;
+}
+
+function shuffleLocal(items) {
+  return [...items].sort(() => Math.random() - 0.5);
 }
 
 function highlight(sentence, word) {
