@@ -431,8 +431,25 @@ function ArcheryGame({ game, onComplete, onExit }) {
   const [aim, setAim] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [shot, setShot] = useState(null);
+  const [questionStartedAt, setQuestionStartedAt] = useState(Date.now());
   const current = questions[index];
   const blocks = useMemo(() => buildArcheryBlocks(current, game.items), [current, game.items]);
+  const fallDuration = Math.max(1800, 3200 - index * 140);
+
+  useEffect(() => {
+    setQuestionStartedAt(Date.now());
+    setAim(null);
+    setDragging(false);
+  }, [index]);
+
+  useEffect(() => {
+    if (!questions.length || shot) return;
+    const timer = window.setTimeout(() => {
+      setShot({ correct: false, targetWord: "", timedOut: true });
+      window.setTimeout(() => finishQuestion(false), 520);
+    }, fallDuration);
+    return () => window.clearTimeout(timer);
+  }, [index, questions.length, shot, fallDuration]);
 
   if (!questions.length) {
     return (
@@ -472,7 +489,7 @@ function ArcheryGame({ game, onComplete, onExit }) {
     const point = pointFromEvent(event);
     setDragging(false);
     setAim(point);
-    const target = findTargetBlock(point, blocks);
+    const target = findTargetBlock(point, blocks, questionStartedAt, fallDuration);
     const correct = target?.word === current.word;
     setShot({ correct, targetWord: target?.word || "" });
     window.setTimeout(() => finishQuestion(correct), 700);
@@ -535,7 +552,11 @@ function ArcheryGame({ game, onComplete, onExit }) {
           <div
             className={`wordBlock ${shot?.correct && block.word === current.word ? "broken" : ""}`}
             key={`${block.word}-${blockIndex}`}
-            style={{ left: `${block.x}%`, top: `${block.y}%`, animationDelay: `${blockIndex * 0.28}s` }}
+            style={{
+              left: `${block.x}%`,
+              "--fall-duration": `${fallDuration}ms`,
+              "--fall-delay": `${blockIndex * 80}ms`
+            }}
           >
             <strong>{block.word}</strong>
             <small>{block.hanja}</small>
@@ -550,12 +571,12 @@ function ArcheryGame({ game, onComplete, onExit }) {
         {shot && (
           <div className={`shotResult ${shot.correct ? "correct" : "wrong"}`}>
             <Mascot mood={shot.correct ? "happy" : "sad"} small />
-            <strong>{shot.correct ? "명중!" : "아쉬워요"}</strong>
+            <strong>{shot.correct ? "명중!" : shot.timedOut ? "놓쳤어요" : "아쉬워요"}</strong>
           </div>
         )}
       </div>
       <div className="archeryControls">
-        <p>아래 궁수에서 단어 블록 쪽으로 드래그한 뒤 손을 떼세요.</p>
+        <p>블록이 바닥에 닿기 전에 단어 블록 쪽으로 드래그해서 맞혀요.</p>
         <button className="btn ghost" onClick={onExit}>그만하기</button>
       </div>
     </section>
@@ -591,29 +612,27 @@ function buildArcheryQuestions(items) {
 function buildArcheryBlocks(current, items) {
   if (!current) return [];
   const options = [current, ...shuffleLocal(items.filter((item) => item.word !== current.word)).slice(0, 3)];
-  const positions = [
-    { x: 18, y: 18 },
-    { x: 48, y: 12 },
-    { x: 75, y: 24 },
-    { x: 36, y: 35 }
-  ];
-  return shuffleLocal(options).map((item, index) => ({ ...item, ...positions[index] }));
+  const lanes = [18, 40, 62, 82];
+  return shuffleLocal(options).map((item, index) => ({ ...item, x: lanes[index] }));
 }
 
-function findTargetBlock(point, blocks) {
+function findTargetBlock(point, blocks, startedAt, duration) {
   if (!point) return null;
+  const elapsed = Math.max(0, Date.now() - startedAt);
+  const fallProgress = Math.min(1, elapsed / Math.max(1, duration));
+  const currentYPercent = -8 + fallProgress * 86;
   let nearest = null;
   let nearestDistance = Infinity;
   blocks.forEach((block) => {
     const blockX = (point.width * block.x) / 100;
-    const blockY = (point.height * block.y) / 100;
+    const blockY = (point.height * currentYPercent) / 100;
     const distance = Math.hypot(point.x - blockX, point.y - blockY);
     if (distance < nearestDistance) {
       nearest = block;
       nearestDistance = distance;
     }
   });
-  return nearestDistance <= 120 ? nearest : null;
+  return nearestDistance <= 130 ? nearest : null;
 }
 
 function shuffleLocal(items) {

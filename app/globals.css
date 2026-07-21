@@ -654,6 +654,7 @@ textarea {
 
 .wordBlock {
   position: absolute;
+  top: -76px;
   z-index: 2;
   display: grid;
   place-items: center;
@@ -667,7 +668,7 @@ textarea {
   text-align: center;
   box-shadow: 0 6px 0 #d6eafb;
   transform: translate(-50%, -50%);
-  animation: blockFloat 5.5s ease-in-out infinite;
+  animation: fallBlock var(--fall-duration, 3000ms) linear var(--fall-delay, 0ms) forwards;
 }
 
 .wordBlock strong {
@@ -1917,6 +1918,11 @@ td span {
   0% { translate: 0 -16px; }
   50% { translate: 0 20px; }
   100% { translate: 0 -16px; }
+}
+
+@keyframes fallBlock {
+  0% { top: -76px; }
+  100% { top: 82%; }
 }
 
 @keyframes blockBreak {
