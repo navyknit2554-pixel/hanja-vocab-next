@@ -1817,6 +1817,36 @@ td span {
   font-weight: 1000;
 }
 
+.matrixCellWrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.matrixUnlock {
+  position: absolute;
+  right: -14px;
+  top: -12px;
+  z-index: 2;
+  display: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #785600;
+  padding: 0;
+  font-size: .65rem;
+  font-weight: 1000;
+  box-shadow: 0 3px 0 #e7b900;
+}
+
+.matrixCellWrap.locked:hover .matrixUnlock,
+.matrixCellWrap.locked:focus-within .matrixUnlock {
+  display: grid;
+}
+
 .matrixCell.completed {
   background: #58cc02;
   color: #fff;

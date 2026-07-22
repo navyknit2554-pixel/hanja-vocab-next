@@ -331,10 +331,10 @@ export function AdminApp() {
     persist(nextState);
   }
 
-  function unlockStudentDay(studentId) {
+  function unlockStudentDay(studentId, targetDay) {
     const student = state.students.find((item) => item.id === studentId);
     if (!student) return;
-    const day = Number(student.day || 1);
+    const day = Number(targetDay || student.day || 1);
     const nextState = structuredClone(state);
     nextState.progress[studentId] ||= { completed: {}, quiz: {} };
     nextState.progress[studentId].unlocks ||= {};
@@ -813,7 +813,6 @@ export function AdminApp() {
                 </label>
                 <div className="studentActions">
                   <button className="miniBtn" type="button" onClick={() => copyParentLink(student)}>학부모 링크</button>
-                  {isStudentDayLocked(state, student) && <button className="miniBtn" type="button" onClick={() => unlockStudentDay(student.id)}>잠금 해제</button>}
                   <button className="miniBtn" type="button" onClick={() => resetStudentProgress(student.id)}>진도 초기화</button>
                   <button className="miniBtn danger" type="button" onClick={() => deleteStudent(student.id)}>삭제</button>
                 </div>
@@ -861,7 +860,7 @@ export function AdminApp() {
           <div className="tableScroller">
           <table className="progressTable">
             <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
-            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onUnlock={unlockStudentDay} onOpenReview={() => setReviewModalStudent(student)} />)}</tbody>
+            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onOpenReview={() => setReviewModalStudent(student)} />)}</tbody>
           </table>
           </div>
           {reviewModalStudent && (
@@ -885,7 +884,7 @@ export function AdminApp() {
             onDayChange={setStudentDayFilter}
             dayOptions={progressDays}
           />
-          <ProgressMatrix state={state} students={filteredStudents} days={matrixDays} />
+          <ProgressMatrix state={state} students={filteredStudents} days={matrixDays} onUnlock={unlockStudentDay} />
         </section>
         )}
 
@@ -954,13 +953,12 @@ export function AdminApp() {
   );
 }
 
-function ProgressRow({ state, student, onUnlock, onOpenReview }) {
+function ProgressRow({ state, student, onOpenReview }) {
   const lesson = findLesson(state.curriculum, student.day, student.level);
   const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
   const status = getProgressStatus(state, student);
   const nextLearning = getNextLearningInfo(state, student);
   const reviewCounts = getReviewCounts(state, student);
-  const locked = isStudentDayLocked(state, student);
   const totalWords = lessonVocab(lesson).length;
   const rate = record.total ? Math.round((record.correct / record.total) * 100) : 0;
   const progress = status.key === "completed" ? 100 : record.total ? Math.min(92, Math.round((record.correct / Math.max(1, totalWords)) * 100)) : 0;
@@ -979,7 +977,6 @@ function ProgressRow({ state, student, onUnlock, onOpenReview }) {
       </td>
       <td data-label="상태">
         <span className={`statusPill ${status.key}`}>{status.label}</span>
-        {locked && <button className="miniBtn unlockBtn" type="button" onClick={() => onUnlock(student.id)}>오늘 열어주기</button>}
         <div className="miniProgress"><i style={{ width: `${progress}%` }} /></div>
       </td>
       <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
@@ -1166,7 +1163,7 @@ function StudentFilters({ gradeFilter, dayFilter, onGradeChange, onDayChange, da
   );
 }
 
-function ProgressMatrix({ state, students, days }) {
+function ProgressMatrix({ state, students, days, onUnlock }) {
   return (
     <div className="progressMatrixWrap">
       <table className="progressMatrix">
@@ -1187,7 +1184,20 @@ function ProgressMatrix({ state, students, days }) {
                 const status = getDayProgressStatus(state, student, day);
                 return (
                   <td key={`${student.id}-${day}`}>
-                    <span className={`matrixCell ${status.key}`} title={status.title}>{status.label}</span>
+                    <span className={`matrixCellWrap ${status.key}`}>
+                      <span className={`matrixCell ${status.key}`} title={status.title}>{status.label}</span>
+                      {status.key === "locked" && (
+                        <button
+                          className="matrixUnlock"
+                          type="button"
+                          title={`${student.name} ${day}일차 잠금 해제`}
+                          aria-label={`${student.name} ${day}일차 잠금 해제`}
+                          onClick={() => onUnlock(student.id, day)}
+                        >
+                          열
+                        </button>
+                      )}
+                    </span>
                   </td>
                 );
               })}
