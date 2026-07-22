@@ -828,7 +828,7 @@ textarea {
   width: 92px;
   height: 92px;
   border-radius: 42% 48% 45% 48%;
-  background: var(--green);
+  background: var(--mascot-color, var(--green));
   border: 6px solid #fff;
   box-shadow: 0 12px 24px rgba(20, 33, 61, .14);
 }
@@ -915,7 +915,82 @@ textarea {
   padding: 4px 10px;
   border-radius: 999px;
   background: #fff;
-  color: #6c37ff;
+  color: var(--mascot-accent, #6c37ff);
+  font-weight: 900;
+}
+
+.mascotLevel {
+  margin-top: -6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff7db;
+  color: #b87800;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.mascotGrowthCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 230px;
+  padding: 12px;
+  border: 2px solid #d8f0d2;
+  border-radius: 18px;
+  background: #fbfff7;
+  box-shadow: 0 5px 0 #d9edf7;
+}
+
+.mascotGrowthCard .mascot {
+  grid-row: span 3;
+}
+
+.mascotGrowthCard strong,
+.mascotGrowthCard span,
+.mascotGrowthCard small {
+  display: block;
+  font-weight: 900;
+}
+
+.mascotGrowthCard span,
+.mascotGrowthCard small {
+  color: var(--muted);
+}
+
+.levelMeter {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #d8f0d2;
+  border-radius: 999px;
+  background: #eef6ff;
+}
+
+.levelMeter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--blue), var(--yellow));
+}
+
+.levelUpBanner {
+  display: grid;
+  gap: 3px;
+  width: min(420px, 100%);
+  margin: -4px auto 12px;
+  padding: 12px 14px;
+  border: 2px solid #d8f0d2;
+  border-radius: 18px;
+  background: #fbfff7;
+}
+
+.levelUpBanner strong {
+  color: var(--green-dark);
+  font-size: 1.18rem;
+}
+
+.levelUpBanner span {
+  color: var(--muted);
   font-weight: 900;
 }
 

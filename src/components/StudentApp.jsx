@@ -239,6 +239,7 @@ export function StudentApp() {
   const lessonCompleted = Boolean(progressRecord.completed?.[lesson.day]) && !lessonProgress?.wrong?.length;
   const unlockAt = progressRecord.unlocks?.[lesson.day];
   const lessonLocked = Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime() && !lessonCompleted);
+  const growth = buildMascotGrowth(progressRecord);
 
   return (
     <main className="appFrame">
@@ -249,9 +250,9 @@ export function StudentApp() {
           <button className="btn" onClick={logoutStudent}>로그아웃</button>
         </div>
       </header>
-      <LessonOverview lesson={lesson} hanja={hanja} vocab={vocab} stage={stage} cardIndex={cardIndex} quizIndex={quizIndex} lessonProgress={lessonProgress} lessonCompleted={lessonCompleted} />
+      <LessonOverview lesson={lesson} hanja={hanja} vocab={vocab} stage={stage} cardIndex={cardIndex} quizIndex={quizIndex} lessonProgress={lessonProgress} lessonCompleted={lessonCompleted} growth={growth} />
       {lessonLocked ? (
-        <LockedLesson lesson={lesson} unlockAt={unlockAt} />
+        <LockedLesson lesson={lesson} unlockAt={unlockAt} growth={growth} />
       ) : (
         <>
       <div className="progress"><span style={{ width: `${Math.max(8, Math.min(100, progress))}%` }} /></div>
@@ -272,6 +273,7 @@ export function StudentApp() {
           stats={stats}
           vocab={vocab}
           reviewGame={reviewGame}
+          growth={growth}
           onStartGame={reviewGame ? () => { setArcheryGame(reviewGame); setStage("archery"); } : null}
           onRestart={() => { setStage("learn"); setCardIndex(0); }}
           onRetryQuiz={startQuiz}
@@ -284,11 +286,11 @@ export function StudentApp() {
   );
 }
 
-function LockedLesson({ lesson, unlockAt }) {
+function LockedLesson({ lesson, unlockAt, growth }) {
   const unlockText = formatKoreanUnlockTime(unlockAt, "long");
   return (
     <section className="lockedLesson">
-      <Mascot mood="happy" />
+      <Mascot mood="happy" growth={growth} />
       <p className="eyebrow">{lesson.day}일차 준비 중</p>
       <h2>다음 학습은 {unlockText}부터 열려요.</h2>
       <p>오늘 학습을 잘 끝냈어요. 내일 00:00 이후에 다음 일차를 시작할 수 있습니다.</p>
@@ -310,7 +312,7 @@ function formatKoreanUnlockTime(value, monthStyle = "numeric") {
   return `${monthText} ${day}일 ${period} ${String(displayHour).padStart(2, "0")}:${minute}`;
 }
 
-function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, lessonProgress, lessonCompleted }) {
+function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, lessonProgress, lessonCompleted, growth }) {
   const stageLabel = stage === "learn" ? "카드 학습" : stage === "quiz" ? "퀴즈" : stage === "archery" ? "복습 게임" : "학습 완성";
   const current = stage === "learn" ? `${cardIndex + 1}번째 카드` : stage === "quiz" ? `${quizIndex + 1}번째 문제` : stage === "archery" ? "활쏘기" : "완료";
   const savedRate = lessonProgress?.total ? Math.round((lessonProgress.correct / lessonProgress.total) * 100) : 0;
@@ -328,12 +330,29 @@ function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, les
         <span><b>{vocab.length}</b>어휘</span>
         <span><b>{stageLabel}</b>{current}</span>
       </div>
+      <MascotGrowthCard growth={growth} />
       <div className={`lessonSaved ${lessonCompleted ? "complete" : lessonProgress?.wrong?.length ? "retry" : ""}`}>
         <b>{savedStatus}</b>
         <span>{savedDetail}</span>
         {lessonProgress?.wrong?.length ? <small>남은 오답: {lessonProgress.wrong.join(", ")}</small> : lessonProgress?.wrongHistory?.length ? <small>복습한 어휘: {lessonProgress.wrongHistory.join(", ")}</small> : null}
       </div>
     </section>
+  );
+}
+
+function MascotGrowthCard({ growth }) {
+  return (
+    <div className="mascotGrowthCard">
+      <Mascot small growth={growth} />
+      <div>
+        <strong>{growth.stage.name} Lv.{growth.level}</strong>
+        <span>{growth.completedDays}일차 완료</span>
+      </div>
+      <div className="levelMeter" aria-hidden="true">
+        <i style={{ width: `${growth.progressToNext}%` }} />
+      </div>
+      <small>{growth.nextLevelText}</small>
+    </div>
   );
 }
 
@@ -387,12 +406,16 @@ function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRe
   );
 }
 
-function Review({ stats, vocab, reviewGame, onStartGame, onRestart, onRetryQuiz, onNextDay }) {
+function Review({ stats, vocab, reviewGame, growth, onStartGame, onRestart, onRetryQuiz, onNextDay }) {
   const rate = stats.total ? Math.round((stats.correct / stats.total) * 100) : 0;
   const wrongHistory = new Set(stats.wrongHistory || []);
   return (
     <section className="reviewCard">
-      <Mascot />
+      <Mascot growth={growth} />
+      <div className="levelUpBanner">
+        <strong>{growth.stage.name} Lv.{growth.level}</strong>
+        <span>{growth.nextLevelText}</span>
+      </div>
       <h1>{stats.wrong.length ? "복습 필요" : "학습 완성"}</h1>
       <p>정답률 {rate}% · {stats.correct}/{stats.total}</p>
       <p>{stats.wrong.length ? `남은 오답 어휘: ${stats.wrong.join(", ")}` : "오답까지 다시 풀어 모두 맞혔습니다."}</p>
@@ -655,6 +678,29 @@ function findTargetBlock(point, blocks, startedAt, duration) {
 function shuffleLocal(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
+
+function buildMascotGrowth(progressRecord) {
+  const completedDays = Object.entries(progressRecord?.completed || {}).filter(([, completed]) => completed).length;
+  const level = Math.max(1, completedDays + 1);
+  const stageIndex = Math.min(mascotStages.length - 1, level < 10 ? 0 : Math.floor(level / 10));
+  const stage = mascotStages[stageIndex];
+  const currentStageStart = stageIndex === 0 ? 1 : stageIndex * 10;
+  const nextEvolutionLevel = stageIndex === 0 ? 10 : (stageIndex + 1) * 10;
+  const nextStage = mascotStages[stageIndex + 1];
+  const progressToNext = nextStage ? Math.min(100, ((level - currentStageStart) / Math.max(1, nextEvolutionLevel - currentStageStart)) * 100) : 100;
+  const nextLevelText = nextStage
+    ? `Lv.${nextEvolutionLevel}이 되면 ${nextStage.name}로 진화해요.`
+    : "최고 단계까지 자랐어요.";
+  return { completedDays, level, stage, progressToNext, nextLevelText };
+}
+
+const mascotStages = [
+  { name: "초록이", color: "#58cc02", accent: "#6c37ff" },
+  { name: "파랑이", color: "#1cb0f6", accent: "#0d75aa" },
+  { name: "노랑이", color: "#ffd43b", accent: "#b87800" },
+  { name: "분홍이", color: "#ff6fa3", accent: "#c22663" },
+  { name: "보라이", color: "#8b5cf6", accent: "#5b32b4" }
+];
 
 function highlight(sentence, word) {
   const parts = sentence.split(word);
