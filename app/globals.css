@@ -1765,6 +1765,7 @@ textarea {
 .studentLevelBadge {
   display: inline-grid;
   place-items: center;
+  width: max-content;
   min-height: 22px;
   margin-left: 6px;
   padding: 3px 8px;
@@ -1775,6 +1776,13 @@ textarea {
   font-weight: 1000;
   vertical-align: middle;
   box-shadow: 0 2px 0 #ffe082;
+}
+
+.studentRow .studentLevelBadge,
+.progressTable .studentLevelBadge,
+.progressMatrix .studentLevelBadge {
+  display: inline-grid;
+  width: max-content;
 }
 
 table {
