@@ -1890,6 +1890,15 @@ td span {
   color: #b87800;
 }
 
+.unlockBtn {
+  display: block;
+  width: max-content;
+  margin-top: 7px;
+  background: #fff7db;
+  color: #9a6500;
+  box-shadow: 0 3px 0 #ffe09a;
+}
+
 .miniProgress {
   width: min(170px, 100%);
   height: 10px;

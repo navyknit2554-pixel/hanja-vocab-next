@@ -330,6 +330,17 @@ export function AdminApp() {
     persist(nextState);
   }
 
+  function unlockStudentDay(studentId) {
+    const student = state.students.find((item) => item.id === studentId);
+    if (!student) return;
+    const day = Number(student.day || 1);
+    const nextState = structuredClone(state);
+    nextState.progress[studentId] ||= { completed: {}, quiz: {} };
+    nextState.progress[studentId].unlocks ||= {};
+    delete nextState.progress[studentId].unlocks[day];
+    persist(nextState);
+  }
+
   function assignFilteredStudentsDay() {
     if (!baseFilteredStudents.length) return;
     const targetDay = Number(bulkDay);
@@ -801,6 +812,7 @@ export function AdminApp() {
                 </label>
                 <div className="studentActions">
                   <button className="miniBtn" type="button" onClick={() => copyParentLink(student)}>학부모 링크</button>
+                  {isStudentDayLocked(state, student) && <button className="miniBtn" type="button" onClick={() => unlockStudentDay(student.id)}>잠금 해제</button>}
                   <button className="miniBtn" type="button" onClick={() => resetStudentProgress(student.id)}>진도 초기화</button>
                   <button className="miniBtn danger" type="button" onClick={() => deleteStudent(student.id)}>삭제</button>
                 </div>
@@ -848,7 +860,7 @@ export function AdminApp() {
           <div className="tableScroller">
           <table className="progressTable">
             <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
-            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} />)}</tbody>
+            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onUnlock={unlockStudentDay} />)}</tbody>
           </table>
           </div>
         </section>
@@ -934,12 +946,13 @@ export function AdminApp() {
   );
 }
 
-function ProgressRow({ state, student }) {
+function ProgressRow({ state, student, onUnlock }) {
   const lesson = findLesson(state.curriculum, student.day, student.level);
   const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
   const status = getProgressStatus(state, student);
   const nextLearning = getNextLearningInfo(state, student);
   const reviewSummary = getReviewSummary(state, student);
+  const locked = isStudentDayLocked(state, student);
   const totalWords = lessonVocab(lesson).length;
   const rate = record.total ? Math.round((record.correct / record.total) * 100) : 0;
   const progress = status.key === "completed" ? 100 : record.total ? Math.min(92, Math.round((record.correct / Math.max(1, totalWords)) * 100)) : 0;
@@ -958,6 +971,7 @@ function ProgressRow({ state, student }) {
       </td>
       <td data-label="상태">
         <span className={`statusPill ${status.key}`}>{status.label}</span>
+        {locked && <button className="miniBtn unlockBtn" type="button" onClick={() => onUnlock(student.id)}>오늘 열어주기</button>}
         <div className="miniProgress"><i style={{ width: `${progress}%` }} /></div>
       </td>
       <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
@@ -967,6 +981,11 @@ function ProgressRow({ state, student }) {
       </td>
     </tr>
   );
+}
+
+function isStudentDayLocked(state, student) {
+  const unlockAt = state.progress[student.id]?.unlocks?.[student.day];
+  return Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime());
 }
 
 function getNextLearningInfo(state, student) {
