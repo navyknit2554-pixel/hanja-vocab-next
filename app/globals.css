@@ -1762,6 +1762,21 @@ textarea {
   box-shadow: 0 3px 0 #ffc2cf;
 }
 
+.studentLevelBadge {
+  display: inline-grid;
+  place-items: center;
+  min-height: 22px;
+  margin-left: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff4ba;
+  color: #f2a900;
+  font-size: .72rem;
+  font-weight: 1000;
+  vertical-align: middle;
+  box-shadow: 0 2px 0 #ffe082;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

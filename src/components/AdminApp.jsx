@@ -803,7 +803,7 @@ export function AdminApp() {
             {baseFilteredStudents.map((student) => (
               <div className="studentRow" key={student.id}>
                 <div>
-                  <strong>{student.name}</strong>
+                  <strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong>
                   <span>{student.loginId} / {student.password} · {student.phone ? `${student.phone} · ` : ""}{student.grade} · {student.level}</span>
                 </div>
                 <label className="dayPicker">현재 일차
@@ -969,7 +969,7 @@ function ProgressRow({ state, student, onOpenReview }) {
 
   return (
     <tr>
-      <td data-label="학생"><strong>{student.name}</strong><br /><span>{student.loginId} / {student.password}</span></td>
+      <td data-label="학생"><strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong><br /><span>{student.loginId} / {student.password}</span></td>
       <td data-label="배정">
         <b>{student.day}일차</b><br />
         <span>{student.grade} · {student.level}</span>
@@ -986,6 +986,16 @@ function ProgressRow({ state, student, onOpenReview }) {
       </td>
     </tr>
   );
+}
+
+function StudentLevelBadge({ state, student }) {
+  const level = getStudentLevel(state, student);
+  return <span className="studentLevelBadge">Lv. {level}</span>;
+}
+
+function getStudentLevel(state, student) {
+  const completedDays = Object.values(state.progress[student.id]?.completed || {}).filter(Boolean).length;
+  return Math.max(1, Math.floor(completedDays / 5) + 1);
 }
 
 function ReviewDetailModal({ state, student, onClose }) {
@@ -1177,7 +1187,7 @@ function ProgressMatrix({ state, students, days, onUnlock }) {
           {students.map((student) => (
             <tr key={student.id}>
               <td className="stickyStudent">
-                <strong>{student.name}</strong>
+                <strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong>
                 <span>{student.grade} · {student.level}</span>
               </td>
               {days.map((day) => {
