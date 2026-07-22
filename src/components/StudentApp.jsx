@@ -256,7 +256,7 @@ export function StudentApp() {
       ) : (
         <>
       <div className="progress"><span style={{ width: `${Math.max(8, Math.min(100, progress))}%` }} /></div>
-      {stage === "learn" && <LearningCard card={cards[cardIndex]} index={cardIndex} total={cards.length} onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))} onNext={() => cardIndex + 1 >= cards.length ? startQuiz() : setCardIndex(cardIndex + 1)} />}
+      {stage === "learn" && <LearningCard card={cards[cardIndex]} index={cardIndex} total={cards.length} growth={growth} onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))} onNext={() => cardIndex + 1 >= cards.length ? startQuiz() : setCardIndex(cardIndex + 1)} />}
       {stage === "quiz" && currentQuiz && <QuizCard quiz={currentQuiz} feedback={feedback} onChoose={choose} remainingWrong={stats.wrong.length} index={quizIndex} total={queue.length} isRetryRound={isRetryRound} />}
       {stage === "archery" && archeryGame && (
         <ArcheryGame
@@ -345,8 +345,8 @@ function MascotGrowthCard({ growth }) {
     <div className="mascotGrowthCard">
       <Mascot small growth={growth} />
       <div>
-        <strong>{growth.stage.name} Lv.{growth.level}</strong>
-        <span>{growth.completedDays}일차 완료</span>
+        <strong>{growth.stage.name} Lv. {growth.level}</strong>
+        <span>{growth.completedDays}일차 완료 · 다음 레벨까지 {growth.daysToNextLevel}일</span>
       </div>
       <div className="levelMeter" aria-hidden="true">
         <i style={{ width: `${growth.progressToNext}%` }} />
@@ -356,11 +356,11 @@ function MascotGrowthCard({ growth }) {
   );
 }
 
-function LearningCard({ card, index, total, onPrev, onNext }) {
+function LearningCard({ card, index, total, growth, onPrev, onNext }) {
   const isHanja = card.type === "hanja";
   return (
     <section className="studyStage">
-      <Mascot small />
+      <Mascot small growth={growth} />
       <p className="eyebrow">{index + 1} / {total}</p>
       {isHanja ? (
         <article className="hanjaCard">
@@ -413,7 +413,7 @@ function Review({ stats, vocab, reviewGame, growth, onStartGame, onRestart, onRe
     <section className="reviewCard">
       <Mascot growth={growth} />
       <div className="levelUpBanner">
-        <strong>{growth.stage.name} Lv.{growth.level}</strong>
+        <strong>{growth.stage.name} Lv. {growth.level}</strong>
         <span>{growth.nextLevelText}</span>
       </div>
       <h1>{stats.wrong.length ? "복습 필요" : "학습 완성"}</h1>
@@ -681,7 +681,9 @@ function shuffleLocal(items) {
 
 function buildMascotGrowth(progressRecord) {
   const completedDays = Object.entries(progressRecord?.completed || {}).filter(([, completed]) => completed).length;
-  const level = Math.max(1, completedDays + 1);
+  const level = Math.max(1, Math.floor(completedDays / 5) + 1);
+  const daysIntoLevel = completedDays % 5;
+  const daysToNextLevel = 5 - daysIntoLevel;
   const stageIndex = Math.min(mascotStages.length - 1, level < 10 ? 0 : Math.floor(level / 10));
   const stage = mascotStages[stageIndex];
   const currentStageStart = stageIndex === 0 ? 1 : stageIndex * 10;
@@ -691,7 +693,7 @@ function buildMascotGrowth(progressRecord) {
   const nextLevelText = nextStage
     ? `Lv.${nextEvolutionLevel}이 되면 ${nextStage.name}로 진화해요.`
     : "최고 단계까지 자랐어요.";
-  return { completedDays, level, stage, progressToNext, nextLevelText };
+  return { completedDays, level, stage, progressToNext, nextLevelText, daysToNextLevel };
 }
 
 const mascotStages = [

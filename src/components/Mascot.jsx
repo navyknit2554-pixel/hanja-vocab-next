@@ -13,7 +13,7 @@ export function Mascot({ mood = "happy", small = false, growth = null }) {
         <span className="spark">!</span>
       </div>
       <span className="mascotName">{stage.name}</span>
-      {growth?.level && <span className="mascotLevel">Lv.{growth.level}</span>}
+      {growth?.level && <span className="mascotLevel">Lv. {growth.level}</span>}
     </div>
   );
 }

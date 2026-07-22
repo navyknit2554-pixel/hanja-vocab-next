@@ -921,12 +921,14 @@ textarea {
 
 .mascotLevel {
   margin-top: -6px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: #fff7db;
-  color: #b87800;
-  font-size: .78rem;
+  background: #fff4ba;
+  color: #f2a900;
+  font-size: .86rem;
+  letter-spacing: 0;
   font-weight: 900;
+  box-shadow: 0 3px 0 #ffe082;
 }
 
 .mascotGrowthCard {
