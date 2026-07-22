@@ -1870,6 +1870,26 @@ td span {
   color: #0d75aa;
 }
 
+.statusPill.locked {
+  background: #fff7db;
+  color: #b87800;
+}
+
+.nextLearning,
+.reviewSummary {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 900;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.nextLearning {
+  color: #b87800;
+}
+
 .miniProgress {
   width: min(170px, 100%);
   height: 10px;

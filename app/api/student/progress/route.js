@@ -33,6 +33,10 @@ export async function PUT(request) {
       total: Number(game.total || 0),
       missed: Number(game.missed || 0),
       accuracy: Number(game.accuracy || 0),
+      reviewedWords: Array.isArray(game.reviewedWords) ? game.reviewedWords : [],
+      hitWords: Array.isArray(game.hitWords) ? game.hitWords : [],
+      missedWords: Array.isArray(game.missedWords) ? game.missedWords : [],
+      answers: Array.isArray(game.answers) ? game.answers : [],
       cleared: Boolean(game.cleared),
       finishedAt: new Date().toISOString()
     };

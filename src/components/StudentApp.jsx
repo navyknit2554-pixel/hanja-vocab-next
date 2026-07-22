@@ -431,6 +431,7 @@ function ArcheryGame({ game, onComplete, onExit }) {
   const [aim, setAim] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [shot, setShot] = useState(null);
+  const [answers, setAnswers] = useState([]);
   const [questionStartedAt, setQuestionStartedAt] = useState(Date.now());
   const current = questions[index];
   const blocks = useMemo(() => buildArcheryBlocks(current, game.items), [current, game.items]);
@@ -446,7 +447,7 @@ function ArcheryGame({ game, onComplete, onExit }) {
     if (!questions.length || shot) return;
     const timer = window.setTimeout(() => {
       setShot({ correct: false, targetWord: "", timedOut: true });
-      window.setTimeout(() => finishQuestion(false), 520);
+      window.setTimeout(() => finishQuestion(false, "", true), 520);
     }, fallDuration);
     return () => window.clearTimeout(timer);
   }, [index, questions.length, shot, fallDuration]);
@@ -492,14 +493,26 @@ function ArcheryGame({ game, onComplete, onExit }) {
     const target = findTargetBlock(point, blocks, questionStartedAt, fallDuration);
     const correct = target?.word === current.word;
     setShot({ correct, targetWord: target?.word || "" });
-    window.setTimeout(() => finishQuestion(correct), 700);
+    window.setTimeout(() => finishQuestion(correct, target?.word || "", false), 700);
   }
 
-  function finishQuestion(correct) {
+  function finishQuestion(correct, selectedWord = "", timedOut = false) {
     const nextHits = hits + (correct ? 1 : 0);
     const nextMissed = missed + (correct ? 0 : 1);
+    const nextAnswers = [
+      ...answers,
+      {
+        word: current.word,
+        hanja: current.hanja,
+        meaning: current.meaning,
+        selectedWord,
+        correct,
+        timedOut
+      }
+    ];
     setHits(nextHits);
     setMissed(nextMissed);
+    setAnswers(nextAnswers);
     setShot(null);
     setAim(null);
     if (index + 1 >= questions.length) {
@@ -510,7 +523,11 @@ function ArcheryGame({ game, onComplete, onExit }) {
         total: questions.length,
         missed: nextMissed,
         accuracy,
-        cleared: accuracy >= 80
+        cleared: accuracy >= 80,
+        reviewedWords: nextAnswers.map((item) => item.word),
+        hitWords: nextAnswers.filter((item) => item.correct).map((item) => item.word),
+        missedWords: nextAnswers.filter((item) => !item.correct).map((item) => item.word),
+        answers: nextAnswers
       });
       return;
     }

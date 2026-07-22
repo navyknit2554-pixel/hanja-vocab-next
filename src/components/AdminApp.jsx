@@ -135,12 +135,12 @@ export function AdminApp() {
     return baseFilteredStudents.filter((student) => progressFilter === "all" || getProgressStatus(state, student).key === progressFilter);
   }, [baseFilteredStudents, progressFilter, state]);
   const progressSummary = useMemo(() => {
-    if (!state) return { completed: 0, retry: 0, active: 0, idle: 0 };
+    if (!state) return { completed: 0, retry: 0, active: 0, locked: 0, idle: 0 };
     return baseFilteredStudents.reduce((summary, student) => {
       const status = getProgressStatus(state, student).key;
       summary[status] += 1;
       return summary;
-    }, { completed: 0, retry: 0, active: 0, idle: 0 });
+    }, { completed: 0, retry: 0, active: 0, locked: 0, idle: 0 });
   }, [baseFilteredStudents, state]);
   const progressDays = useMemo(() => {
     const days = state?.curriculum.map((lesson) => Number(lesson.day)).filter(Boolean) || [];
@@ -827,6 +827,7 @@ export function AdminApp() {
             <span className="complete"><b>{progressSummary.completed}</b>완성</span>
             <span className="retry"><b>{progressSummary.retry}</b>복습 필요</span>
             <span className="active"><b>{progressSummary.active}</b>진행 중</span>
+            <span><b>{progressSummary.locked}</b>대기 중</span>
             <span><b>{progressSummary.idle}</b>시작 전</span>
           </div>
           <div className="statusFilters">
@@ -835,6 +836,7 @@ export function AdminApp() {
               ["completed", "완성", progressSummary.completed],
               ["retry", "복습 필요", progressSummary.retry],
               ["active", "진행 중", progressSummary.active],
+              ["locked", "대기 중", progressSummary.locked],
               ["idle", "시작 전", progressSummary.idle]
             ].map(([key, label, count]) => (
               <button className={progressFilter === key ? "active" : ""} type="button" key={key} onClick={() => setProgressFilter(key)}>
@@ -936,6 +938,8 @@ function ProgressRow({ state, student }) {
   const lesson = findLesson(state.curriculum, student.day, student.level);
   const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
   const status = getProgressStatus(state, student);
+  const nextLearning = getNextLearningInfo(state, student);
+  const reviewSummary = getReviewSummary(state, student);
   const totalWords = lessonVocab(lesson).length;
   const rate = record.total ? Math.round((record.correct / record.total) * 100) : 0;
   const progress = status.key === "completed" ? 100 : record.total ? Math.min(92, Math.round((record.correct / Math.max(1, totalWords)) * 100)) : 0;
@@ -947,15 +951,68 @@ function ProgressRow({ state, student }) {
   return (
     <tr>
       <td data-label="학생"><strong>{student.name}</strong><br /><span>{student.loginId} / {student.password}</span></td>
-      <td data-label="배정"><b>{student.day}일차</b><br /><span>{student.grade} · {student.level}</span></td>
+      <td data-label="배정">
+        <b>{student.day}일차</b><br />
+        <span>{student.grade} · {student.level}</span>
+        {nextLearning && <small className="nextLearning">{nextLearning}</small>}
+      </td>
       <td data-label="상태">
         <span className={`statusPill ${status.key}`}>{status.label}</span>
         <div className="miniProgress"><i style={{ width: `${progress}%` }} /></div>
       </td>
       <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
-      <td data-label="오답/복습">{wrongText}</td>
+      <td data-label="오답/복습">
+        <span>{wrongText}</span>
+        {reviewSummary && <small className="reviewSummary">{reviewSummary}</small>}
+      </td>
     </tr>
   );
+}
+
+function getNextLearningInfo(state, student) {
+  const progress = state.progress[student.id] || {};
+  const currentDay = Number(student.day || 1);
+  const currentUnlock = progress.unlocks?.[currentDay];
+  if (currentUnlock && Date.now() < new Date(currentUnlock).getTime()) {
+    return `${currentDay}일차 대기 · ${formatKoreanUnlockTime(currentUnlock)}부터`;
+  }
+
+  const currentRecord = progress.quiz?.[currentDay];
+  const currentCompleted = progress.completed?.[currentDay] && !currentRecord?.wrong?.length;
+  if (!currentCompleted) return "";
+
+  const nextDay = currentDay + 1;
+  const hasNextLesson = state.curriculum.some((lesson) => Number(lesson.day) === nextDay && String(lesson.level || "").trim() === String(student.level || "").trim());
+  if (!hasNextLesson) return "마지막 일차 완료";
+
+  const unlockAt = progress.unlocks?.[nextDay] || inferNextUnlockFromRecord(currentRecord);
+  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
+    return `${nextDay}일차 대기 · ${formatKoreanUnlockTime(unlockAt)}부터`;
+  }
+  return `${nextDay}일차 학습 가능`;
+}
+
+function getReviewSummary(state, student) {
+  const progress = state.progress[student.id] || {};
+  const quizReviews = Object.entries(progress.quiz || {})
+    .filter(([day]) => Number(day) !== Number(student.day))
+    .flatMap(([day, record]) => (record.wrongHistory || []).map((word) => `${day}일차 ${word}`));
+  const gameReviews = Object.values(progress.games || {}).flatMap((game) => {
+    const words = game.reviewedWords || [];
+    if (!words.length) return [];
+    return [`활쏘기 ${game.rangeStart}-${game.rangeEnd}일차: ${words.slice(0, 8).join(", ")}${words.length > 8 ? "..." : ""}`];
+  });
+  const items = [...quizReviews, ...gameReviews];
+  return items.length ? `지난 복습: ${items.slice(0, 8).join(" / ")}` : "";
+}
+
+function inferNextUnlockFromRecord(record) {
+  if (!record?.finishedAt) return "";
+  const finished = new Date(record.finishedAt);
+  if (Number.isNaN(finished.getTime())) return "";
+  const koreanFinished = new Date(finished.getTime() + 9 * 60 * 60 * 1000);
+  const nextMidnightUtcMs = Date.UTC(koreanFinished.getUTCFullYear(), koreanFinished.getUTCMonth(), koreanFinished.getUTCDate() + 1, -9, 0, 0, 0);
+  return new Date(nextMidnightUtcMs).toISOString();
 }
 
 function StudentFilters({ gradeFilter, dayFilter, onGradeChange, onDayChange, dayOptions }) {
@@ -1039,6 +1096,8 @@ function formatKoreanUnlockTime(value) {
 }
 
 function getProgressStatus(state, student) {
+  const unlockAt = state.progress[student.id]?.unlocks?.[student.day];
+  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) return { key: "locked", label: "대기 중" };
   const record = state.progress[student.id]?.quiz?.[student.day];
   const completed = state.progress[student.id]?.completed?.[student.day] && !record?.wrong?.length;
   if (completed) return { key: "completed", label: "학습 완성" };
