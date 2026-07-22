@@ -64,6 +64,7 @@ export function AdminApp() {
   const [studentDayFilter, setStudentDayFilter] = useState("all");
   const [adminView, setAdminView] = useState("students");
   const [bulkDay, setBulkDay] = useState(1);
+  const [reviewModalStudent, setReviewModalStudent] = useState(null);
 
   useEffect(() => {
     try {
@@ -860,9 +861,16 @@ export function AdminApp() {
           <div className="tableScroller">
           <table className="progressTable">
             <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
-            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onUnlock={unlockStudentDay} />)}</tbody>
+            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onUnlock={unlockStudentDay} onOpenReview={() => setReviewModalStudent(student)} />)}</tbody>
           </table>
           </div>
+          {reviewModalStudent && (
+            <ReviewDetailModal
+              state={state}
+              student={reviewModalStudent}
+              onClose={() => setReviewModalStudent(null)}
+            />
+          )}
         </section>
         )}
 
@@ -946,12 +954,12 @@ export function AdminApp() {
   );
 }
 
-function ProgressRow({ state, student, onUnlock }) {
+function ProgressRow({ state, student, onUnlock, onOpenReview }) {
   const lesson = findLesson(state.curriculum, student.day, student.level);
   const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
   const status = getProgressStatus(state, student);
   const nextLearning = getNextLearningInfo(state, student);
-  const reviewSummary = getReviewSummary(state, student);
+  const reviewCounts = getReviewCounts(state, student);
   const locked = isStudentDayLocked(state, student);
   const totalWords = lessonVocab(lesson).length;
   const rate = record.total ? Math.round((record.correct / record.total) * 100) : 0;
@@ -959,7 +967,7 @@ function ProgressRow({ state, student, onUnlock }) {
   const finishedAt = record.finishedAt ? new Date(record.finishedAt).toLocaleDateString("ko-KR") : "";
   const attempts = record.attempts || (record.total ? 1 : 0);
   const quizMeta = record.total ? [`${record.correct}/${record.total}문항`, `${attempts}회 응시`, finishedAt].filter(Boolean).join(" · ") : `예정 어휘 ${totalWords}개`;
-  const wrongText = record.wrong?.length ? record.wrong.join(", ") : record.wrongHistory?.length ? `복습 완료: ${record.wrongHistory.join(", ")}` : "-";
+  const reviewMeta = reviewCounts.total ? `오답 ${reviewCounts.currentWrong} · 복습 ${reviewCounts.quizReview} · 게임 ${reviewCounts.gameReview}` : "기록 없음";
 
   return (
     <tr>
@@ -976,11 +984,84 @@ function ProgressRow({ state, student, onUnlock }) {
       </td>
       <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
       <td data-label="오답/복습">
-        <span>{wrongText}</span>
-        {reviewSummary && <small className="reviewSummary">{reviewSummary}</small>}
+        <button className="miniBtn" type="button" onClick={onOpenReview}>자세히 보기</button>
+        <small className="reviewSummary">{reviewMeta}</small>
       </td>
     </tr>
   );
+}
+
+function ReviewDetailModal({ state, student, onClose }) {
+  const details = getReviewDetails(state, student);
+  const hasAnyReview = details.currentWrong.length || details.currentReviewDone.length || details.quizReviews.length || details.gameReviews.length;
+  return (
+    <div className="modalOverlay" role="presentation">
+      <section className="reviewModal" role="dialog" aria-modal="true" aria-label={`${student.name} 오답 복습 기록`}>
+        <div className="modalHead">
+          <div>
+            <p className="eyebrow">{student.grade} · {student.level} · {student.day}일차</p>
+            <h2>{student.name} 오답/복습 기록</h2>
+          </div>
+          <button className="miniBtn" type="button" onClick={onClose}>닫기</button>
+        </div>
+
+        {!hasAnyReview && <p className="emptyText">아직 오답이나 복습 기록이 없습니다.</p>}
+
+        <div className="reviewModalGrid">
+          <article className="reviewDetailBlock">
+            <h3>현재 일차</h3>
+            <ReviewWordList title="남은 오답" words={details.currentWrong} empty="남은 오답 없음" />
+            <ReviewWordList title="다시 풀어 맞힌 어휘" words={details.currentReviewDone} empty="복습 완료 어휘 없음" />
+          </article>
+
+          <article className="reviewDetailBlock">
+            <h3>일차별 퀴즈 복습</h3>
+            {details.quizReviews.length ? details.quizReviews.map((item) => (
+              <div className="reviewHistoryItem" key={`quiz-${item.day}`}>
+                <strong>{item.day}일차</strong>
+                {item.finishedAt && <span>{formatShortDate(item.finishedAt)}</span>}
+                <ReviewWordList title="오답" words={item.wrong} empty="남은 오답 없음" />
+                <ReviewWordList title="복습한 어휘" words={item.words} empty="복습 어휘 없음" />
+              </div>
+            )) : <p className="emptyText">퀴즈 복습 기록이 없습니다.</p>}
+          </article>
+
+          <article className="reviewDetailBlock full">
+            <h3>활쏘기 복습 게임</h3>
+            {details.gameReviews.length ? details.gameReviews.map((game, index) => (
+              <div className="reviewHistoryItem" key={`game-${game.rangeStart}-${game.rangeEnd}-${index}`}>
+                <strong>{game.rangeStart}-{game.rangeEnd}일차 활쏘기</strong>
+                <span>{game.accuracy}% · {game.score}점{game.finishedAt ? ` · ${formatShortDate(game.finishedAt)}` : ""}</span>
+                <ReviewWordList title="출제 어휘" words={game.reviewedWords} empty="출제 기록 없음" />
+                <ReviewWordList title="맞힌 어휘" words={game.hitWords} empty="맞힌 어휘 없음" />
+                <ReviewWordList title="놓친 어휘" words={game.missedWords} empty="놓친 어휘 없음" />
+              </div>
+            )) : <p className="emptyText">활쏘기 복습 기록이 없습니다.</p>}
+          </article>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ReviewWordList({ title, words, empty }) {
+  const cleanWords = [...new Set((words || []).filter(Boolean))];
+  return (
+    <div className="reviewWordList">
+      <span>{title}</span>
+      {cleanWords.length ? (
+        <div>{cleanWords.map((word) => <b key={word}>{word}</b>)}</div>
+      ) : (
+        <small>{empty}</small>
+      )}
+    </div>
+  );
+}
+
+function formatShortDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ko-KR");
 }
 
 function isStudentDayLocked(state, student) {
@@ -1011,18 +1092,50 @@ function getNextLearningInfo(state, student) {
   return `${nextDay}일차 학습 가능`;
 }
 
-function getReviewSummary(state, student) {
+function getReviewCounts(state, student) {
+  const details = getReviewDetails(state, student);
+  const currentWrong = details.currentWrong.length;
+  const quizReview = details.quizReviews.reduce((sum, item) => sum + item.words.length, 0);
+  const gameReview = details.gameReviews.reduce((sum, item) => sum + item.reviewedWords.length, 0);
+  return {
+    currentWrong,
+    quizReview,
+    gameReview,
+    total: currentWrong + quizReview + gameReview
+  };
+}
+
+function getReviewDetails(state, student) {
   const progress = state.progress[student.id] || {};
+  const currentRecord = progress.quiz?.[student.day] || {};
   const quizReviews = Object.entries(progress.quiz || {})
-    .filter(([day]) => Number(day) !== Number(student.day))
-    .flatMap(([day, record]) => (record.wrongHistory || []).map((word) => `${day}일차 ${word}`));
-  const gameReviews = Object.values(progress.games || {}).flatMap((game) => {
-    const words = game.reviewedWords || [];
-    if (!words.length) return [];
-    return [`활쏘기 ${game.rangeStart}-${game.rangeEnd}일차: ${words.slice(0, 8).join(", ")}${words.length > 8 ? "..." : ""}`];
-  });
-  const items = [...quizReviews, ...gameReviews];
-  return items.length ? `지난 복습: ${items.slice(0, 8).join(" / ")}` : "";
+    .map(([day, record]) => ({
+      day: Number(day),
+      wrong: record.wrong || [],
+      words: record.wrongHistory || [],
+      finishedAt: record.finishedAt || ""
+    }))
+    .filter((item) => item.wrong.length || item.words.length)
+    .sort((a, b) => a.day - b.day);
+  const gameReviews = Object.values(progress.games || {})
+    .map((game) => ({
+      type: game.type || "archery",
+      rangeStart: game.rangeStart,
+      rangeEnd: game.rangeEnd,
+      score: game.score || 0,
+      accuracy: game.accuracy || 0,
+      reviewedWords: game.reviewedWords || [],
+      hitWords: game.hitWords || [],
+      missedWords: game.missedWords || [],
+      finishedAt: game.finishedAt || ""
+    }))
+    .sort((a, b) => Number(a.rangeStart || 0) - Number(b.rangeStart || 0));
+  return {
+    currentWrong: currentRecord.wrong || [],
+    currentReviewDone: currentRecord.wrongHistory || [],
+    quizReviews,
+    gameReviews
+  };
 }
 
 function inferNextUnlockFromRecord(record) {
