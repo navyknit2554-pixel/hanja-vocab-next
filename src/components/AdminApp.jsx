@@ -336,6 +336,10 @@ export function AdminApp() {
     if (!student) return;
     const day = Number(targetDay || student.day || 1);
     const nextState = structuredClone(state);
+    const nextStudent = nextState.students.find((item) => item.id === studentId);
+    if (nextStudent && Number(nextStudent.day || 1) < day) {
+      nextStudent.day = day;
+    }
     nextState.progress[studentId] ||= { completed: {}, quiz: {} };
     nextState.progress[studentId].unlocks ||= {};
     delete nextState.progress[studentId].unlocks[day];
@@ -1223,7 +1227,7 @@ function ProgressMatrix({ state, students, days, onUnlock }) {
 function getDayProgressStatus(state, student, day) {
   const record = state.progress[student.id]?.quiz?.[day];
   const completed = state.progress[student.id]?.completed?.[day] && !record?.wrong?.length;
-  const unlockAt = state.progress[student.id]?.unlocks?.[day];
+  const unlockAt = state.progress[student.id]?.unlocks?.[day] || getInferredUnlockForDay(state, student, day);
   if (completed) return { key: "completed", label: "완", title: `${day}일차 학습 완성` };
   if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요: ${record.wrong.join(", ")}` };
   if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}` };
@@ -1231,8 +1235,22 @@ function getDayProgressStatus(state, student, day) {
     const unlockText = formatKoreanUnlockTime(unlockAt);
     return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };
   }
-  if (Number(student.day) === Number(day)) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
+  if (Number(student.day) === Number(day) || unlockAt) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
   return { key: "idle", label: "-", title: `${day}일차 시작 전` };
+}
+
+function getInferredUnlockForDay(state, student, day) {
+  const targetDay = Number(day);
+  const previousDay = targetDay - 1;
+  if (previousDay < 1) return "";
+  const previousRecord = state.progress[student.id]?.quiz?.[previousDay];
+  const previousCompleted = state.progress[student.id]?.completed?.[previousDay] && !previousRecord?.wrong?.length;
+  if (!previousCompleted) return "";
+  const hasTargetLesson = state.curriculum.some(
+    (lesson) => Number(lesson.day) === targetDay && String(lesson.level || "").trim() === String(student.level || "").trim()
+  );
+  if (!hasTargetLesson) return "";
+  return inferNextUnlockFromRecord(previousRecord) || "";
 }
 
 function formatKoreanUnlockTime(value) {

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { buildSeedCurriculum, cloneSeed } from "./data";
+import { normalizeStudentProgression } from "./progression";
 
 const statePath = join(process.cwd(), ".data", "app-state.json");
 const stateKey = "main";
@@ -115,6 +116,7 @@ function normalizeState(state, scopeKey = stateKey) {
     student.level ||= "초급";
     student.day ||= 1;
     next.progress[student.id] ||= { completed: {}, quiz: {} };
+    normalizeStudentProgression(next, student);
   });
   next.curriculum.sort((a, b) => levelOrder(a.level) - levelOrder(b.level) || Number(a.day) - Number(b.day));
   return next;
