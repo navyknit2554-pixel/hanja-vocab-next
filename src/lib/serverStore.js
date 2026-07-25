@@ -141,8 +141,20 @@ function isIncompleteLesson(lesson) {
   if (dailyCount < 4 || hanjaSet.length < dailyCount) return true;
   return hanjaSet.slice(0, dailyCount).some((hanja) => {
     if (!Array.isArray(hanja?.vocab) || hanja.vocab.length < 8) return true;
+    if (Number(lesson?.day || 0) > 5 && hasPatternedGeneratedVocab(hanja)) return true;
     return hanja.vocab.some((word) => !isValidVocabWord(word, hanja.character));
   });
+}
+
+function hasPatternedGeneratedVocab(hanja) {
+  const sound = String(hanja?.sound || "").trim();
+  const generatedEndings = new Set(["력", "성", "도", "화", "자", "물", "심"]);
+  const words = Array.isArray(hanja?.vocab) ? hanja.vocab : [];
+  const generatedCount = words.filter((item) => {
+    const word = String(item?.word || "").trim();
+    return word.startsWith(sound) && generatedEndings.has(word.slice(-1));
+  }).length;
+  return generatedCount >= 4;
 }
 
 function isValidVocabWord(word, character) {

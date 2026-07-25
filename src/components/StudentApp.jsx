@@ -111,7 +111,7 @@ export function StudentApp() {
   }
 
   function startQuiz() {
-    setQueue(quizItems(lesson));
+    setQueue(shuffleLocal(quizItems(lesson)));
     setRetry([]);
     setQuizIndex(0);
     setPendingStudent(null);
@@ -149,7 +149,7 @@ export function StudentApp() {
     if (stage !== "quiz" || !queue.length || feedback) return;
     if (quizIndex < queue.length) return;
     if (retry.length) {
-      setQueue(retry);
+      setQueue(shuffleLocal(retry));
       setRetry([]);
       setQuizIndex(0);
       return;

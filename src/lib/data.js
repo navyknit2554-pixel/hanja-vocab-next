@@ -2151,6 +2151,126 @@ const curatedVocabByCharacter = {
     ["希少", "희소", "매우 드묾"],
     ["少量", "소량", "적은 양"],
     ["最少", "최소", "가장 적음"]
+  ],
+  男: [
+    ["男子", "남자", "남성인 사람"],
+    ["男性", "남성", "남자의 성질이나 남자"],
+    ["男女", "남녀", "남자와 여자"],
+    ["長男", "장남", "첫째 아들"],
+    ["次男", "차남", "둘째 아들"],
+    ["男兒", "남아", "남자아이"],
+    ["男便", "남편", "혼인한 남자 배우자"],
+    ["男學生", "남학생", "남자인 학생"]
+  ],
+  女: [
+    ["女子", "여자", "여성인 사람"],
+    ["女性", "여성", "여자의 성질이나 여자"],
+    ["男女", "남녀", "남자와 여자"],
+    ["長女", "장녀", "첫째 딸"],
+    ["次女", "차녀", "둘째 딸"],
+    ["女王", "여왕", "여자인 왕"],
+    ["女學生", "여학생", "여자인 학생"],
+    ["女優", "여우", "여자 배우"]
+  ],
+  南: [
+    ["南方", "남방", "남쪽 방향"],
+    ["南部", "남부", "남쪽 지역"],
+    ["南海", "남해", "남쪽 바다"],
+    ["南山", "남산", "남쪽에 있는 산"],
+    ["南北", "남북", "남쪽과 북쪽"],
+    ["東南", "동남", "동쪽과 남쪽 사이"],
+    ["西南", "서남", "서쪽과 남쪽 사이"],
+    ["南極", "남극", "지구의 남쪽 끝 지역"]
+  ],
+  如: [
+    ["如前", "여전", "전과 같음"],
+    ["如實", "여실", "있는 그대로 분명함"],
+    ["如何", "여하", "어떠함"],
+    ["如此", "여차", "이와 같음"],
+    ["一如", "일여", "한결같음"],
+    ["缺如", "결여", "마땅히 있어야 할 것이 빠져 있음"],
+    ["如上", "여상", "위와 같음"],
+    ["如斯", "여사", "이와 같음"]
+  ],
+  成: [
+    ["成功", "성공", "뜻한 일을 이룸"],
+    ["成長", "성장", "자라서 커짐"],
+    ["完成", "완성", "완전히 이룸"],
+    ["形成", "형성", "어떤 모양이나 상태를 이룸"],
+    ["達成", "달성", "목표를 이룸"],
+    ["構成", "구성", "여러 부분이 모여 이룸"],
+    ["成立", "성립", "일이나 관계가 이루어짐"],
+    ["造成", "조성", "만들어 이룸"]
+  ],
+  敗: [
+    ["失敗", "실패", "뜻한 일을 이루지 못함"],
+    ["敗北", "패배", "싸움이나 겨룸에서 짐"],
+    ["勝敗", "승패", "이김과 짐"],
+    ["連敗", "연패", "계속해서 짐"],
+    ["敗者", "패자", "진 사람"],
+    ["大敗", "대패", "크게 짐"],
+    ["敗因", "패인", "진 원인"],
+    ["敗色", "패색", "질 기색"]
+  ],
+  星: [
+    ["星座", "성좌", "별자리"],
+    ["恒星", "항성", "스스로 빛을 내는 별"],
+    ["惑星", "혹성", "행성"],
+    ["流星", "유성", "별똥별"],
+    ["明星", "명성", "밝게 빛나는 별"],
+    ["星雲", "성운", "구름처럼 보이는 천체"],
+    ["衛星", "위성", "행성 둘레를 도는 천체"],
+    ["星光", "성광", "별빛"]
+  ],
+  貝: [
+    ["貝類", "패류", "조개 종류"],
+    ["貝殼", "패각", "조개의 껍데기"],
+    ["貝塚", "패총", "조개껍데기가 쌓인 유적"],
+    ["魚貝", "어패", "물고기와 조개류"],
+    ["貝貨", "패화", "조개껍데기로 만든 돈"],
+    ["貝柱", "패주", "조개의 관자"],
+    ["貝毒", "패독", "조개류에 든 독"],
+    ["卷貝", "권패", "소라처럼 말린 조개"]
+  ],
+  供: [
+    ["供給", "공급", "필요한 것을 대어 줌"],
+    ["提供", "제공", "무엇을 내주거나 마련해 줌"],
+    ["供與", "공여", "무엇을 주어 쓰게 함"],
+    ["供出", "공출", "필요에 따라 물건을 내놓음"],
+    ["供述", "공술", "사실을 말함"],
+    ["自供", "자공", "스스로 사실을 말함"],
+    ["供物", "공물", "제사 등에 바치는 물건"],
+    ["供給者", "공급자", "필요한 것을 대어 주는 사람"]
+  ],
+  需: [
+    ["需要", "수요", "필요로 하거나 요구함"],
+    ["需給", "수급", "수요와 공급"],
+    ["必需", "필수", "반드시 필요함"],
+    ["軍需", "군수", "군사에 필요한 물자"],
+    ["民需", "민수", "민간에서 필요한 수요"],
+    ["內需", "내수", "나라 안의 수요"],
+    ["實需", "실수", "실제로 필요한 수요"],
+    ["需用", "수용", "필요로 하여 씀"]
+  ],
+  公: [
+    ["公共", "공공", "여러 사람에게 관계됨"],
+    ["公平", "공평", "치우치지 않고 고름"],
+    ["公正", "공정", "공평하고 바름"],
+    ["公開", "공개", "여러 사람에게 드러냄"],
+    ["公園", "공원", "사람들이 쉬는 곳"],
+    ["公演", "공연", "대중 앞에서 연주하거나 연기함"],
+    ["公式", "공식", "공적으로 정한 방식"],
+    ["公務", "공무", "국가나 공공 단체의 일"]
+  ],
+  水: [
+    ["水準", "수준", "정도의 높이"],
+    ["水道", "수도", "물을 보내는 시설"],
+    ["水面", "수면", "물의 표면"],
+    ["水泳", "수영", "물에서 헤엄침"],
+    ["水質", "수질", "물의 성질"],
+    ["洪水", "홍수", "물이 넘쳐흐름"],
+    ["海水", "해수", "바닷물"],
+    ["地下水", "지하수", "땅속의 물"]
   ]
 };
 
@@ -2233,19 +2353,19 @@ function makeHanja([character, sound, meaning, hanja, word, wordMeaning], day, i
     relation: `${level} ${day}일차 ${index + 1}번 한자입니다. ${role}로 묶어 학습합니다.`,
     origin: `${character}은 '${meaning}'의 뜻을 지닌 한자로, 어휘 속에서 뜻이 어떻게 확장되는지 살펴봅니다.`,
     difficultyNote: criteria ? `${criteria.target} 기준: ${criteria.focus}` : "",
-    vocab: makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }),
+    vocab: makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level, day }),
     reviewCycle: cycle
   };
 }
 
-function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level }) {
+function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, level, day }) {
   const curated = curatedVocabByCharacter[character];
   const templates = curated ? curated.map(([itemHanja, itemWord, itemMeaning], index) => ({
     hanja: itemHanja,
     word: itemWord,
     meaning: itemMeaning,
     topic: index === 0 ? "대표 어휘" : "확장 어휘"
-  })) : uniqueVocabTemplates([
+  })) : Number(day) > 5 ? makeVariedVocabTemplates({ character, sound, meaning, hanja, word, wordMeaning, level, day }) : uniqueVocabTemplates([
     { hanja, word, meaning: wordMeaning, topic: "대표 어휘" },
     { hanja: `${character}力`, word: `${sound}력`, meaning: `${meaning}의 힘이나 능력`, topic: "능력 어휘" },
     { hanja: `${character}性`, word: `${sound}성`, meaning: `${meaning}와 관련된 성질`, topic: "성질 어휘" },
@@ -2264,6 +2384,91 @@ function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, lev
     meaning: item.meaning,
     examples: curatedExamplesByWord[item.word] || makeDictionaryLikeExamples(item.word, item.meaning)
   }));
+}
+
+const variedVocabPartners = [
+  ["文", "문", "글이나 표현"],
+  ["語", "어", "말이나 언어"],
+  ["事", "사", "일이나 사건"],
+  ["用", "용", "쓰임"],
+  ["法", "법", "방법"],
+  ["生", "생", "생활이나 생김"],
+  ["感", "감", "느낌"],
+  ["記", "기", "기록"],
+  ["觀", "관", "관점"],
+  ["學", "학", "배움"],
+  ["問", "문", "문제"],
+  ["時", "시", "시간"],
+  ["界", "계", "세계나 범위"],
+  ["點", "점", "특징이나 부분"],
+  ["路", "로", "길"],
+  ["家", "가", "사람이나 전문가"],
+  ["色", "색", "색이나 성격"],
+  ["物", "물", "대상"],
+  ["例", "례", "보기"],
+  ["理", "리", "이치"]
+];
+
+const variedVocabPrefixes = [
+  ["自", "자", "스스로"],
+  ["他", "타", "다른"],
+  ["公", "공", "공적인"],
+  ["私", "사", "개인의"],
+  ["全", "전", "전체의"],
+  ["半", "반", "절반의"],
+  ["前", "전", "앞선"],
+  ["後", "후", "뒤의"],
+  ["新", "신", "새로운"],
+  ["舊", "구", "오래된"],
+  ["本", "본", "근본이 되는"],
+  ["別", "별", "따로 구별한"],
+  ["同", "동", "같은"],
+  ["異", "이", "다른"],
+  ["再", "재", "다시"],
+  ["共", "공", "함께"]
+];
+
+function makeVariedVocabTemplates({ character, sound, meaning, hanja, word, wordMeaning, level, day }) {
+  const seed = character.charCodeAt(0) + Number(day || 0) * 7 + String(level || "").length;
+  const suffixPartners = rotate(variedVocabPartners, seed).map(([partnerHanja, partnerSound, partnerMeaning]) => ({
+    hanja: `${character}${partnerHanja}`,
+    word: `${sound}${partnerSound}`,
+    meaning: `${meaning}의 뜻이 ${partnerMeaning}와 함께 쓰인 말`,
+    topic: "확장 어휘"
+  }));
+  const prefixPartners = rotate(variedVocabPrefixes, seed + 5).map(([partnerHanja, partnerSound, partnerMeaning]) => ({
+    hanja: `${partnerHanja}${character}`,
+    word: `${partnerSound}${sound}`,
+    meaning: `${partnerMeaning} ${meaning}의 뜻을 나타내는 말`,
+    topic: level === "고급" ? "심화 어휘" : "확장 어휘"
+  }));
+  return uniqueVocabTemplates([
+    { hanja, word, meaning: wordMeaning, topic: "대표 어휘" },
+    ...interleave(suffixPartners, prefixPartners)
+  ])
+    .filter((item) => item.word !== word || item.hanja === hanja)
+    .filter(hasDifferentEndingSyllable)
+    .slice(0, 8);
+}
+
+function hasDifferentEndingSyllable(item, index, items) {
+  const ending = String(item.word || "").slice(-1);
+  return items.findIndex((candidate) => String(candidate.word || "").slice(-1) === ending) === index;
+}
+
+function rotate(items, offset) {
+  if (!items.length) return [];
+  const start = Math.abs(offset) % items.length;
+  return [...items.slice(start), ...items.slice(0, start)];
+}
+
+function interleave(left, right) {
+  const result = [];
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if (left[index]) result.push(left[index]);
+    if (right[index]) result.push(right[index]);
+  }
+  return result;
 }
 
 function makeDictionaryLikeExamples(word, meaning) {
