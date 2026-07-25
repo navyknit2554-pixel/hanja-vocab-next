@@ -44,20 +44,20 @@ export function StudentApp() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/student/session", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((result) => {
-        if (result.authenticated) {
-          setStudent(result.student);
-          setCurriculum(result.curriculum || []);
-          setProgressRecord(result.progress || { completed: {}, quiz: {} });
-        } else if (result.configError) {
-          setLoginError(result.configError);
-        }
-      })
-      .catch((error) => setLoadError(error.message))
-      .finally(() => setCheckingSession(false));
+    refreshStudentSession({ initial: true });
   }, []);
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") refreshStudentSession();
+    }
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [student, stage]);
 
   const lesson = useMemo(() => findLesson(curriculum, student?.day, student?.level), [curriculum, student]);
   const cards = useMemo(() => learningCards(lesson), [lesson]);
@@ -65,6 +65,42 @@ export function StudentApp() {
   const vocab = useMemo(() => lessonVocab(lesson), [lesson]);
   const reviewGame = useMemo(() => buildReviewGame(curriculum, lesson, student?.level, progressRecord), [curriculum, lesson, student, progressRecord]);
   const currentQuiz = queue[quizIndex];
+
+  async function refreshStudentSession({ initial = false } = {}) {
+    try {
+      const response = await fetch("/api/student/session", { cache: "no-store" });
+      const result = await response.json();
+      if (result.authenticated) {
+        applyStudentPayload(result);
+      } else if (result.configError) {
+        setLoginError(result.configError);
+      }
+    } catch (error) {
+      setLoadError(error.message);
+    } finally {
+      if (initial) setCheckingSession(false);
+    }
+  }
+
+  function applyStudentPayload(result) {
+    const nextStudent = result.student;
+    if (!nextStudent) return;
+    const previousDay = Number(student?.day || nextStudent.day || 1);
+    const nextDay = Number(nextStudent.day || previousDay);
+    setStudent(nextStudent);
+    setCurriculum(result.curriculum || []);
+    setProgressRecord(result.progress || { completed: {}, quiz: {} });
+    if (nextDay !== previousDay && stage !== "quiz" && stage !== "archery") {
+      setStage("learn");
+      setCardIndex(0);
+      setQuizIndex(0);
+      setQueue([]);
+      setRetry([]);
+      setPendingStudent(null);
+      setArcheryGame(null);
+      resetStats();
+    }
+  }
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -80,9 +116,7 @@ export function StudentApp() {
       return;
     }
     const result = await response.json();
-    setStudent(result.student);
-    setCurriculum(result.curriculum || []);
-    setProgressRecord(result.progress || { completed: {}, quiz: {} });
+    applyStudentPayload(result);
     setStage("learn");
     setCardIndex(0);
     setQuizIndex(0);
@@ -170,7 +204,17 @@ export function StudentApp() {
         throw new Error(result.message || "학습 결과를 저장하지 못했습니다.");
       }
       const result = await response.json();
-      if (result.student) setPendingStudent(result.student);
+      if (result.stale && result.student) {
+        setStudent(result.student);
+        setPendingStudent(null);
+        setStage("learn");
+        setCardIndex(0);
+        setQuizIndex(0);
+        setQueue([]);
+        setRetry([]);
+      } else if (result.student) {
+        setPendingStudent(result.student);
+      }
       if (result.progress) setProgressRecord(result.progress);
     } catch (error) {
       setLoadError(error.message);
@@ -275,9 +319,27 @@ export function StudentApp() {
           reviewGame={reviewGame}
           growth={growth}
           onStartGame={reviewGame ? () => { setArcheryGame(reviewGame); setStage("archery"); } : null}
-          onRestart={() => { setStage("learn"); setCardIndex(0); }}
+          onRestart={() => {
+            if (pendingStudent) {
+              setStudent(pendingStudent);
+              setPendingStudent(null);
+            }
+            setStage("learn");
+            setCardIndex(0);
+            setQuizIndex(0);
+            setQueue([]);
+            setRetry([]);
+          }}
           onRetryQuiz={startQuiz}
-          onNextDay={pendingStudent ? () => { setStudent(pendingStudent); setPendingStudent(null); setStage("learn"); setCardIndex(0); } : null}
+          onNextDay={pendingStudent ? () => {
+            setStudent(pendingStudent);
+            setPendingStudent(null);
+            setStage("learn");
+            setCardIndex(0);
+            setQuizIndex(0);
+            setQueue([]);
+            setRetry([]);
+          } : null}
         />
       )}
         </>

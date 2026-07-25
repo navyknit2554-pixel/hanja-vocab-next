@@ -46,6 +46,17 @@ export async function PUT(request) {
 
   const mastered = Array.isArray(body.stats.wrong) ? body.stats.wrong.length === 0 : Boolean(body.stats.mastered);
   const previousRecord = state.progress[student.id].quiz?.[lessonDay] || {};
+  const currentDay = Number(student.day || 1);
+  const alreadyMastered = Boolean(state.progress[student.id].completed?.[lessonDay]) && !previousRecord?.wrong?.length;
+  if (lessonDay < currentDay && alreadyMastered) {
+    return NextResponse.json({
+      ok: true,
+      stale: true,
+      message: "이미 완료한 이전 일차입니다. 현재 일차로 이동합니다.",
+      student: withoutPassword(student),
+      progress: state.progress[student.id]
+    });
+  }
   state.progress[student.id].completed[lessonDay] = mastered;
   state.progress[student.id].unlocks ||= {};
   state.progress[student.id].quiz[lessonDay] = {
