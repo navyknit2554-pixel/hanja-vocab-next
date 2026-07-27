@@ -65,6 +65,7 @@ export function AdminApp() {
   const [adminView, setAdminView] = useState("students");
   const [bulkDay, setBulkDay] = useState(1);
   const [reviewModalStudent, setReviewModalStudent] = useState(null);
+  const [dictionaryStatus, setDictionaryStatus] = useState("");
 
   useEffect(() => {
     try {
@@ -519,6 +520,58 @@ export function AdminApp() {
     });
   }
 
+  async function fillExamplesFromDictionary() {
+    let hanjaSet;
+    try {
+      hanjaSet = JSON.parse(hanjaJson || "[]");
+    } catch {
+      alert("한자 묶음 JSON 형식을 먼저 확인해 주세요.");
+      return;
+    }
+    const words = [...new Set(
+      (Array.isArray(hanjaSet) ? hanjaSet : [])
+        .flatMap((hanja) => Array.isArray(hanja.vocab) ? hanja.vocab : [])
+        .map((vocab) => String(vocab.word || "").trim())
+        .filter(Boolean)
+    )];
+    if (!words.length) {
+      alert("가져올 어휘가 없습니다.");
+      return;
+    }
+    setDictionaryStatus(`국어원 API에서 ${words.length}개 어휘를 확인하는 중...`);
+    try {
+      const response = await fetch("/api/admin/dictionary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ words })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 API 결과를 가져오지 못했습니다.");
+      const results = payload.results || {};
+      let filled = 0;
+      let missing = 0;
+      const nextHanjaSet = structuredClone(hanjaSet);
+      nextHanjaSet.forEach((hanja) => {
+        (hanja.vocab || []).forEach((vocab) => {
+          const result = results[vocab.word];
+          if (result?.definition) vocab.meaning = result.definition;
+          if (result?.examples?.length) {
+            vocab.examples = result.examples.slice(0, 3);
+            filled += 1;
+          } else {
+            vocab.examples = makeNeedsReviewExamples(vocab.word);
+            missing += 1;
+          }
+          vocab.source = result?.examples?.length ? "한국어기초사전" : "확인 필요";
+        });
+      });
+      setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
+      setDictionaryStatus(`국어원 용례 반영: ${filled}개 완료, ${missing}개 확인 필요`);
+    } catch (error) {
+      setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
+    }
+  }
+
   function makePrompt() {
     setAiPrompt(buildAiPrompt(plan));
   }
@@ -936,6 +989,10 @@ export function AdminApp() {
               <div className="editorControls">
                 <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
                 <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
+              </div>
+              <div className="dictionaryTools">
+                <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary}>국어원 뜻/용례 가져오기</button>
+                <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>
               </div>
               <HanjaQuickEditor
                 hanjaSet={contentPreview.hanjaSet}
@@ -1385,6 +1442,15 @@ function ContentPreview({ preview, dailyCount }) {
 
 function csvCell(value) {
   return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+}
+
+function makeNeedsReviewExamples(word) {
+  const cleanWord = String(word || "").trim() || "어휘";
+  return [
+    `${cleanWord} 용례 확인 필요.`,
+    `${cleanWord} 용례 확인 필요.`,
+    `${cleanWord} 용례 확인 필요.`
+  ];
 }
 
 function parseCsv(text) {

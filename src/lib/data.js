@@ -2382,7 +2382,7 @@ function makeVocabSet({ character, sound, meaning, hanja, word, wordMeaning, lev
     hanja: item.hanja,
     word: item.word,
     meaning: item.meaning,
-    examples: curatedExamplesByWord[item.word] || makeDictionaryLikeExamples(item.word, item.meaning)
+    examples: curatedExamplesByWord[item.word] || (Number(day) > 5 ? makeNeedsReviewExamples(item.word) : makeDictionaryLikeExamples(item.word, item.meaning))
   }));
 }
 
@@ -2529,6 +2529,15 @@ function makeDictionaryLikeExamples(word, meaning) {
     `최근 ${word}에 대한 관심이 높아졌다.`,
     `신문 기사에서는 ${word} 문제를 자세히 다루었다.`,
     `지역 사회는 ${word}${connectParticle} 관련한 대책을 마련했다.`
+  ];
+}
+
+function makeNeedsReviewExamples(word) {
+  const cleanWord = String(word || "").trim() || "어휘";
+  return [
+    `${cleanWord} 용례 확인 필요.`,
+    `${cleanWord} 용례 확인 필요.`,
+    `${cleanWord} 용례 확인 필요.`
   ];
 }
 

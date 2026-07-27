@@ -1231,6 +1231,23 @@ textarea {
   gap: 10px;
 }
 
+.dictionaryTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 2px solid #d9f7c7;
+  border-radius: 12px;
+  background: #f6fff0;
+}
+
+.dictionaryTools span {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
 .contentForm label {
   gap: 6px;
   font-size: .82rem;
@@ -1760,6 +1777,12 @@ textarea {
   background: #fff0f3;
   color: #c22645;
   box-shadow: 0 3px 0 #ffc2cf;
+}
+
+.miniBtn.blue {
+  background: #ecf7ff;
+  color: #1175b8;
+  box-shadow: 0 3px 0 #c8e5fb;
 }
 
 .studentLevelBadge {

@@ -156,6 +156,8 @@ export function validateHanjaSet(hanjaSet, context = "한자 묶음") {
       const examples = word?.examples || (word?.example ? [word.example] : []);
       if (!Array.isArray(examples) || !examples.some((item) => String(item || "").trim())) {
         errors.push(`${wordLabel}: 예문이 1개 이상 필요합니다.`);
+      } else if (!examples.some((item) => isUsefulExample(item, plainWord))) {
+        errors.push(`${wordLabel}: 실제 용례를 확인해 주세요.`);
       }
     });
   });
@@ -168,6 +170,22 @@ export function validateLesson(lesson) {
   if (!Number(lesson?.day)) errors.push("일차 번호가 필요합니다.");
   if (!Number(lesson?.dailyCount)) errors.push("일일 한자 수가 필요합니다.");
   return [...errors, ...validateHanjaSet(lesson?.hanjaSet, `${lesson?.day || "?"}일차`)];
+}
+
+function isUsefulExample(example, word) {
+  const text = String(example || "").trim();
+  if (!text.includes(word)) return false;
+  return ![
+    "최근",
+    "관심이 높아졌다",
+    "문제를 자세히 다루었다",
+    "대책을 마련했다",
+    "용례 확인 필요",
+    "글쓴이는",
+    "그 문장에서는",
+    "쓰임을 살펴보았다",
+    "짧은 문장을 만들었다"
+  ].some((phrase) => text.includes(phrase));
 }
 
 export function assertValidLesson(lesson) {
