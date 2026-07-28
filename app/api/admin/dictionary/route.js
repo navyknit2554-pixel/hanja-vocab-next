@@ -6,6 +6,13 @@ export const dynamic = "force-dynamic";
 
 const searchUrl = "https://krdict.korean.go.kr/api/search";
 
+class DictionaryApiError extends Error {
+  constructor(message, status = 502) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function POST(request) {
   const cookieStore = await cookies();
   const session = readAdminSession(cookieStore.get(adminCookieName)?.value);
@@ -26,25 +33,32 @@ export async function POST(request) {
   const uniqueWords = [...new Set(words.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 80);
   const results = {};
 
-  for (const word of uniqueWords) {
-    try {
+  try {
+    for (const word of uniqueWords) {
       results[word] = await lookupWord(apiKey, word);
-    } catch {
-      results[word] = { found: false, word, origin: "", definition: "", examples: [] };
     }
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, message: error.message || "한국어기초사전 API 연결을 확인해 주세요." },
+      { status: error.status || 502 }
+    );
   }
 
   return NextResponse.json({ ok: true, results });
 }
 
 async function lookupWord(apiKey, word) {
-  const [entry, examples] = await Promise.all([
-    fetchDictionaryPart(apiKey, word, "word"),
-    fetchDictionaryPart(apiKey, word, "exam")
+  const [exactEntry, broadEntry, exactExamples, broadExamples] = await Promise.all([
+    fetchDictionaryPart(apiKey, word, "word", { method: "exact" }),
+    fetchDictionaryPart(apiKey, word, "word", { method: "include" }),
+    fetchDictionaryPart(apiKey, word, "exam", { method: "exact" }),
+    fetchDictionaryPart(apiKey, word, "exam", { method: "include" })
   ]);
-  const matchedEntry = entry.items.find((item) => normalizeWord(item.word) === normalizeWord(word)) || entry.items[0];
-  const matchedExamples = examples.items
-    .filter((item) => normalizeWord(item.word) === normalizeWord(word) || String(item.example || "").includes(word))
+  const entries = [...exactEntry.items, ...broadEntry.items];
+  const exampleItems = [...exactExamples.items, ...broadExamples.items];
+  const matchedEntry = entries.find((item) => normalizeWord(item.word) === normalizeWord(word)) || entries[0];
+  const matchedExamples = exampleItems
+    .filter((item) => String(item.example || "").includes(word))
     .map((item) => cleanText(item.example))
     .filter((item) => item.includes(word) && isUsefulExample(item));
 
@@ -57,7 +71,7 @@ async function lookupWord(apiKey, word) {
   };
 }
 
-async function fetchDictionaryPart(apiKey, word, part) {
+async function fetchDictionaryPart(apiKey, word, part, options = {}) {
   const params = new URLSearchParams({
     key: apiKey,
     q: word,
@@ -65,15 +79,25 @@ async function fetchDictionaryPart(apiKey, word, part) {
     sort: "dict",
     num: "20",
     advanced: "y",
-    method: "exact",
-    type1: "word",
-    type2: "chinese"
+    method: options.method || "exact",
+    type1: "word"
   });
   if (part === "exam") params.set("target", "3");
   const response = await fetch(`${searchUrl}?${params.toString()}`, { cache: "no-store" });
   const xml = await response.text();
-  if (!response.ok) return { items: [] };
+  assertDictionaryResponse(xml, response.ok);
   return { items: parseItems(xml, part) };
+}
+
+function assertDictionaryResponse(xml, responseOk) {
+  const errorCode = tagRaw(xml, "error_code");
+  const errorMessage = tagRaw(xml, "message");
+  if (!responseOk || errorCode) {
+    if (errorCode === "020" || /unregistered key/i.test(errorMessage)) {
+      throw new DictionaryApiError("한국어기초사전 API 인증키가 등록되지 않았습니다. Vercel의 KOREAN_DICT_API_KEY 값을 다시 확인해 주세요.", 500);
+    }
+    throw new DictionaryApiError(`한국어기초사전 API 오류: ${errorMessage || errorCode || "응답을 확인할 수 없습니다."}`);
+  }
 }
 
 function parseItems(xml, part) {
@@ -91,6 +115,11 @@ function parseItems(xml, part) {
 function tag(xml, name) {
   const match = String(xml || "").match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`));
   return cleanText(match?.[1] || "");
+}
+
+function tagRaw(xml, name) {
+  const match = String(xml || "").match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`));
+  return String(match?.[1] || "").trim();
 }
 
 function cleanText(value) {

@@ -548,16 +548,20 @@ export function AdminApp() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 API 결과를 가져오지 못했습니다.");
       const results = payload.results || {};
-      let filled = 0;
+      let definitions = 0;
+      let examples = 0;
       let missing = 0;
       const nextHanjaSet = structuredClone(hanjaSet);
       nextHanjaSet.forEach((hanja) => {
         (hanja.vocab || []).forEach((vocab) => {
           const result = results[vocab.word];
-          if (result?.definition) vocab.meaning = result.definition;
+          if (result?.definition) {
+            vocab.meaning = result.definition;
+            definitions += 1;
+          }
           if (result?.examples?.length) {
             vocab.examples = result.examples.slice(0, 3);
-            filled += 1;
+            examples += 1;
           } else {
             vocab.examples = makeNeedsReviewExamples(vocab.word);
             missing += 1;
@@ -566,7 +570,7 @@ export function AdminApp() {
         });
       });
       setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
-      setDictionaryStatus(`국어원 용례 반영: ${filled}개 완료, ${missing}개 확인 필요`);
+      setDictionaryStatus(`국어원 반영: 뜻 ${definitions}개, 용례 ${examples}개 완료, ${missing}개 확인 필요`);
     } catch (error) {
       setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
     }
