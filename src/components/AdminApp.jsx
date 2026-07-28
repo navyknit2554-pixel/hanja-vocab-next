@@ -408,7 +408,7 @@ export function AdminApp() {
     }
     const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
     const errors = validateLesson(nextLesson);
-    const blockingErrors = errors.filter((error) => !isVocabCountWarning(error));
+    const blockingErrors = errors.filter((error) => !isSaveableContentWarning(error));
     if (blockingErrors.length) {
       alert(blockingErrors.slice(0, 8).join("\n"));
       return;
@@ -1541,8 +1541,8 @@ function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, 
 
 function ContentPreview({ preview, dailyCount }) {
   const visibleHanja = preview.hanjaSet.slice(0, Number(dailyCount) || preview.hanjaSet.length);
-  const blockingErrors = preview.errors.filter((error) => !isVocabCountWarning(error));
-  const warnings = preview.errors.filter(isVocabCountWarning);
+  const blockingErrors = preview.errors.filter((error) => !isSaveableContentWarning(error));
+  const warnings = preview.errors.filter(isSaveableContentWarning);
   return (
     <section className={`contentPreview ${blockingErrors.length ? "hasError" : warnings.length ? "hasWarning" : ""}`}>
       <div className="previewSummary">
@@ -1552,7 +1552,7 @@ function ContentPreview({ preview, dailyCount }) {
       </div>
       {blockingErrors.length || warnings.length ? (
         <ul className="previewErrors">
-          {[...blockingErrors, ...warnings].slice(0, 5).map((error) => <li key={error}>{isVocabCountWarning(error) ? error.replace("필요합니다.", "권장됩니다.") : error}</li>)}
+          {[...blockingErrors, ...warnings].slice(0, 5).map((error) => <li key={error}>{isSaveableContentWarning(error) ? formatSaveableWarning(error) : error}</li>)}
         </ul>
       ) : (
         <div className="hanjaPreviewList">
@@ -1569,8 +1569,16 @@ function ContentPreview({ preview, dailyCount }) {
   );
 }
 
-function isVocabCountWarning(error) {
-  return String(error || "").includes("어휘가 8개 이상 필요합니다.");
+function isSaveableContentWarning(error) {
+  const text = String(error || "");
+  return text.includes("어휘가 8개 이상 필요합니다.") || text.includes("실제 용례를 확인해 주세요.");
+}
+
+function formatSaveableWarning(error) {
+  const text = String(error || "");
+  if (text.includes("어휘가 8개 이상 필요합니다.")) return text.replace("필요합니다.", "권장됩니다.");
+  if (text.includes("실제 용례를 확인해 주세요.")) return text.replace("확인해 주세요.", "나중에 보완할 수 있습니다.");
+  return text;
 }
 
 function csvCell(value) {
