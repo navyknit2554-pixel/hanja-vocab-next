@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 export const dynamic = "force-dynamic";
 
 const searchUrl = "https://krdict.korean.go.kr/api/search";
+const viewUrl = "https://krdict.korean.go.kr/api/view";
 
 class DictionaryApiError extends Error {
   constructor(message, status = 502) {
@@ -54,20 +55,25 @@ async function lookupWord(apiKey, word) {
     fetchDictionaryPart(apiKey, word, "exam", { method: "exact" }),
     fetchDictionaryPart(apiKey, word, "exam", { method: "include" })
   ]);
-  const entries = [...exactEntry.items, ...broadEntry.items];
-  const exampleItems = [...exactExamples.items, ...broadExamples.items];
+
+  const entries = dedupeByTargetCode([...exactEntry.items, ...broadEntry.items]);
   const matchedEntry = entries.find((item) => normalizeWord(item.word) === normalizeWord(word)) || entries[0];
-  const matchedExamples = exampleItems
+  const viewExamples = matchedEntry?.targetCode
+    ? await fetchDictionaryViewExamples(apiKey, matchedEntry.targetCode, word)
+    : [];
+  const searchExamples = [...exactExamples.items, ...broadExamples.items]
     .filter((item) => String(item.example || "").includes(word))
-    .map((item) => cleanText(item.example))
-    .filter((item) => item.includes(word) && isUsefulExample(item));
+    .map((item) => cleanText(item.example));
+  const matchedExamples = [...new Set([...viewExamples, ...searchExamples])]
+    .filter((item) => item.includes(word) && isUsefulExample(item))
+    .slice(0, 3);
 
   return {
     found: Boolean(matchedEntry || matchedExamples.length),
     word,
     origin: cleanText(matchedEntry?.origin || ""),
     definition: cleanText(matchedEntry?.definition || ""),
-    examples: [...new Set(matchedExamples)].slice(0, 3)
+    examples: matchedExamples
   };
 }
 
@@ -77,16 +83,27 @@ async function fetchDictionaryPart(apiKey, word, part, options = {}) {
     q: word,
     part,
     sort: "dict",
-    num: "20",
+    num: "50",
     advanced: "y",
     method: options.method || "exact",
     type1: "word"
   });
-  if (part === "exam") params.set("target", "3");
   const response = await fetch(`${searchUrl}?${params.toString()}`, { cache: "no-store" });
   const xml = await response.text();
   assertDictionaryResponse(xml, response.ok);
   return { items: parseItems(xml, part) };
+}
+
+async function fetchDictionaryViewExamples(apiKey, targetCode, word) {
+  const params = new URLSearchParams({
+    key: apiKey,
+    method: "target_code",
+    q: String(targetCode)
+  });
+  const response = await fetch(`${viewUrl}?${params.toString()}`, { cache: "no-store" });
+  const xml = await response.text();
+  assertDictionaryResponse(xml, response.ok);
+  return parseExamplesFromView(xml, word);
 }
 
 function assertDictionaryResponse(xml, responseOk) {
@@ -104,11 +121,29 @@ function parseItems(xml, part) {
   return [...String(xml || "").matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => {
     const item = match[1];
     return {
+      targetCode: tag(item, "target_code"),
       word: tag(item, "word"),
       origin: tag(item, "origin"),
       definition: tag(item, "definition"),
       example: part === "exam" ? tag(item, "example") : ""
     };
+  });
+}
+
+function parseExamplesFromView(xml, word) {
+  const examples = [...String(xml || "").matchAll(/<example[^>]*>([\s\S]*?)<\/example>/g)]
+    .map((match) => cleanText(match[1]))
+    .filter((item) => item.includes(word));
+  return [...new Set(examples)];
+}
+
+function dedupeByTargetCode(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item.targetCode || `${item.word}-${item.definition}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 
