@@ -654,7 +654,7 @@ export function AdminApp() {
       .filter((item) => {
         const level = String(item.level || "").trim();
         const day = Number(item.day);
-        if (level === "초급") return day >= 8 && day <= 100;
+        if (level === "초급") return day >= 1 && day <= 100;
         if (level === "중급" || level === "고급") return day >= 1 && day <= 100;
         return false;
       })
@@ -666,7 +666,7 @@ export function AdminApp() {
       alert("국어원 어휘로 재구성할 일차가 없습니다.");
       return;
     }
-    if (!window.confirm(`초급 8~100일차, 중급/고급 1~100일차를 국어원 자료 기반 어휘로 다시 구성할까요? 총 ${targets.length}개 일차를 순서대로 처리합니다.`)) return;
+    if (!window.confirm(`초급/중급/고급 1~100일차를 국어원 자료 기반 어휘로 다시 구성할까요? 총 ${targets.length}개 일차를 순서대로 처리합니다.`)) return;
 
     setDictionaryBulkRunning(true);
     let replaced = 0;
@@ -1116,7 +1116,7 @@ export function AdminApp() {
                 <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
               </div>
               <div className="dictionaryTools">
-                <button className="miniBtn blue" type="button" onClick={rebuildBulkVocabFromDictionary} disabled={dictionaryBulkRunning}>8~100일차 국어원 일괄 구성</button>
+                <button className="miniBtn blue" type="button" onClick={rebuildBulkVocabFromDictionary} disabled={dictionaryBulkRunning}>1~100일차 국어원 일괄 구성</button>
                 <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary} disabled={dictionaryBulkRunning}>현재 일차 국어원 어휘</button>
                 <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary} disabled={dictionaryBulkRunning}>국어원 뜻/용례 가져오기</button>
                 <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>
