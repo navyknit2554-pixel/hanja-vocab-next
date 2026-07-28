@@ -66,6 +66,7 @@ export function AdminApp() {
   const [bulkDay, setBulkDay] = useState(1);
   const [reviewModalStudent, setReviewModalStudent] = useState(null);
   const [dictionaryStatus, setDictionaryStatus] = useState("");
+  const [dictionaryBulkRunning, setDictionaryBulkRunning] = useState(false);
 
   useEffect(() => {
     try {
@@ -619,6 +620,82 @@ export function AdminApp() {
     }
   }
 
+  function applyDictionaryVocabResults(hanjaSet, results, count) {
+    let replaced = 0;
+    let missing = 0;
+    hanjaSet.slice(0, Number(count) || 4).forEach((hanja) => {
+      const candidates = results[hanja.character] || [];
+      if (candidates.length) {
+        hanja.vocab = candidates.slice(0, 8);
+        replaced += candidates.length;
+      } else {
+        missing += 1;
+      }
+    });
+    return { replaced, missing };
+  }
+
+  async function fetchDictionaryVocabForHanjaSet(hanjaSet, count) {
+    const activeHanjaSet = (Array.isArray(hanjaSet) ? hanjaSet : []).slice(0, Number(count) || 4);
+    const response = await fetch("/api/admin/dictionary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "hanja-vocab", hanjaSet: activeHanjaSet })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 어휘 후보를 가져오지 못했습니다.");
+    return payload.results || {};
+  }
+
+  async function rebuildBulkVocabFromDictionary() {
+    if (dictionaryBulkRunning) return;
+    const targets = state.curriculum
+      .filter((item) => {
+        const level = String(item.level || "").trim();
+        const day = Number(item.day);
+        if (level === "초급") return day >= 8 && day <= 100;
+        if (level === "중급" || level === "고급") return day >= 1 && day <= 100;
+        return false;
+      })
+      .sort((a, b) => {
+        const levelOrder = { "초급": 1, "중급": 2, "고급": 3 };
+        return (levelOrder[a.level] || 9) - (levelOrder[b.level] || 9) || Number(a.day) - Number(b.day);
+      });
+    if (!targets.length) {
+      alert("국어원 어휘로 재구성할 일차가 없습니다.");
+      return;
+    }
+    if (!window.confirm(`초급 8~100일차, 중급/고급 1~100일차를 국어원 자료 기반 어휘로 다시 구성할까요? 총 ${targets.length}개 일차를 순서대로 처리합니다.`)) return;
+
+    setDictionaryBulkRunning(true);
+    let replaced = 0;
+    let missing = 0;
+    let done = 0;
+    const nextState = structuredClone(state);
+
+    try {
+      for (const target of targets) {
+        done += 1;
+        setDictionaryStatus(`국어원 일괄 구성 중: ${target.level} ${target.day}일차 (${done}/${targets.length})`);
+        const lessonIndex = nextState.curriculum.findIndex((item) => Number(item.day) === Number(target.day) && String(item.level || "").trim() === String(target.level || "").trim());
+        if (lessonIndex < 0) continue;
+        const lesson = nextState.curriculum[lessonIndex];
+        const results = await fetchDictionaryVocabForHanjaSet(lesson.hanjaSet || [], lesson.dailyCount || 4);
+        const summary = applyDictionaryVocabResults(lesson.hanjaSet || [], results, lesson.dailyCount || 4);
+        replaced += summary.replaced;
+        missing += summary.missing;
+      }
+      await persist(nextState);
+      const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
+      setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
+      setDictionaryStatus(`국어원 일괄 구성 완료: ${targets.length}개 일차, 어휘 ${replaced}개 반영, 후보 부족 한자 ${missing}개`);
+    } catch (error) {
+      setDictionaryStatus(error.message || `국어원 일괄 구성 중 ${done}/${targets.length} 지점에서 멈췄습니다.`);
+    } finally {
+      setDictionaryBulkRunning(false);
+    }
+  }
+
   function makePrompt() {
     setAiPrompt(buildAiPrompt(plan));
   }
@@ -1038,8 +1115,9 @@ export function AdminApp() {
                 <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
               </div>
               <div className="dictionaryTools">
-                <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary}>국어원 어휘로 재구성</button>
-                <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary}>국어원 뜻/용례 가져오기</button>
+                <button className="miniBtn blue" type="button" onClick={rebuildBulkVocabFromDictionary} disabled={dictionaryBulkRunning}>8~100일차 국어원 일괄 구성</button>
+                <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary} disabled={dictionaryBulkRunning}>현재 일차 국어원 어휘</button>
+                <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary} disabled={dictionaryBulkRunning}>국어원 뜻/용례 가져오기</button>
                 <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>
               </div>
               <HanjaQuickEditor
