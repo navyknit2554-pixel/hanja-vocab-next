@@ -1417,6 +1417,7 @@ function getDayProgressStatus(state, student, day) {
   if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요: ${record.wrong.join(", ")}` };
   if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}` };
   if (explicitUnlock === "open") return { key: "ready", label: "대", title: `${day}일차 관리자 잠금 해제` };
+  if (!explicitUnlock && Number(student.day) === Number(day)) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
   if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
     const unlockText = formatKoreanUnlockTime(unlockAt);
     return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };
