@@ -576,6 +576,49 @@ export function AdminApp() {
     }
   }
 
+  async function rebuildVocabFromDictionary() {
+    let hanjaSet;
+    try {
+      hanjaSet = JSON.parse(hanjaJson || "[]");
+    } catch {
+      alert("한자 묶음 JSON 형식을 먼저 확인해 주세요.");
+      return;
+    }
+    const activeHanjaSet = (Array.isArray(hanjaSet) ? hanjaSet : []).slice(0, Number(dailyCount) || 4);
+    if (!activeHanjaSet.length) {
+      alert("어휘를 구성할 한자가 없습니다.");
+      return;
+    }
+    if (!window.confirm("현재 일차의 어휘를 국어원 등재 어휘 기준으로 다시 구성할까요? 기존 어휘는 교체됩니다.")) return;
+    setDictionaryStatus(`국어원에서 ${activeHanjaSet.length}개 한자의 등재 어휘를 찾는 중...`);
+    try {
+      const response = await fetch("/api/admin/dictionary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "hanja-vocab", hanjaSet: activeHanjaSet })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 어휘 후보를 가져오지 못했습니다.");
+      const results = payload.results || {};
+      const nextHanjaSet = structuredClone(hanjaSet);
+      let replaced = 0;
+      let missing = 0;
+      nextHanjaSet.slice(0, Number(dailyCount) || 4).forEach((hanja) => {
+        const candidates = results[hanja.character] || [];
+        if (candidates.length) {
+          hanja.vocab = candidates.slice(0, 8);
+          replaced += candidates.length;
+        } else {
+          missing += 1;
+        }
+      });
+      setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
+      setDictionaryStatus(`국어원 어휘 재구성: ${replaced}개 반영, 후보 부족 한자 ${missing}개`);
+    } catch (error) {
+      setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
+    }
+  }
+
   function makePrompt() {
     setAiPrompt(buildAiPrompt(plan));
   }
@@ -995,6 +1038,7 @@ export function AdminApp() {
                 <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
               </div>
               <div className="dictionaryTools">
+                <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary}>국어원 어휘로 재구성</button>
                 <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary}>국어원 뜻/용례 가져오기</button>
                 <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>
               </div>

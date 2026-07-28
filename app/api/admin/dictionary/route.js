@@ -29,23 +29,62 @@ export async function POST(request) {
     );
   }
 
-  const body = await request.json().catch(() => ({}));
-  const words = Array.isArray(body.words) ? body.words : [];
-  const uniqueWords = [...new Set(words.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 80);
-  const results = {};
-
   try {
+    const body = await request.json().catch(() => ({}));
+    if (body.mode === "hanja-vocab") {
+      const hanjaSet = Array.isArray(body.hanjaSet) ? body.hanjaSet : [];
+      const results = {};
+      for (const hanja of hanjaSet.slice(0, 8)) {
+        const character = String(hanja?.character || "").trim();
+        if (character) results[character] = await lookupHanjaVocab(apiKey, hanja);
+      }
+      return NextResponse.json({ ok: true, results });
+    }
+
+    const words = Array.isArray(body.words) ? body.words : [];
+    const uniqueWords = [...new Set(words.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 80);
+    const results = {};
     for (const word of uniqueWords) {
       results[word] = await lookupWord(apiKey, word);
     }
+    return NextResponse.json({ ok: true, results });
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error.message || "한국어기초사전 API 연결을 확인해 주세요." },
       { status: error.status || 502 }
     );
   }
+}
 
-  return NextResponse.json({ ok: true, results });
+async function lookupHanjaVocab(apiKey, hanja) {
+  const character = String(hanja?.character || "").trim();
+  const candidates = await fetchDictionaryPart(apiKey, character, "word", {
+    method: "include",
+    type2: "chinese",
+    num: "100"
+  });
+  const filtered = candidates.items
+    .filter((item) => isValidHanjaVocabCandidate(item, character))
+    .sort((left, right) => scoreCandidate(right, character) - scoreCandidate(left, character));
+  const selected = [];
+
+  for (const item of filtered) {
+    if (selected.length >= 8) break;
+    const examples = item.targetCode ? await fetchDictionaryViewExamples(apiKey, item.targetCode, item.word) : [];
+    selected.push({
+      hanja: extractHanjaWord(item.origin, character) || item.origin || item.word,
+      word: item.word,
+      meaning: item.definition,
+      examples: examples.length ? examples.slice(0, 3) : [
+        `${item.word} 용례 확인 필요.`,
+        `${item.word} 용례 확인 필요.`,
+        `${item.word} 용례 확인 필요.`
+      ],
+      source: examples.length ? "한국어기초사전" : "한국어기초사전 확인 필요"
+    });
+  }
+
+  return selected;
 }
 
 async function lookupWord(apiKey, word) {
@@ -83,11 +122,12 @@ async function fetchDictionaryPart(apiKey, word, part, options = {}) {
     q: word,
     part,
     sort: "dict",
-    num: "50",
+    num: options.num || "50",
     advanced: "y",
     method: options.method || "exact",
     type1: "word"
   });
+  if (options.type2) params.set("type2", options.type2);
   const response = await fetch(`${searchUrl}?${params.toString()}`, { cache: "no-store" });
   const xml = await response.text();
   assertDictionaryResponse(xml, response.ok);
@@ -123,7 +163,7 @@ function parseItems(xml, part) {
     return {
       targetCode: tag(item, "target_code"),
       word: tag(item, "word"),
-      origin: tag(item, "origin"),
+      origin: tag(item, "origin") || tag(item, "original_language"),
       definition: tag(item, "definition"),
       example: part === "exam" ? tag(item, "example") : ""
     };
@@ -145,6 +185,31 @@ function dedupeByTargetCode(items) {
     seen.add(key);
     return true;
   });
+}
+
+function isValidHanjaVocabCandidate(item, character) {
+  const word = String(item.word || "").trim();
+  const hanjaWord = extractHanjaWord(item.origin, character);
+  if (!word || word.length < 2 || word.length > 3 || /\s/.test(word)) return false;
+  if (!String(item.definition || "").trim()) return false;
+  if (!hanjaWord || hanjaWord.length < 2 || hanjaWord.length > 3) return false;
+  return hanjaWord.includes(character);
+}
+
+function extractHanjaWord(origin, character) {
+  const hanjaWords = String(origin || "").match(/[\u3400-\u9fff]{2,3}/g) || [];
+  return hanjaWords.find((item) => item.includes(character)) || "";
+}
+
+function scoreCandidate(item, character) {
+  const word = String(item.word || "");
+  const hanjaWord = extractHanjaWord(item.origin, character);
+  let score = 0;
+  if (hanjaWord.startsWith(character)) score += 4;
+  if (word.length === 2) score += 3;
+  if (word.length === 3) score += 1;
+  if (!/[·ㆍ,;()]/.test(String(item.origin || ""))) score += 1;
+  return score;
 }
 
 function tag(xml, name) {
