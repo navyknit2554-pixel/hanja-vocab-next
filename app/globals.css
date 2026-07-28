@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ink: #14213d;
   --muted: #65708a;
   --line: #d9e6f7;
@@ -2466,4 +2466,30 @@ td span {
     border-radius: 18px;
     padding: 18px;
   }
+}
+
+.saveActionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.saveStatus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f0fff4;
+  color: #168a00;
+  font-size: .85rem;
+  font-weight: 900;
+  border: 1px solid #b8ef9f;
+}
+
+.saveStatus.error {
+  background: #fff5f7;
+  color: #d12745;
+  border-color: #ffc2cf;
 }

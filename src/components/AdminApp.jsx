@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -67,6 +67,8 @@ export function AdminApp() {
   const [reviewModalStudent, setReviewModalStudent] = useState(null);
   const [dictionaryStatus, setDictionaryStatus] = useState("");
   const [dictionaryBulkRunning, setDictionaryBulkRunning] = useState(false);
+  const [lessonSaveStatus, setLessonSaveStatus] = useState("");
+  const [lessonSaving, setLessonSaving] = useState(false);
 
   useEffect(() => {
     try {
@@ -397,23 +399,37 @@ export function AdminApp() {
     persist(nextState);
   }
 
-  function saveLesson(event) {
+  async function saveLesson(event) {
     event.preventDefault();
+    setLessonSaveStatus("?? ?...");
+    setLessonSaving(true);
     let hanjaSet;
     try {
       hanjaSet = JSON.parse(hanjaJson);
     } catch {
-      alert("한자 묶음 JSON 형식을 확인해 주세요.");
+      setLessonSaveStatus("?? ??: ?? ?? JSON ??? ??? ???.");
+      setLessonSaving(false);
+      alert("?? ?? JSON ??? ??? ???.");
       return;
     }
     const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
     const errors = validateLesson(nextLesson);
     const blockingErrors = errors.filter((error) => !isSaveableContentWarning(error));
     if (blockingErrors.length) {
+      setLessonSaveStatus("?? ??: ?? ??? ??? ???.");
+      setLessonSaving(false);
       alert(blockingErrors.slice(0, 8).join("\n"));
       return;
     }
-    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
+    try {
+      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
+      const savedAt = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+      setLessonSaveStatus(selectedLevel + " " + selectedDay + "?? ?? ?? ? " + savedAt);
+    } catch (error) {
+      setLessonSaveStatus(error.message || "?? ??: ?? ??? ???.");
+    } finally {
+      setLessonSaving(false);
+    }
   }
 
   function addLesson() {
@@ -1131,7 +1147,10 @@ export function AdminApp() {
               />
               <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
               <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
-              <button className="btn primary" type="submit">저장</button>
+              <div className="saveActionRow">
+                <button className="btn primary" type="submit" disabled={lessonSaving}>{lessonSaving ? "저장 중..." : "저장"}</button>
+                <span className={lessonSaveStatus.includes("실패") ? "saveStatus error" : "saveStatus"}>{lessonSaveStatus || "저장 버튼을 누르면 현재 일차 구성이 반영됩니다."}</span>
+              </div>
             </div>
           </div>
         </form>
@@ -1672,3 +1691,4 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+
