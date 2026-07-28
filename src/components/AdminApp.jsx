@@ -344,7 +344,7 @@ export function AdminApp() {
     }
     nextState.progress[studentId] ||= { completed: {}, quiz: {} };
     nextState.progress[studentId].unlocks ||= {};
-    delete nextState.progress[studentId].unlocks[day];
+    nextState.progress[studentId].unlocks[day] = "open";
     persist(nextState);
   }
 
@@ -1411,10 +1411,12 @@ function ProgressMatrix({ state, students, days, onUnlock }) {
 function getDayProgressStatus(state, student, day) {
   const record = state.progress[student.id]?.quiz?.[day];
   const completed = state.progress[student.id]?.completed?.[day] && !record?.wrong?.length;
-  const unlockAt = state.progress[student.id]?.unlocks?.[day] || getInferredUnlockForDay(state, student, day);
+  const explicitUnlock = state.progress[student.id]?.unlocks?.[day];
+  const unlockAt = explicitUnlock || getInferredUnlockForDay(state, student, day);
   if (completed) return { key: "completed", label: "완", title: `${day}일차 학습 완성` };
   if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요: ${record.wrong.join(", ")}` };
   if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}` };
+  if (explicitUnlock === "open") return { key: "ready", label: "대", title: `${day}일차 관리자 잠금 해제` };
   if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
     const unlockText = formatKoreanUnlockTime(unlockAt);
     return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };

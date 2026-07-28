@@ -281,7 +281,8 @@ export function StudentApp() {
   const progress = stage === "learn" ? ((cardIndex + 1) / Math.max(1, cards.length)) * 100 : stage === "quiz" ? (quizIndex / quizTotal) * 100 : 100;
   const lessonProgress = progressRecord.quiz?.[lesson.day] || null;
   const lessonCompleted = Boolean(progressRecord.completed?.[lesson.day]) && !lessonProgress?.wrong?.length;
-  const unlockAt = progressRecord.unlocks?.[lesson.day];
+  const rawUnlockAt = progressRecord.unlocks?.[lesson.day];
+  const unlockAt = rawUnlockAt === "open" ? "" : rawUnlockAt;
   const lessonLocked = Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime() && !lessonCompleted);
   const growth = buildMascotGrowth(progressRecord);
 
