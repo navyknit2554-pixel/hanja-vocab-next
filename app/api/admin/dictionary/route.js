@@ -61,6 +61,8 @@ async function lookupHanjaVocab(apiKey, hanja) {
   const candidates = await fetchDictionaryPart(apiKey, character, "word", {
     method: "include",
     type2: "chinese",
+    target: "4",
+    lang: "2",
     num: "100"
   });
   const filtered = candidates.items
@@ -128,6 +130,8 @@ async function fetchDictionaryPart(apiKey, word, part, options = {}) {
     type1: "word"
   });
   if (options.type2) params.set("type2", options.type2);
+  if (options.target) params.set("target", options.target);
+  if (options.lang) params.set("lang", options.lang);
   const response = await fetch(`${searchUrl}?${params.toString()}`, { cache: "no-store" });
   const xml = await response.text();
   assertDictionaryResponse(xml, response.ok);
