@@ -408,8 +408,9 @@ export function AdminApp() {
     }
     const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
     const errors = validateLesson(nextLesson);
-    if (errors.length) {
-      alert(errors.slice(0, 8).join("\n"));
+    const blockingErrors = errors.filter((error) => !isVocabCountWarning(error));
+    if (blockingErrors.length) {
+      alert(blockingErrors.slice(0, 8).join("\n"));
       return;
     }
     persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
@@ -1540,16 +1541,18 @@ function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, 
 
 function ContentPreview({ preview, dailyCount }) {
   const visibleHanja = preview.hanjaSet.slice(0, Number(dailyCount) || preview.hanjaSet.length);
+  const blockingErrors = preview.errors.filter((error) => !isVocabCountWarning(error));
+  const warnings = preview.errors.filter(isVocabCountWarning);
   return (
-    <section className={`contentPreview ${preview.errors.length ? "hasError" : ""}`}>
+    <section className={`contentPreview ${blockingErrors.length ? "hasError" : warnings.length ? "hasWarning" : ""}`}>
       <div className="previewSummary">
         <span><b>{visibleHanja.length}</b>학습 한자</span>
         <span><b>{preview.vocabCount}</b>전체 어휘</span>
-        <span><b>{preview.errors.length ? "확인 필요" : "저장 가능"}</b>상태</span>
+        <span><b>{blockingErrors.length ? "확인 필요" : warnings.length ? "저장 가능" : "저장 가능"}</b>상태</span>
       </div>
-      {preview.errors.length ? (
+      {blockingErrors.length || warnings.length ? (
         <ul className="previewErrors">
-          {preview.errors.slice(0, 5).map((error) => <li key={error}>{error}</li>)}
+          {[...blockingErrors, ...warnings].slice(0, 5).map((error) => <li key={error}>{isVocabCountWarning(error) ? error.replace("필요합니다.", "권장됩니다.") : error}</li>)}
         </ul>
       ) : (
         <div className="hanjaPreviewList">
@@ -1564,6 +1567,10 @@ function ContentPreview({ preview, dailyCount }) {
       )}
     </section>
   );
+}
+
+function isVocabCountWarning(error) {
+  return String(error || "").includes("어휘가 8개 이상 필요합니다.");
 }
 
 function csvCell(value) {

@@ -1449,6 +1449,11 @@ textarea {
   background: #fff7f9;
 }
 
+.contentPreview.hasWarning {
+  border-color: #ffe08a;
+  background: #fffbea;
+}
+
 .previewSummary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1481,6 +1486,10 @@ textarea {
   font-size: .82rem;
   font-weight: 900;
   line-height: 1.5;
+}
+
+.contentPreview.hasWarning .previewErrors {
+  color: #9a6a00;
 }
 
 .hanjaPreviewList {
