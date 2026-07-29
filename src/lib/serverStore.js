@@ -105,6 +105,7 @@ function normalizeState(state, scopeKey = stateKey) {
   next.students = Array.isArray(next.students) ? next.students : [];
   next.curriculum = mergeDefaultCurriculum(Array.isArray(next.curriculum) ? next.curriculum : []);
   next.progress = next.progress || {};
+  next.licenseRecords = Array.isArray(next.licenseRecords) ? next.licenseRecords : [];
   next.licenseRevocations = Array.isArray(next.licenseRevocations) ? next.licenseRevocations : [];
   next.students.forEach((student, index) => {
     student.id ||= `s${index + 1}`;

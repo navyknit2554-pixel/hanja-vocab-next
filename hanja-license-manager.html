@@ -669,11 +669,20 @@
             <textarea id="revokeKey" placeholder="HANJA-..."></textarea>
           </label>
           <label>
+            기록 이름
+            <input id="revokeOwner" type="text" placeholder="예: 김선생님, 7월 이용권" />
+          </label>
+          <label>
+            수정할 만료일
+            <input id="revokeExpiresAt" type="date" />
+          </label>
+          <label>
             폐기 사유
             <input id="revokeReason" type="text" placeholder="예: 계약 종료, 오발급, 테스트 키" />
           </label>
           <div class="actions">
             <button id="lookupLicenseButton" type="button">키 조회</button>
+            <button class="secondary" id="updateLicenseButton" type="button">목록 추가/수정</button>
             <button class="danger" id="revokeLicenseButton" type="button">라이선스 폐기</button>
             <button class="secondary" id="restoreLicenseButton" type="button">폐기 해제</button>
           </div>
@@ -760,8 +769,11 @@
     const verifyResult = document.getElementById("verifyResult");
     const revokePassword = document.getElementById("revokePassword");
     const revokeKey = document.getElementById("revokeKey");
+    const revokeOwner = document.getElementById("revokeOwner");
+    const revokeExpiresAt = document.getElementById("revokeExpiresAt");
     const revokeReason = document.getElementById("revokeReason");
     const lookupLicenseButton = document.getElementById("lookupLicenseButton");
+    const updateLicenseButton = document.getElementById("updateLicenseButton");
     const revokeLicenseButton = document.getElementById("revokeLicenseButton");
     const restoreLicenseButton = document.getElementById("restoreLicenseButton");
     const revokeResult = document.getElementById("revokeResult");
@@ -894,6 +906,29 @@
 
     function saveHistory(items) {
       localStorage.setItem(storageKey, JSON.stringify(items));
+    }
+
+    function upsertHistoryFromManaged(license, licenseKey) {
+      if (!license?.licenseHash || !licenseKey) return;
+      const items = loadHistory();
+      const index = items.findIndex((item) => item.licenseHash === license.licenseHash || normalize(item.licenseKey) === normalize(licenseKey));
+      const previous = index >= 0 ? items[index] : {};
+      const next = {
+        ...previous,
+        licenseKey: normalize(licenseKey),
+        licenseHash: license.licenseHash,
+        teacherCode: license.teacherCode,
+        expiresAt: license.expiresAt || previous.expiresAt,
+        createdAt: previous.createdAt || new Date().toISOString(),
+        owner: license.owner || previous.owner || normalize(revokeOwner.value) || "조회한 라이선스",
+        note: license.note || previous.note || "키 조회로 복원",
+        managedStatus: license.revoked ? "paused" : "active",
+        lastCheckedAt: new Date().toISOString()
+      };
+      if (index >= 0) items[index] = next;
+      else items.unshift(next);
+      saveHistory(items);
+      renderHistory();
     }
 
     function escapeHtml(value) {
@@ -1032,7 +1067,7 @@
                 <option value="paused" ${managedStatus === "paused" ? "selected" : ""}>보류</option>
               </select>
             </label>
-            <label>만료 기한<input type="date" value="${dateInputValue(item.expiresAt)}" disabled title="만료일은 라이선스 키 안에 고정되어 있습니다." /></label>
+            <label>만료 기한<input type="date" value="${dateInputValue(item.expiresAt)}" disabled title="만료일은 위의 라이선스 키 조회/폐기 카드에서 수정합니다." /></label>
             <label>최근 접속 기록<input type="datetime-local" data-field="lastAccessAt" data-index="${index}" value="${datetimeInputValue(item.lastAccessAt)}" /></label>
             <label class="full">메모<input data-field="note" data-index="${index}" value="${escapeHtml(item.note || "")}" /></label>
             <div class="miniActions full">
@@ -1084,13 +1119,19 @@
         return;
       }
       const license = result.license || {};
+      if (license.expiresAt) revokeExpiresAt.value = dateInputValue(license.expiresAt);
+      if (license.owner && !revokeOwner.value) revokeOwner.value = license.owner;
+      if (license.reason && !revokeReason.value) revokeReason.value = license.reason;
+      if (result.licenseKey) upsertHistoryFromManaged(license, result.licenseKey);
       revokeResult.innerHTML = `
         <h3>${license.revoked ? "폐기된 라이선스입니다." : "사용 가능한 라이선스입니다."}</h3>
         <div class="metaGrid">
           <div class="meta"><span>선생님 코드</span><strong>${escapeHtml(license.teacherCode || "-")}</strong></div>
           <div class="meta"><span>만료일</span><strong>${license.expiresAt ? formatDate(new Date(license.expiresAt)) : "-"}</strong></div>
+          <div class="meta"><span>원래 만료일</span><strong>${license.originalExpiresAt ? formatDate(new Date(license.originalExpiresAt)) : "-"}</strong></div>
           <div class="meta"><span>상태</span><strong>${license.revoked ? "폐기됨" : "사용 가능"}</strong></div>
           <div class="meta"><span>폐기일</span><strong>${license.revokedAt ? formatDate(new Date(license.revokedAt)) : "-"}</strong></div>
+          <div class="meta"><span>관리 목록</span><strong>${license.managed ? "등록됨" : "미등록"}</strong></div>
           <div class="meta"><span>라이선스 해시</span><strong>${escapeHtml((license.licenseHash || "").slice(0, 12) || "-")}</strong></div>
           <div class="meta"><span>사유</span><strong>${escapeHtml(license.reason || "-")}</strong></div>
         </div>
@@ -1109,19 +1150,36 @@
         showToast("라이선스 키를 입력해 주세요.");
         return;
       }
+      if (location.protocol === "file:") {
+        renderManagedLicense({
+          ok: false,
+          message: "이 HTML을 파일로 직접 열면 서버 API에 연결할 수 없습니다. Vercel에 배포된 한자 학습 프로그램 주소에서 라이선스 관리 페이지를 열어 주세요."
+        });
+        return;
+      }
       if (action === "revoke" && !confirm("이 라이선스를 폐기하고 강사 로그인을 차단할까요?")) return;
       if (action === "restore" && !confirm("이 라이선스의 폐기를 해제할까요?")) return;
       try {
         const response = await fetch("/api/license/revocations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password, licenseKey, action, reason: normalize(revokeReason.value) })
+          body: JSON.stringify({
+            password,
+            licenseKey,
+            action,
+            owner: normalize(revokeOwner.value),
+            expiresAt: normalize(revokeExpiresAt.value),
+            note: normalize(revokeReason.value),
+            reason: normalize(revokeReason.value)
+          })
         });
         const result = await response.json().catch(() => ({}));
+        result.licenseKey = licenseKey;
+        if (!response.ok && !result.message) result.message = "서버에서 라이선스를 처리하지 못했습니다.";
         renderManagedLicense(result);
         showToast(result.message || (response.ok ? "처리 완료" : "처리 실패"));
       } catch (error) {
-        renderManagedLicense({ ok: false, message: error.message || "서버 연결을 확인해 주세요." });
+        renderManagedLicense({ ok: false, message: `${error.message || "서버 연결을 확인해 주세요."} 배포가 아직 반영되지 않았다면 git push 후 Vercel 배포 완료를 기다려 주세요.` });
       }
     }
 
@@ -1182,6 +1240,7 @@
     copyTeacherCode.addEventListener("click", () => copyText(latestIssued?.teacherCode, "선생님 코드"));
 
     lookupLicenseButton.addEventListener("click", () => manageLicense("lookup"));
+    updateLicenseButton.addEventListener("click", () => manageLicense("update"));
     revokeLicenseButton.addEventListener("click", () => manageLicense("revoke"));
     restoreLicenseButton.addEventListener("click", () => manageLicense("restore"));
 
