@@ -53,6 +53,9 @@ export function AdminApp() {
   const [plan, setPlan] = useState({ grade: "초1", level: "초급", startDay: 1, days: 3 });
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedLevel, setSelectedLevel] = useState("초급");
+  const [worksheetLevel, setWorksheetLevel] = useState("초급");
+  const [worksheetEndDay, setWorksheetEndDay] = useState(5);
+  const [worksheetQuestionCount, setWorksheetQuestionCount] = useState(30);
   const [hanjaJson, setHanjaJson] = useState("");
   const [dailyCount, setDailyCount] = useState(4);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -114,6 +117,21 @@ export function AdminApp() {
     const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
     return [...new Set(lessons.map((item) => Number(item.day)).filter(Boolean))].sort((a, b) => a - b);
   }, [selectedLevel, state]);
+  const worksheetBlocks = useMemo(() => {
+    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === worksheetLevel) || [];
+    const lessonDays = new Set(lessons.map((item) => Number(item.day)).filter(Boolean));
+    const maxDay = Math.max(0, ...lessonDays);
+    const blocks = [];
+    for (let endDay = 5; endDay <= maxDay; endDay += 5) {
+      const startDay = endDay - 4;
+      const availableDays = [];
+      for (let day = startDay; day <= endDay; day += 1) {
+        if (lessonDays.has(day)) availableDays.push(day);
+      }
+      if (availableDays.length) blocks.push({ startDay, endDay, label: `${startDay}-${endDay}일차`, availableDays });
+    }
+    return blocks;
+  }, [state, worksheetLevel]);
   const levelLessonSummary = useMemo(() => {
     const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
     return lessons
@@ -852,6 +870,42 @@ export function AdminApp() {
     downloadFile(`hanja-students-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
   }
 
+  function makeWorksheetHtml() {
+    const worksheet = buildWorksheet(state.curriculum, {
+      level: worksheetLevel,
+      endDay: worksheetEndDay,
+      questionCount: worksheetQuestionCount
+    });
+    if (!worksheet.questions.length) {
+      alert("학습지를 만들 어휘가 부족합니다. 해당 5일 묶음의 어휘를 확인해 주세요.");
+      return "";
+    }
+    return createWorksheetHtml(worksheet);
+  }
+
+  function openWorksheetPrint() {
+    const html = makeWorksheetHtml();
+    if (!html) return;
+    const printWindow = window.open("", "_blank", "width=980,height=900");
+    if (!printWindow) {
+      alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  function downloadWorksheetHtml() {
+    const html = makeWorksheetHtml();
+    if (!html) return;
+    downloadFile(
+      `hanja-worksheet-${worksheetLevel}-${worksheetEndDay - 4}-${worksheetEndDay}days.html`,
+      html,
+      "text/html;charset=utf-8"
+    );
+  }
+
   function downloadStudentTemplate() {
     const rows = [
       ["이름", "전화번호", "아이디", "비밀번호", "학년", "난이도", "일차"],
@@ -946,6 +1000,7 @@ export function AdminApp() {
           ["students", "학생 관리"],
           ["progress", "학생별 학습도"],
           ["matrix", "일차별 진행도"],
+          ["worksheet", "학습지"],
           ["ai", "AI 생성"],
           ["curriculum", "한자 관리"]
         ].map(([key, label]) => (
@@ -1086,6 +1141,37 @@ export function AdminApp() {
         </section>
         )}
 
+        {adminView === "worksheet" && (
+        <section className="panel wide worksheetPanel">
+          <div className="panelTitle">
+            <div>
+              <h2>누적 어휘 종이 학습지</h2>
+              <p className="filterNote">5일차, 10일차처럼 5일 단위로 쌓인 어휘를 랜덤 시험지로 만들어 출력합니다.</p>
+            </div>
+            <Mascot small />
+          </div>
+          <div className="worksheetControls">
+            <Select label="난이도" value={worksheetLevel} onChange={(level) => {
+              setWorksheetLevel(level);
+              setWorksheetEndDay(5);
+            }} options={["초급", "중급", "고급"]} />
+            <label>학습 범위
+              <select value={worksheetEndDay} onChange={(event) => setWorksheetEndDay(Number(event.target.value))}>
+                {worksheetBlocks.map((block) => <option key={`${worksheetLevel}-${block.endDay}`} value={block.endDay}>{block.label}</option>)}
+              </select>
+            </label>
+            <label>문항 수
+              <input type="number" min="10" max="60" value={worksheetQuestionCount} onChange={(event) => setWorksheetQuestionCount(Number(event.target.value))} />
+            </label>
+          </div>
+          <WorksheetPreview state={state} level={worksheetLevel} endDay={worksheetEndDay} questionCount={worksheetQuestionCount} />
+          <div className="buttonRow">
+            <button className="btn primary" type="button" onClick={openWorksheetPrint}>인쇄/PDF 저장</button>
+            <button className="btn blue" type="button" onClick={downloadWorksheetHtml}>HTML 다운로드</button>
+          </div>
+        </section>
+        )}
+
         {adminView === "ai" && (
         <section className="panel form">
           <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
@@ -1157,6 +1243,31 @@ export function AdminApp() {
         )}
       </section>
     </main>
+  );
+}
+
+function WorksheetPreview({ state, level, endDay, questionCount }) {
+  const worksheet = useMemo(() => buildWorksheet(state.curriculum, { level, endDay, questionCount, preview: true }), [state, level, endDay, questionCount]);
+  return (
+    <div className="worksheetPreview">
+      <div>
+        <span>범위</span>
+        <strong>{worksheet.rangeStart}-{worksheet.rangeEnd}일차</strong>
+      </div>
+      <div>
+        <span>누적 어휘</span>
+        <strong>{worksheet.words.length}개</strong>
+      </div>
+      <div>
+        <span>생성 문항</span>
+        <strong>{worksheet.questions.length}문항</strong>
+      </div>
+      <div>
+        <span>구성</span>
+        <strong>쓰기 · 객관식 · 빈칸</strong>
+      </div>
+      <p>{worksheet.words.length ? `${worksheet.words.slice(0, 10).map((item) => item.word).join(", ")}${worksheet.words.length > 10 ? " ..." : ""}` : "해당 범위에 어휘가 없습니다."}</p>
+    </div>
   );
 }
 
@@ -1614,6 +1725,143 @@ function makeNeedsReviewExamples(word) {
     `${cleanWord} 용례 확인 필요.`,
     `${cleanWord} 용례 확인 필요.`
   ];
+}
+
+function buildWorksheet(curriculum, { level, endDay, questionCount }) {
+  const rangeEnd = Number(endDay || 5);
+  const rangeStart = Math.max(1, rangeEnd - 4);
+  const lessons = [];
+  for (let day = rangeStart; day <= rangeEnd; day += 1) {
+    const lesson = findLesson(curriculum, day, level);
+    if (lesson) lessons.push(lesson);
+  }
+  const seen = new Set();
+  const words = lessons
+    .flatMap((lesson) => lessonVocab(lesson).map((item) => ({ ...item, day: Number(lesson.day) })))
+    .filter((item) => {
+      const key = item.word || item.hanja;
+      if (!key || !item.meaning || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const questions = buildWorksheetQuestions(words, Number(questionCount || 30));
+  return { level, rangeStart, rangeEnd, lessons, words, questions };
+}
+
+function buildWorksheetQuestions(words, questionCount) {
+  const pool = shuffleItems(words);
+  const count = Math.min(Math.max(1, questionCount), pool.length || 0);
+  const writingCount = Math.ceil(count * 0.4);
+  const choiceCount = Math.ceil(count * 0.35);
+  const blankCount = Math.max(0, count - writingCount - choiceCount);
+  const questions = [];
+  let cursor = 0;
+
+  pool.slice(cursor, cursor + writingCount).forEach((item) => {
+    questions.push({ type: "write", prompt: item.meaning, answer: item.word, meta: item });
+  });
+  cursor += writingCount;
+
+  pool.slice(cursor, cursor + choiceCount).forEach((item) => {
+    const distractors = shuffleItems(words.filter((word) => word.word !== item.word)).slice(0, 3);
+    questions.push({
+      type: "choice",
+      prompt: item.word,
+      answer: item.meaning,
+      choices: shuffleItems([item, ...distractors]).map((choice) => choice.meaning),
+      meta: item
+    });
+  });
+  cursor += choiceCount;
+
+  pool.slice(cursor, cursor + blankCount).forEach((item) => {
+    const example = (item.examples || []).find((sentence) => String(sentence || "").includes(item.word)) || `${item.word}의 의미를 생각하며 문장을 완성해 보세요.`;
+    questions.push({
+      type: "blank",
+      prompt: String(example).replaceAll(item.word, "(          )"),
+      answer: item.word,
+      meta: item
+    });
+  });
+
+  return shuffleItems(questions).map((question, index) => ({ ...question, number: index + 1 }));
+}
+
+function createWorksheetHtml(worksheet) {
+  const title = `${worksheet.level} ${worksheet.rangeStart}-${worksheet.rangeEnd}일차 누적 어휘 학습지`;
+  const issuedAt = new Date().toLocaleDateString("ko-KR");
+  const writeQuestions = worksheet.questions.filter((item) => item.type === "write");
+  const choiceQuestions = worksheet.questions.filter((item) => item.type === "choice");
+  const blankQuestions = worksheet.questions.filter((item) => item.type === "blank");
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeWorksheetHtml(title)}</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #14213d; font-family: Arial, "Malgun Gothic", sans-serif; }
+    header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #14213d; padding-bottom: 12px; margin-bottom: 18px; }
+    h1 { margin: 0 0 8px; font-size: 25px; }
+    h2 { margin: 24px 0 10px; padding: 8px 12px; border-radius: 12px; background: #eaf8ff; font-size: 17px; }
+    .meta { color: #65708a; font-weight: 700; }
+    .nameBox { min-width: 210px; border: 2px solid #d9e6f7; border-radius: 12px; padding: 10px; font-weight: 800; }
+    ol { margin: 0; padding-left: 24px; }
+    li { margin: 0 0 12px; break-inside: avoid; line-height: 1.55; }
+    .answerLine { display: inline-block; min-width: 150px; border-bottom: 1.8px solid #14213d; margin-left: 8px; }
+    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px; margin-top: 5px; color: #34415f; }
+    .wordBank { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 16px; }
+    .wordBank span { border: 1px solid #d9e6f7; border-radius: 999px; padding: 4px 8px; background: #f8fbff; font-weight: 800; }
+    .answers { break-before: page; }
+    .answerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+    .answerGrid div { border-bottom: 1px solid #d9e6f7; padding-bottom: 4px; }
+    .toolbar { position: fixed; right: 18px; top: 18px; display: flex; gap: 8px; }
+    .toolbar button { border: 0; border-radius: 999px; padding: 10px 14px; background: #58cc02; color: white; font-weight: 900; cursor: pointer; }
+    @media print { .toolbar { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">인쇄/PDF 저장</button></div>
+  <header>
+    <div>
+      <h1>${escapeWorksheetHtml(title)}</h1>
+      <div class="meta">발행일 ${escapeWorksheetHtml(issuedAt)} · 총 ${worksheet.questions.length}문항 · 누적 어휘 ${worksheet.words.length}개</div>
+    </div>
+    <div class="nameBox">이름: __________________</div>
+  </header>
+  <section>
+    <h2>1. 뜻을 보고 알맞은 어휘를 쓰세요.</h2>
+    <ol>${writeQuestions.map((item) => `<li>${escapeWorksheetHtml(item.prompt)} <span class="answerLine"></span></li>`).join("")}</ol>
+  </section>
+  <section>
+    <h2>2. 어휘의 뜻으로 알맞은 것을 고르세요.</h2>
+    <ol>${choiceQuestions.map((item) => `<li><b>${escapeWorksheetHtml(item.prompt)}</b><div class="choices">${item.choices.map((choice, index) => `<span>${index + 1}. ${escapeWorksheetHtml(choice)}</span>`).join("")}</div></li>`).join("")}</ol>
+  </section>
+  <section>
+    <h2>3. 문맥에 알맞은 어휘를 쓰세요.</h2>
+    <div class="wordBank">${shuffleItems(blankQuestions).map((item) => `<span>${escapeWorksheetHtml(item.answer)}</span>`).join("")}</div>
+    <ol>${blankQuestions.map((item) => `<li>${escapeWorksheetHtml(item.prompt)}</li>`).join("")}</ol>
+  </section>
+  <section class="answers">
+    <h1>정답</h1>
+    <div class="answerGrid">${worksheet.questions.map((item) => `<div>${item.number}. ${escapeWorksheetHtml(item.answer)}</div>`).join("")}</div>
+  </section>
+</body>
+</html>`;
+}
+
+function escapeWorksheetHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function shuffleItems(items) {
+  return [...items].sort(() => Math.random() - 0.5);
 }
 
 function parseCsv(text) {

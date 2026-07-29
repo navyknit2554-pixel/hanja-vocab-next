@@ -1530,6 +1530,77 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+}
+
+.panelTitle p {
+  margin: 6px 0 0;
+}
+
+.worksheetPanel {
+  display: grid;
+  gap: 18px;
+}
+
+.worksheetControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.worksheetControls label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.worksheetControls input,
+.worksheetControls select {
+  height: 46px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 12px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.worksheetPreview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border: 2px solid #d8f0d2;
+  border-radius: 18px;
+  background: #fbfff7;
+}
+
+.worksheetPreview div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 2px solid #e2f5d8;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.worksheetPreview span,
+.worksheetPreview p {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.worksheetPreview strong {
+  font-size: 1.15rem;
+}
+
+.worksheetPreview p {
+  grid-column: 1 / -1;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .studentPanelHead {
@@ -2221,6 +2292,11 @@ td span {
   }
 
   .choices, .adminGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .worksheetControls,
+  .worksheetPreview {
     grid-template-columns: 1fr;
   }
 
