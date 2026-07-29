@@ -650,6 +650,36 @@
 
           <div class="verifyResult" id="verifyResult"></div>
         </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>라이선스 키로 조회/폐기</h2>
+              <p>다른 브라우저에서 발급했거나 기록을 삭제한 키도 직접 조회하고 로그인 차단 처리합니다.</p>
+            </div>
+            <span class="badge">폐기</span>
+          </div>
+
+          <label>
+            소유자 관리자 비밀번호
+            <input id="revokePassword" type="password" autocomplete="off" placeholder="ADMIN_PASSWORD" />
+          </label>
+          <label>
+            조회/폐기할 라이선스 키
+            <textarea id="revokeKey" placeholder="HANJA-..."></textarea>
+          </label>
+          <label>
+            폐기 사유
+            <input id="revokeReason" type="text" placeholder="예: 계약 종료, 오발급, 테스트 키" />
+          </label>
+          <div class="actions">
+            <button id="lookupLicenseButton" type="button">키 조회</button>
+            <button class="danger" id="revokeLicenseButton" type="button">라이선스 폐기</button>
+            <button class="secondary" id="restoreLicenseButton" type="button">폐기 해제</button>
+          </div>
+
+          <div class="verifyResult" id="revokeResult"></div>
+        </section>
       </div>
 
       <aside class="stack">
@@ -728,6 +758,13 @@
     const verifyKey = document.getElementById("verifyKey");
     const verifyButton = document.getElementById("verifyButton");
     const verifyResult = document.getElementById("verifyResult");
+    const revokePassword = document.getElementById("revokePassword");
+    const revokeKey = document.getElementById("revokeKey");
+    const revokeReason = document.getElementById("revokeReason");
+    const lookupLicenseButton = document.getElementById("lookupLicenseButton");
+    const revokeLicenseButton = document.getElementById("revokeLicenseButton");
+    const restoreLicenseButton = document.getElementById("restoreLicenseButton");
+    const revokeResult = document.getElementById("revokeResult");
     const historyList = document.getElementById("historyList");
     const historyCount = document.getElementById("historyCount");
     const exportCsv = document.getElementById("exportCsv");
@@ -1040,6 +1077,54 @@
       `;
     }
 
+    function renderManagedLicense(result) {
+      revokeResult.className = `verifyResult show${result.ok ? "" : " bad"}`;
+      if (!result.ok) {
+        revokeResult.innerHTML = `<h3>처리 실패</h3><p>${escapeHtml(result.message || "라이선스를 확인하지 못했습니다.")}</p>`;
+        return;
+      }
+      const license = result.license || {};
+      revokeResult.innerHTML = `
+        <h3>${license.revoked ? "폐기된 라이선스입니다." : "사용 가능한 라이선스입니다."}</h3>
+        <div class="metaGrid">
+          <div class="meta"><span>선생님 코드</span><strong>${escapeHtml(license.teacherCode || "-")}</strong></div>
+          <div class="meta"><span>만료일</span><strong>${license.expiresAt ? formatDate(new Date(license.expiresAt)) : "-"}</strong></div>
+          <div class="meta"><span>상태</span><strong>${license.revoked ? "폐기됨" : "사용 가능"}</strong></div>
+          <div class="meta"><span>폐기일</span><strong>${license.revokedAt ? formatDate(new Date(license.revokedAt)) : "-"}</strong></div>
+          <div class="meta"><span>라이선스 해시</span><strong>${escapeHtml((license.licenseHash || "").slice(0, 12) || "-")}</strong></div>
+          <div class="meta"><span>사유</span><strong>${escapeHtml(license.reason || "-")}</strong></div>
+        </div>
+        <p>${escapeHtml(result.message || "")}</p>
+      `;
+    }
+
+    async function manageLicense(action) {
+      const password = normalize(revokePassword.value);
+      const licenseKey = normalize(revokeKey.value);
+      if (!password) {
+        showToast("소유자 관리자 비밀번호를 입력해 주세요.");
+        return;
+      }
+      if (!licenseKey) {
+        showToast("라이선스 키를 입력해 주세요.");
+        return;
+      }
+      if (action === "revoke" && !confirm("이 라이선스를 폐기하고 강사 로그인을 차단할까요?")) return;
+      if (action === "restore" && !confirm("이 라이선스의 폐기를 해제할까요?")) return;
+      try {
+        const response = await fetch("/api/license/revocations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password, licenseKey, action, reason: normalize(revokeReason.value) })
+        });
+        const result = await response.json().catch(() => ({}));
+        renderManagedLicense(result);
+        showToast(result.message || (response.ok ? "처리 완료" : "처리 실패"));
+      } catch (error) {
+        renderManagedLicense({ ok: false, message: error.message || "서버 연결을 확인해 주세요." });
+      }
+    }
+
     durationSelect.addEventListener("change", () => {
       expiresInput.disabled = durationSelect.value !== "custom";
       if (durationSelect.value === "custom" && !expiresInput.value) {
@@ -1095,6 +1180,10 @@
 
     copyLicense.addEventListener("click", () => copyText(latestIssued?.licenseKey, "라이선스"));
     copyTeacherCode.addEventListener("click", () => copyText(latestIssued?.teacherCode, "선생님 코드"));
+
+    lookupLicenseButton.addEventListener("click", () => manageLicense("lookup"));
+    revokeLicenseButton.addEventListener("click", () => manageLicense("revoke"));
+    restoreLicenseButton.addEventListener("click", () => manageLicense("restore"));
 
     verifyButton.addEventListener("click", async () => {
       const secret = normalize(secretInput.value);

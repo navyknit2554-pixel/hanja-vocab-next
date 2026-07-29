@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminConfigError, adminCookieName, adminSessionValue, isValidAdminPassword, licenseAdminSessionValue } from "../../../../src/lib/adminAuth";
 import { getLicenseAccess } from "../../../../src/lib/licenseAuth";
+import { getState } from "../../../../src/lib/serverStore";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,13 @@ export async function POST(request) {
   if (!isMaster && !licenseAccess?.allowed) {
     const message = licenseErrorMessage(licenseAccess?.reason, licenseKey);
     return NextResponse.json({ ok: false, message }, { status: 401 });
+  }
+  if (!isMaster && licenseAccess?.licenseHash) {
+    const mainState = await getState("main");
+    const revoked = (mainState.licenseRevocations || []).some((item) => item.licenseHash === licenseAccess.licenseHash && item.status !== "restored");
+    if (revoked) {
+      return NextResponse.json({ ok: false, message: "폐기된 라이선스입니다. 관리자에게 문의해 주세요." }, { status: 401 });
+    }
   }
 
   const response = NextResponse.json({
