@@ -419,22 +419,22 @@ export function AdminApp() {
 
   async function saveLesson(event) {
     event.preventDefault();
-    setLessonSaveStatus("?? ?...");
+    setLessonSaveStatus("저장 중...");
     setLessonSaving(true);
     let hanjaSet;
     try {
       hanjaSet = JSON.parse(hanjaJson);
     } catch {
-      setLessonSaveStatus("?? ??: ?? ?? JSON ??? ??? ???.");
+      setLessonSaveStatus("저장 실패: 한자 묶음 JSON 형식을 확인해 주세요.");
       setLessonSaving(false);
-      alert("?? ?? JSON ??? ??? ???.");
+      alert("한자 묶음 JSON 형식을 확인해 주세요.");
       return;
     }
     const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
     const errors = validateLesson(nextLesson);
     const blockingErrors = errors.filter((error) => !isSaveableContentWarning(error));
     if (blockingErrors.length) {
-      setLessonSaveStatus("?? ??: ?? ??? ??? ???.");
+      setLessonSaveStatus("저장 실패: 필수 내용을 확인해 주세요.");
       setLessonSaving(false);
       alert(blockingErrors.slice(0, 8).join("\n"));
       return;
@@ -442,9 +442,9 @@ export function AdminApp() {
     try {
       await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
       const savedAt = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-      setLessonSaveStatus(selectedLevel + " " + selectedDay + "?? ?? ?? ? " + savedAt);
+      setLessonSaveStatus(selectedLevel + " " + selectedDay + "일차 저장 완료 · " + savedAt);
     } catch (error) {
-      setLessonSaveStatus(error.message || "?? ??: ?? ??? ???.");
+      setLessonSaveStatus(error.message || "저장 실패: 다시 시도해 주세요.");
     } finally {
       setLessonSaving(false);
     }
@@ -1939,4 +1939,5 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+
 
