@@ -684,48 +684,26 @@ export function AdminApp() {
 
   async function rebuildBulkVocabFromDictionary() {
     if (dictionaryBulkRunning) return;
-    const targets = state.curriculum
-      .filter((item) => {
-        const level = String(item.level || "").trim();
-        const day = Number(item.day);
-        if (level === "초급") return day >= 1 && day <= 100;
-        if (level === "중급" || level === "고급") return day >= 1 && day <= 100;
-        return false;
-      })
-      .sort((a, b) => {
-        const levelOrder = { "초급": 1, "중급": 2, "고급": 3 };
-        return (levelOrder[a.level] || 9) - (levelOrder[b.level] || 9) || Number(a.day) - Number(b.day);
-      });
-    if (!targets.length) {
-      alert("국어원 어휘로 재구성할 일차가 없습니다.");
-      return;
-    }
-    if (!window.confirm(`초급/중급/고급 1~100일차를 국어원 자료 기반 어휘로 다시 구성할까요? 총 ${targets.length}개 일차를 순서대로 처리합니다.`)) return;
+    if (!window.confirm("초급 1일차부터 고급 100일차까지 한자 구성은 유지하고, 어휘/뜻/용례만 국어원 자료 기준으로 다시 저장할까요? 처리 시간이 걸릴 수 있습니다.")) return;
 
     setDictionaryBulkRunning(true);
-    let replaced = 0;
-    let missing = 0;
-    let done = 0;
-    const nextState = structuredClone(state);
-
+    setDictionaryStatus("국어원 자료 기준으로 전체 커리큘럼 어휘를 다시 구성하는 중...");
     try {
-      for (const target of targets) {
-        done += 1;
-        setDictionaryStatus(`국어원 일괄 구성 중: ${target.level} ${target.day}일차 (${done}/${targets.length})`);
-        const lessonIndex = nextState.curriculum.findIndex((item) => Number(item.day) === Number(target.day) && String(item.level || "").trim() === String(target.level || "").trim());
-        if (lessonIndex < 0) continue;
-        const lesson = nextState.curriculum[lessonIndex];
-        const results = await fetchDictionaryVocabForHanjaSet(lesson.hanjaSet || [], lesson.dailyCount || 4);
-        const summary = applyDictionaryVocabResults(lesson.hanjaSet || [], results, lesson.dailyCount || 4);
-        replaced += summary.replaced;
-        missing += summary.missing;
-      }
-      await persist(nextState);
+      const response = await fetch("/api/admin/dictionary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "bulk-curriculum-vocab" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 일괄 구성을 완료하지 못했습니다.");
+      const nextState = await loadAppState();
+      setState(nextState);
       const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
       setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
-      setDictionaryStatus(`국어원 일괄 구성 완료: ${targets.length}개 일차, 어휘 ${replaced}개 반영, 후보 부족 한자 ${missing}개`);
+      const summary = payload.summary || {};
+      setDictionaryStatus(`국어원 일괄 구성 완료: ${summary.lessons || 0}개 일차, ${summary.hanja || 0}개 한자, 어휘 ${summary.replaced || 0}개 반영, 후보 부족 한자 ${summary.missing || 0}개`);
     } catch (error) {
-      setDictionaryStatus(error.message || `국어원 일괄 구성 중 ${done}/${targets.length} 지점에서 멈췄습니다.`);
+      setDictionaryStatus(error.message || "국어원 전체 일괄 구성 중 문제가 발생했습니다.");
     } finally {
       setDictionaryBulkRunning(false);
     }

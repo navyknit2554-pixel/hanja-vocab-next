@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
+﻿import { mkdir, readFile, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { buildSeedCurriculum, cloneSeed } from "./data";
 import { normalizeStudentProgression } from "./progression";
@@ -142,7 +142,7 @@ function isIncompleteLesson(lesson) {
   const hanjaSet = Array.isArray(lesson?.hanjaSet) ? lesson.hanjaSet : [];
   if (dailyCount < 4 || hanjaSet.length < dailyCount) return true;
   return hanjaSet.slice(0, dailyCount).some((hanja) => {
-    if (!Array.isArray(hanja?.vocab) || hanja.vocab.length < 8) return true;
+    if (!Array.isArray(hanja?.vocab) || !hanja.vocab.length) return true;
     if (Number(lesson?.day || 0) > 5 && hasPatternedGeneratedVocab(hanja)) return true;
     return hanja.vocab.some((word) => !isValidVocabWord(word, hanja.character));
   });
@@ -204,3 +204,4 @@ function levelOrder(level) {
   const order = { 초급: 1, 중급: 2, 고급: 3 };
   return order[String(level || "").trim()] || 99;
 }
+

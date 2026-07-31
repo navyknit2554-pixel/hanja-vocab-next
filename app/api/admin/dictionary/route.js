@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminCookieName, readAdminSession } from "../../../../src/lib/adminAuth";
 import { cookies } from "next/headers";
+import { getState, setState } from "../../../../src/lib/serverStore";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,13 @@ export async function POST(request) {
 
   try {
     const body = await request.json().catch(() => ({}));
+    if (body.mode === "bulk-curriculum-vocab") {
+      const state = await getState(session.scopeKey);
+      const summary = await rebuildCurriculumVocab(apiKey, state);
+      await setState(state, session.scopeKey);
+      return NextResponse.json({ ok: true, summary });
+    }
+
     if (body.mode === "hanja-vocab") {
       const hanjaSet = Array.isArray(body.hanjaSet) ? body.hanjaSet : [];
       const results = {};
@@ -54,6 +62,44 @@ export async function POST(request) {
       { status: error.status || 502 }
     );
   }
+}
+
+async function rebuildCurriculumVocab(apiKey, state) {
+  const levels = new Set(["초급", "중급", "고급"]);
+  const targets = (Array.isArray(state.curriculum) ? state.curriculum : [])
+    .filter((lesson) => levels.has(String(lesson.level || "").trim()) && Number(lesson.day) >= 1 && Number(lesson.day) <= 100)
+    .sort((left, right) => levelOrder(left.level) - levelOrder(right.level) || Number(left.day) - Number(right.day));
+  const cache = new Map();
+  let lessons = 0;
+  let hanja = 0;
+  let replaced = 0;
+  let missing = 0;
+
+  for (const lesson of targets) {
+    lessons += 1;
+    const dailyCount = Number(lesson.dailyCount || 4);
+    const hanjaSet = Array.isArray(lesson.hanjaSet) ? lesson.hanjaSet : [];
+    for (const item of hanjaSet.slice(0, dailyCount)) {
+      const character = String(item?.character || "").trim();
+      if (!character) continue;
+      hanja += 1;
+      if (!cache.has(character)) cache.set(character, await lookupHanjaVocab(apiKey, item));
+      const candidates = cache.get(character) || [];
+      if (candidates.length) {
+        item.vocab = candidates;
+        replaced += candidates.length;
+      } else {
+        item.vocab = [];
+        missing += 1;
+      }
+    }
+  }
+
+  return { lessons, hanja, replaced, missing };
+}
+
+function levelOrder(level) {
+  return { "초급": 1, "중급": 2, "고급": 3 }[String(level || "").trim()] || 9;
 }
 
 async function lookupHanjaVocab(apiKey, hanja) {
