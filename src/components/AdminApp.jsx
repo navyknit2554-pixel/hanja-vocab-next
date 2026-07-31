@@ -726,6 +726,32 @@ export function AdminApp() {
     }
   }
 
+  async function removeNoExampleVocab() {
+    if (dictionaryBulkRunning) return;
+    if (!window.confirm("전체 커리큘럼에서 실제 용례가 없는 어휘를 삭제할까요? 삭제 후에는 백업이 없다면 되돌릴 수 없습니다.")) return;
+    setDictionaryBulkRunning(true);
+    setDictionaryStatus("용례 없는 어휘를 찾고 삭제하는 중...");
+    try {
+      const response = await fetch("/api/admin/dictionary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "prune-no-example-vocab" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "용례 없는 어휘 삭제를 완료하지 못했습니다.");
+      const nextState = await loadAppState();
+      setState(nextState);
+      const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
+      setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
+      const summary = payload.summary || {};
+      setDictionaryStatus(`용례 없는 어휘 삭제 완료: ${summary.removed || 0}개 삭제, ${summary.remaining || 0}개 유지`);
+    } catch (error) {
+      setDictionaryStatus(error.message || "용례 없는 어휘 삭제 중 문제가 발생했습니다.");
+    } finally {
+      setDictionaryBulkRunning(false);
+    }
+  }
+
   function makePrompt() {
     setAiPrompt(buildAiPrompt(plan));
   }
@@ -1214,6 +1240,7 @@ export function AdminApp() {
               </div>
               <div className="dictionaryTools">
                 <button className="miniBtn blue" type="button" onClick={rebuildBulkVocabFromDictionary} disabled={dictionaryBulkRunning}>1~100일차 국어원 일괄 구성</button>
+                <button className="miniBtn danger" type="button" onClick={removeNoExampleVocab} disabled={dictionaryBulkRunning}>용례 없는 어휘 삭제</button>
                 <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary} disabled={dictionaryBulkRunning}>현재 일차 국어원 어휘</button>
                 <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary} disabled={dictionaryBulkRunning}>국어원 뜻/용례 가져오기</button>
                 <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>

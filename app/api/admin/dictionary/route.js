@@ -22,6 +22,14 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
   }
 
+  const requestBody = await request.json().catch(() => ({}));
+  if (requestBody.mode === "prune-no-example-vocab") {
+    const state = await getState(session.scopeKey);
+    const summary = pruneNoExampleVocab(state);
+    await setState(state, session.scopeKey);
+    return NextResponse.json({ ok: true, summary });
+  }
+
   const apiKey = process.env.KOREAN_DICT_API_KEY || process.env.KRDICT_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -31,7 +39,7 @@ export async function POST(request) {
   }
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = requestBody;
     if (body.mode === "bulk-curriculum-vocab") {
       const state = await getState(session.scopeKey);
       const summary = await rebuildCurriculumVocab(apiKey, state, body);
@@ -62,6 +70,49 @@ export async function POST(request) {
       { status: error.status || 502 }
     );
   }
+}
+
+function pruneNoExampleVocab(state) {
+  let lessons = 0;
+  let hanja = 0;
+  let removed = 0;
+  let remaining = 0;
+  const removedSamples = [];
+
+  (Array.isArray(state.curriculum) ? state.curriculum : []).forEach((lesson) => {
+    lessons += 1;
+    const dailyCount = Number(lesson.dailyCount || 4);
+    const hanjaSet = Array.isArray(lesson.hanjaSet) ? lesson.hanjaSet : [];
+    hanjaSet.slice(0, dailyCount).forEach((item) => {
+      hanja += 1;
+      const before = Array.isArray(item.vocab) ? item.vocab : [];
+      const kept = before.filter((word) => hasUsableExamples(word));
+      before.forEach((word) => {
+        if (!hasUsableExamples(word) && removedSamples.length < 20) {
+          removedSamples.push({
+            level: lesson.level,
+            day: lesson.day,
+            hanja: item.character,
+            word: word?.word || word?.hanja || ""
+          });
+        }
+      });
+      removed += before.length - kept.length;
+      remaining += kept.length;
+      item.vocab = kept;
+    });
+  });
+
+  return { lessons, hanja, removed, remaining, removedSamples };
+}
+
+function hasUsableExamples(word) {
+  const plainWord = String(word?.word || "").trim();
+  const examples = Array.isArray(word?.examples) ? word.examples : [];
+  return examples.some((example) => {
+    const text = String(example || "").trim();
+    return plainWord && text.includes(plainWord) && isUsefulExample(text);
+  });
 }
 
 async function rebuildCurriculumVocab(apiKey, state, options = {}) {
