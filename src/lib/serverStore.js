@@ -143,8 +143,7 @@ function isIncompleteLesson(lesson) {
   if (dailyCount < 4 || hanjaSet.length < dailyCount) return true;
   return hanjaSet.slice(0, dailyCount).some((hanja) => {
     if (!Array.isArray(hanja?.vocab) || !hanja.vocab.length) return true;
-    if (Number(lesson?.day || 0) > 5 && hasPatternedGeneratedVocab(hanja)) return true;
-    return hanja.vocab.some((word) => !isValidVocabWord(word, hanja.character));
+    return false;
   });
 }
 

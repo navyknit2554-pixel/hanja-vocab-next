@@ -129,7 +129,8 @@ async function lookupHanjaVocab(apiKey, hanja) {
 
   for (const item of filtered) {
     if (selected.length >= 8) break;
-    const examples = item.targetCode ? await fetchDictionaryViewExamples(apiKey, item.targetCode, item.word) : [];
+    const viewExamples = item.targetCode ? await fetchDictionaryViewExamples(apiKey, item.targetCode, item.word) : [];
+    const examples = viewExamples.length ? viewExamples : await fetchDictionarySearchExamples(apiKey, item.word);
     selected.push({
       hanja: extractHanjaWord(item.origin, character) || item.origin || item.word,
       word: item.word,
@@ -144,6 +145,15 @@ async function lookupHanjaVocab(apiKey, hanja) {
   }
 
   return selected;
+}
+
+async function fetchDictionarySearchExamples(apiKey, word) {
+  const exactExamples = await fetchDictionaryPart(apiKey, word, "exam", { method: "exact", num: "20" });
+  const includeExamples = exactExamples.items.length ? { items: [] } : await fetchDictionaryPart(apiKey, word, "exam", { method: "include", num: "20" });
+  return [...exactExamples.items, ...includeExamples.items]
+    .map((item) => cleanText(item.example))
+    .filter((item) => item.includes(word) && isUsefulExample(item))
+    .slice(0, 3);
 }
 
 async function lookupWord(apiKey, word) {
