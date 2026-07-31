@@ -34,7 +34,7 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     if (body.mode === "bulk-curriculum-vocab") {
       const state = await getState(session.scopeKey);
-      const summary = await rebuildCurriculumVocab(apiKey, state);
+      const summary = await rebuildCurriculumVocab(apiKey, state, body);
       await setState(state, session.scopeKey);
       return NextResponse.json({ ok: true, summary });
     }
@@ -64,18 +64,29 @@ export async function POST(request) {
   }
 }
 
-async function rebuildCurriculumVocab(apiKey, state) {
-  const levels = new Set(["초급", "중급", "고급"]);
+async function rebuildCurriculumVocab(apiKey, state, options = {}) {
+  const allowedLevels = new Set(["\uCD08\uAE09", "\uC911\uAE09", "\uACE0\uAE09"]);
+  const requestedLevel = String(options.level || "").trim();
+  const startDay = Math.max(1, Number(options.startDay || 1));
+  const endDay = Math.min(100, Number(options.endDay || 100));
+  const maxLessons = Math.min(20, Math.max(1, Number(options.maxLessons || 5)));
   const targets = (Array.isArray(state.curriculum) ? state.curriculum : [])
-    .filter((lesson) => levels.has(String(lesson.level || "").trim()) && Number(lesson.day) >= 1 && Number(lesson.day) <= 100)
+    .filter((lesson) => {
+      const level = String(lesson.level || "").trim();
+      const day = Number(lesson.day);
+      if (!allowedLevels.has(level)) return false;
+      if (requestedLevel && level !== requestedLevel) return false;
+      return day >= startDay && day <= endDay;
+    })
     .sort((left, right) => levelOrder(left.level) - levelOrder(right.level) || Number(left.day) - Number(right.day));
+  const selectedTargets = targets.slice(0, maxLessons);
   const cache = new Map();
   let lessons = 0;
   let hanja = 0;
   let replaced = 0;
   let missing = 0;
 
-  for (const lesson of targets) {
+  for (const lesson of selectedTargets) {
     lessons += 1;
     const dailyCount = Number(lesson.dailyCount || 4);
     const hanjaSet = Array.isArray(lesson.hanjaSet) ? lesson.hanjaSet : [];
@@ -95,11 +106,11 @@ async function rebuildCurriculumVocab(apiKey, state) {
     }
   }
 
-  return { lessons, hanja, replaced, missing };
+  return { level: requestedLevel || "전체", startDay, endDay, lessons, hanja, replaced, missing };
 }
 
 function levelOrder(level) {
-  return { "초급": 1, "중급": 2, "고급": 3 }[String(level || "").trim()] || 9;
+  return { "\uCD08\uAE09": 1, "\uC911\uAE09": 2, "\uACE0\uAE09": 3 }[String(level || "").trim()] || 9;
 }
 
 async function lookupHanjaVocab(apiKey, hanja) {

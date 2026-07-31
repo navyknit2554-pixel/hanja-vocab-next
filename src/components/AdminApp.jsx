@@ -687,23 +687,40 @@ export function AdminApp() {
     if (!window.confirm("초급 1일차부터 고급 100일차까지 한자 구성은 유지하고, 어휘/뜻/용례만 국어원 자료 기준으로 다시 저장할까요? 처리 시간이 걸릴 수 있습니다.")) return;
 
     setDictionaryBulkRunning(true);
-    setDictionaryStatus("국어원 자료 기준으로 전체 커리큘럼 어휘를 다시 구성하는 중...");
+    const batches = ["초급", "중급", "고급"].flatMap((level) =>
+      Array.from({ length: 20 }, (_, index) => {
+        const startDay = index * 5 + 1;
+        return { level, startDay, endDay: startDay + 4 };
+      })
+    );
+    const total = { lessons: 0, hanja: 0, replaced: 0, missing: 0 };
     try {
-      const response = await fetch("/api/admin/dictionary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "bulk-curriculum-vocab" })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 일괄 구성을 완료하지 못했습니다.");
+      for (let index = 0; index < batches.length; index += 1) {
+        const batch = batches[index];
+        setDictionaryStatus(`국어원 일괄 구성 중: ${batch.level} ${batch.startDay}-${batch.endDay}일차 (${index + 1}/${batches.length})`);
+        const response = await fetch("/api/admin/dictionary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "bulk-curriculum-vocab", ...batch, maxLessons: 5 })
+        });
+        const text = await response.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || `${batch.level} ${batch.startDay}-${batch.endDay}일차 처리 중 서버 응답을 확인하지 못했습니다.`);
+        }
+        const summary = payload.summary || {};
+        total.lessons += summary.lessons || 0;
+        total.hanja += summary.hanja || 0;
+        total.replaced += summary.replaced || 0;
+        total.missing += summary.missing || 0;
+      }
       const nextState = await loadAppState();
       setState(nextState);
       const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
       setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
-      const summary = payload.summary || {};
-      setDictionaryStatus(`국어원 일괄 구성 완료: ${summary.lessons || 0}개 일차, ${summary.hanja || 0}개 한자, 어휘 ${summary.replaced || 0}개 반영, 후보 부족 한자 ${summary.missing || 0}개`);
+      setDictionaryStatus(`국어원 일괄 구성 완료: ${total.lessons}개 일차, ${total.hanja}개 한자, 어휘 ${total.replaced}개 반영, 후보 부족 한자 ${total.missing}개`);
     } catch (error) {
-      setDictionaryStatus(error.message || "국어원 전체 일괄 구성 중 문제가 발생했습니다.");
+      setDictionaryStatus(error.message || "국어원 전체 일괄 구성 중 문제가 발생했습니다. 완료된 구간은 이미 저장되었습니다.");
     } finally {
       setDictionaryBulkRunning(false);
     }
