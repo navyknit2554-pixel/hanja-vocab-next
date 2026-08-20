@@ -7,6 +7,37 @@ import { Mascot } from "./Mascot";
 
 const studentLoginStorageKey = "chologihanzi-student-login";
 
+function studentApiUrl(path) {
+  if (typeof window === "undefined") return path;
+  try {
+    return new URL(path, window.location.origin).toString();
+  } catch {
+    return path;
+  }
+}
+
+function fetchStudentApi(path, options) {
+  return fetch(studentApiUrl(path), options);
+}
+
+function friendlyStudentError(error, fallback = "학습 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.") {
+  const message = String(error?.message || error || "");
+  if (/string did not match the expected pattern/i.test(message)) {
+    return "앱 주소 또는 저장된 로그인 정보가 올바르지 않습니다. 다시 로그인해 주세요.";
+  }
+  return message || fallback;
+}
+
+function normalizeSavedLogin(saved) {
+  if (!saved || typeof saved !== "object") return null;
+  return {
+    teacherCode: typeof saved.teacherCode === "string" ? saved.teacherCode : "",
+    loginId: typeof saved.loginId === "string" ? saved.loginId : "",
+    password: typeof saved.password === "string" ? saved.password : "",
+    remember: saved.remember !== false
+  };
+}
+
 export function StudentApp() {
   const [student, setStudent] = useState(null);
   const [curriculum, setCurriculum] = useState([]);
@@ -29,14 +60,14 @@ export function StudentApp() {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(studentLoginStorageKey) || "null");
+      const saved = normalizeSavedLogin(JSON.parse(window.localStorage.getItem(studentLoginStorageKey) || "null"));
       if (saved) {
         setLogin({
-          teacherCode: saved.teacherCode || "",
-          loginId: saved.loginId || "",
-          password: saved.password || ""
+          teacherCode: saved.teacherCode,
+          loginId: saved.loginId,
+          password: saved.password
         });
-        setRememberLogin(saved.remember !== false);
+        setRememberLogin(saved.remember);
       }
     } catch {
       window.localStorage.removeItem(studentLoginStorageKey);
@@ -68,15 +99,18 @@ export function StudentApp() {
 
   async function refreshStudentSession({ initial = false } = {}) {
     try {
-      const response = await fetch("/api/student/session", { cache: "no-store" });
+      const response = await fetchStudentApi("/api/student/session", { cache: "no-store" });
       const result = await response.json();
       if (result.authenticated) {
+        setLoadError("");
+        setLoginError("");
         applyStudentPayload(result);
       } else if (result.configError) {
         setLoginError(result.configError);
       }
     } catch (error) {
-      setLoadError(error.message);
+      setLoginError(friendlyStudentError(error));
+      setStudent(null);
     } finally {
       if (initial) setCheckingSession(false);
     }
@@ -105,36 +139,41 @@ export function StudentApp() {
   async function handleLogin(event) {
     event.preventDefault();
     setLoginError("");
-    const response = await fetch("/api/student/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(login)
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      setLoginError(result.message || "아이디 또는 비밀번호를 확인해 주세요.");
-      return;
-    }
-    const result = await response.json();
-    applyStudentPayload(result);
-    setStage("learn");
-    setCardIndex(0);
-    setQuizIndex(0);
-    setQueue([]);
-    setRetry([]);
-    setArcheryGame(null);
-    setPendingStudent(null);
-    resetStats();
-    if (rememberLogin) {
-      window.localStorage.setItem(studentLoginStorageKey, JSON.stringify({ ...login, remember: true }));
-    } else {
-      window.localStorage.removeItem(studentLoginStorageKey);
-      setLogin({ teacherCode: "", loginId: "", password: "" });
+    setLoadError("");
+    try {
+      const response = await fetchStudentApi("/api/student/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(login)
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        setLoginError(result.message || "아이디 또는 비밀번호를 확인해 주세요.");
+        return;
+      }
+      const result = await response.json();
+      applyStudentPayload(result);
+      setStage("learn");
+      setCardIndex(0);
+      setQuizIndex(0);
+      setQueue([]);
+      setRetry([]);
+      setArcheryGame(null);
+      setPendingStudent(null);
+      resetStats();
+      if (rememberLogin) {
+        window.localStorage.setItem(studentLoginStorageKey, JSON.stringify({ ...login, remember: true }));
+      } else {
+        window.localStorage.removeItem(studentLoginStorageKey);
+        setLogin({ teacherCode: "", loginId: "", password: "" });
+      }
+    } catch (error) {
+      setLoginError(friendlyStudentError(error, "로그인 요청을 처리하지 못했습니다."));
     }
   }
 
   async function logoutStudent() {
-    await fetch("/api/student/session", { method: "DELETE" });
+    await fetchStudentApi("/api/student/session", { method: "DELETE" });
     setStudent(null);
     setCurriculum([]);
     setProgressRecord({ completed: {}, quiz: {} });
@@ -194,7 +233,7 @@ export function StudentApp() {
 
   async function saveProgress(finalStats) {
     try {
-      const response = await fetch("/api/student/progress", {
+      const response = await fetchStudentApi("/api/student/progress", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lessonDay: lesson.day, stats: finalStats })
@@ -217,14 +256,14 @@ export function StudentApp() {
       }
       if (result.progress) setProgressRecord(result.progress);
     } catch (error) {
-      setLoadError(error.message);
+      setLoadError(friendlyStudentError(error, "학습 결과를 저장하지 못했습니다."));
     }
   }
 
   async function saveGameProgress(result) {
     if (!archeryGame || !lesson) return;
     try {
-      const response = await fetch("/api/student/progress", {
+      const response = await fetchStudentApi("/api/student/progress", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -248,11 +287,21 @@ export function StudentApp() {
       setArcheryGame(null);
       setStage("review");
     } catch (error) {
-      setLoadError(error.message);
+      setLoadError(friendlyStudentError(error, "게임 결과를 저장하지 못했습니다."));
     }
   }
 
-  if (loadError) return <main className="centerPage"><strong className="errorText">{loadError}</strong></main>;
+  if (loadError) return (
+    <main className="centerPage">
+      <section className="loginCard">
+        <Mascot mood="sad" />
+        <h1>학습 화면 오류</h1>
+        <strong className="errorText">{loadError}</strong>
+        <button className="btn primary" type="button" onClick={() => window.location.reload()}>다시 불러오기</button>
+        <button className="btn ghost" type="button" onClick={logoutStudent}>다시 로그인</button>
+      </section>
+    </main>
+  );
   if (checkingSession) return <main className="centerPage">확인하는 중...</main>;
 
   if (!student) {
