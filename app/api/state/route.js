@@ -51,8 +51,11 @@ function stateErrorResponse(error, fallback) {
 function normalizeStateError(error, fallback) {
   const message = String(error?.message || "").trim();
   if (!message) return fallback;
+  if (/data transfer quota|quota exceeded|exceeded the data transfer quota/i.test(message)) {
+    return `${fallback} Neon 데이터베이스의 무료 데이터 전송량 한도를 초과했습니다. Neon 요금제 업그레이드, 한도 초기화 대기, 또는 새 DB 연결이 필요합니다.`;
+  }
   if (/database|postgres|neon|connection|timeout|fetch failed|ECONN|ENOTFOUND|password|authentication/i.test(message)) {
-    return `${fallback} 데이터베이스 연결 또는 Vercel 환경변수를 확인해 주세요. (${message})`;
+    return `${fallback} 데이터베이스 연결 또는 Vercel 환경변수를 확인해 주세요.`;
   }
   return `${fallback} ${message}`;
 }

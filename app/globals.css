@@ -155,6 +155,9 @@ button:disabled {
   display: block;
   margin-top: 14px;
   color: var(--rose);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
 }
 
 .loginCard label, .form label {
