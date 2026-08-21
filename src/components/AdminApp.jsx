@@ -100,7 +100,19 @@ export function AdminApp() {
 
   useEffect(() => {
     if (!authenticated) return;
-    loadAppState().then(setState).catch((error) => setLoadError(error.message));
+    loadAppState().then((nextState) => {
+      setState(nextState);
+      setLoadError("");
+    }).catch((error) => {
+      if (error.status === 401) {
+        setAuthenticated(false);
+        setAdminInfo(null);
+        setLoadError("");
+        setAdminError("관리자 로그인이 필요합니다. 다시 로그인해 주세요.");
+        return;
+      }
+      setLoadError(error.message);
+    });
   }, [authenticated]);
 
   useEffect(() => {
@@ -998,7 +1010,21 @@ export function AdminApp() {
     );
   }
 
-  if (loadError) return <main className="centerPage"><strong className="errorText">{loadError}</strong></main>;
+  if (loadError) return (
+    <main className="centerPage">
+      <section className="loginCard">
+        <Mascot mood="sad" />
+        <h1>학습 데이터 오류</h1>
+        <strong className="errorText">{loadError}</strong>
+        <button className="btn primary" type="button" onClick={() => window.location.reload()}>다시 불러오기</button>
+        <button className="btn ghost" type="button" onClick={() => {
+          setAuthenticated(false);
+          setAdminInfo(null);
+          setLoadError("");
+        }}>관리자 로그인으로</button>
+      </section>
+    </main>
+  );
   if (!state) return <main className="centerPage">불러오는 중...</main>;
 
   return (
