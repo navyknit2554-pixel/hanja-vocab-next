@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
-    return NextResponse.json(await getState(access.scopeKey));
+    return NextResponse.json(await withTimeout(getState(access.scopeKey), "학습 데이터 조회 시간이 초과되었습니다."));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 불러오지 못했습니다.");
   }
@@ -21,7 +21,7 @@ export async function PUT(request) {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
     const state = await readStatePayload(request);
-    return NextResponse.json(await setState(state, access.scopeKey));
+    return NextResponse.json(await withTimeout(setState(state, access.scopeKey), "학습 데이터 저장 시간이 초과되었습니다."));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 저장하지 못했습니다.");
   }
@@ -31,7 +31,7 @@ export async function DELETE() {
   try {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
-    return NextResponse.json(await resetState(access.scopeKey));
+    return NextResponse.json(await withTimeout(resetState(access.scopeKey), "학습 데이터 초기화 시간이 초과되었습니다."));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 초기화하지 못했습니다.");
   }
@@ -50,6 +50,15 @@ async function readStatePayload(request) {
     return JSON.parse(gunzipSync(buffer).toString("utf8"));
   }
   return request.json();
+}
+
+function withTimeout(promise, message, timeoutMs = 20000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]);
 }
 
 function stateErrorResponse(error, fallback) {

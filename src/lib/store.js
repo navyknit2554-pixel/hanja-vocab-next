@@ -24,7 +24,7 @@ async function buildApiError(response, fallback) {
 }
 
 export async function loadAppState() {
-  const response = await fetch(apiUrl("/api/state"), { cache: "no-store" });
+  const response = await fetchWithTimeout(apiUrl("/api/state"), { cache: "no-store" }, 25000);
   if (!response.ok) throw await buildApiError(response, "학습 데이터를 불러오지 못했습니다.");
   return response.json();
 }
@@ -33,21 +33,36 @@ export async function saveAppState(state) {
   const payload = JSON.stringify(state);
   const compressed = await gzipText(payload);
   const useCompressed = Boolean(compressed && compressed.size < payload.length);
-  const response = await fetch(apiUrl("/api/state"), {
+  const response = await fetchWithTimeout(apiUrl("/api/state"), {
     method: "PUT",
     headers: useCompressed
       ? { "Content-Type": "application/octet-stream", "X-Hanja-Content-Encoding": "gzip" }
       : { "Content-Type": "application/json" },
     body: useCompressed ? compressed : payload
-  });
+  }, 30000);
   if (!response.ok) throw await buildApiError(response, "학습 데이터를 저장하지 못했습니다.");
   return response.json();
 }
 
 export async function resetAppState() {
-  const response = await fetch(apiUrl("/api/state"), { method: "DELETE" });
+  const response = await fetchWithTimeout(apiUrl("/api/state"), { method: "DELETE" }, 25000);
   if (!response.ok) throw await buildApiError(response, "학습 데이터를 초기화하지 못했습니다.");
   return response.json();
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("요청 시간이 초과되었습니다. Supabase 연결 문자열 또는 배포 상태를 확인해 주세요.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 async function gzipText(text) {
