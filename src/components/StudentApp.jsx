@@ -68,6 +68,7 @@ export function StudentApp() {
   const latestStatsRef = useRef(stats);
   const [feedback, setFeedback] = useState(null);
   const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [archeryGame, setArcheryGame] = useState(null);
 
   useEffect(() => {
@@ -154,14 +155,16 @@ export function StudentApp() {
 
   async function handleLogin(event) {
     event.preventDefault();
+    if (loggingIn) return;
     setLoginError("");
     setLoadError("");
+    setLoggingIn(true);
     try {
       const response = await fetchStudentApi("/api/student/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(login)
-      });
+      }, 15000);
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
         setLoginError(result.message || "아이디 또는 비밀번호를 확인해 주세요.");
@@ -185,6 +188,8 @@ export function StudentApp() {
       }
     } catch (error) {
       setLoginError(friendlyStudentError(error, "로그인 요청을 처리하지 못했습니다."));
+    } finally {
+      setLoggingIn(false);
     }
   }
 
@@ -333,7 +338,7 @@ export function StudentApp() {
           <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
           <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
           <label className="rememberLogin"><input type="checkbox" checked={rememberLogin} onChange={(event) => setRememberLogin(event.target.checked)} />강사 코드, 아이디, 비밀번호 저장</label>
-          <button className="btn primary" type="submit">로그인</button>
+          <button className="btn primary" type="submit" disabled={loggingIn}>{loggingIn ? "로그인 중..." : "로그인"}</button>
           <InstallAppButton compact />
           {loginError && <strong className="errorText">{loginError}</strong>}
           <Link className="textLink" href="/admin">관리 화면</Link>
