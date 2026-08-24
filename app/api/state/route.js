@@ -63,11 +63,7 @@ async function expandStatePayload(payload, scopeKey) {
   if (!payload?.__omitCurriculum) return payload;
   const current = await getState(scopeKey);
   const { __omitCurriculum, __omitProgress, __curriculumPatch, __dataPatch, ...nextPayload } = payload;
-  const merged = applyDataPatch({
-    ...current,
-    ...nextPayload,
-    progress: payload?.__omitProgress ? current.progress : nextPayload.progress
-  }, __dataPatch);
+  const merged = applyDataPatch({ ...current, ...nextPayload }, __dataPatch);
   return {
     ...merged,
     curriculum: applyCurriculumPatch(current.curriculum, __curriculumPatch)

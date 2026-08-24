@@ -33,9 +33,6 @@ export async function saveAppState(state, { curriculumPatch = null, dataPatch = 
   const payloadState = includeFullState
     ? state
     : {
-      ...state,
-      curriculum: undefined,
-      progress: undefined,
       __omitCurriculum: true,
       __omitProgress: true,
       ...(curriculumPatch ? { __curriculumPatch: curriculumPatch } : {}),
