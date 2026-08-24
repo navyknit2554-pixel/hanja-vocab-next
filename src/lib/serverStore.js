@@ -59,8 +59,11 @@ export async function findStudentLoginPayload(loginId, password) {
     select key, student
     from app_state
     cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
-    where trim(student->>'loginId') = ${loginId}
-      and trim(student->>'password') = ${password}
+    where (
+        trim(coalesce(student->>'loginId', '')) = ${loginId}
+        or trim(coalesce(student->>'name', '')) = ${loginId}
+      )
+      and trim(coalesce(student->>'password', '')) = ${password}
     order by case when key = ${stateKey} then 0 else 1 end, updated_at desc
     limit 2
   `;
@@ -84,7 +87,7 @@ function findStudentByCredentials(students, loginId, password) {
   const targetLoginId = String(loginId || "").trim();
   const targetPassword = String(password || "").trim();
   return (Array.isArray(students) ? students : []).find((item) =>
-    String(item?.loginId || "").trim() === targetLoginId &&
+    [item?.loginId, item?.name].some((value) => String(value || "").trim() === targetLoginId) &&
     String(item?.password || "").trim() === targetPassword
   );
 }
