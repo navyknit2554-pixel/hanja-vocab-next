@@ -29,8 +29,9 @@ export async function loadAppState() {
   return response.json();
 }
 
-export async function saveAppState(state) {
-  const payload = JSON.stringify(state);
+export async function saveAppState(state, { includeCurriculum = false } = {}) {
+  const payloadState = includeCurriculum ? state : { ...state, curriculum: undefined, __omitCurriculum: true };
+  const payload = JSON.stringify(payloadState);
   const compressed = await gzipText(payload);
   const useCompressed = Boolean(compressed && compressed.size < payload.length);
   const response = await fetchWithTimeout(apiUrl("/api/state"), {

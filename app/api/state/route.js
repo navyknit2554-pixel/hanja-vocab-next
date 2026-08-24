@@ -20,7 +20,8 @@ export async function PUT(request) {
   try {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
-    const state = await readStatePayload(request);
+    const payload = await readStatePayload(request);
+    const state = await expandStatePayload(payload, access.scopeKey);
     return NextResponse.json(await withTimeout(setState(state, access.scopeKey), "학습 데이터 저장 시간이 초과되었습니다."));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 저장하지 못했습니다.");
@@ -50,6 +51,13 @@ async function readStatePayload(request) {
     return JSON.parse(gunzipSync(buffer).toString("utf8"));
   }
   return request.json();
+}
+
+async function expandStatePayload(payload, scopeKey) {
+  if (!payload?.__omitCurriculum) return payload;
+  const current = await getState(scopeKey);
+  const { __omitCurriculum, ...nextPayload } = payload;
+  return { ...current, ...nextPayload, curriculum: current.curriculum };
 }
 
 function withTimeout(promise, message, timeoutMs = 20000) {

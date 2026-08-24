@@ -245,10 +245,10 @@ export function AdminApp() {
     setState(null);
   }
 
-  async function persist(nextState) {
+  async function persist(nextState, options = {}) {
     setState(nextState);
     try {
-      const saved = await saveAppState(nextState);
+      const saved = await saveAppState(nextState, options);
       setState(saved);
     } catch (error) {
       setLoadError(error.message);
@@ -452,7 +452,7 @@ export function AdminApp() {
       return;
     }
     try {
-      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
+      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { includeCurriculum: true });
       const savedAt = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
       setLessonSaveStatus(selectedLevel + " " + selectedDay + "일차 저장 완료 · " + savedAt);
     } catch (error) {
@@ -489,7 +489,7 @@ export function AdminApp() {
         }
       ]
     };
-    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) });
+    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { includeCurriculum: true });
     setSelectedDay(nextDay);
     setSelectedLevel(plan.level);
   }
@@ -512,7 +512,7 @@ export function AdminApp() {
       delete record.completed?.[selectedDay];
       delete record.quiz?.[selectedDay];
     });
-    persist(nextState);
+    persist(nextState, { includeCurriculum: true });
     setSelectedDay(fallbackDay);
   }
 
@@ -789,7 +789,7 @@ export function AdminApp() {
     lessons.forEach((item) => {
       nextState.curriculum = upsertLesson(nextState.curriculum, item);
     });
-    persist(nextState);
+    persist(nextState, { includeCurriculum: true });
     setSelectedDay(lessons[0].day);
     setSelectedLevel(lessons[0].level || plan.level);
     setAiPreview(lessons.map((item) => `${item.day}일차 적용 완료`).join("\n"));
@@ -799,7 +799,7 @@ export function AdminApp() {
     if (!window.confirm("초급/중급/고급 100일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
     const nextState = structuredClone(state);
     nextState.curriculum = buildSeedCurriculum();
-    persist(nextState);
+    persist(nextState, { includeCurriculum: true });
     setSelectedLevel("초급");
     setSelectedDay(1);
   }
