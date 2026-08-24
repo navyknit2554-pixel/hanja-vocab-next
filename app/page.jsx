@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InstallAppButton } from "../src/components/InstallAppButton";
 import { Mascot } from "../src/components/Mascot";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
           <Link className="btn primary" href="/student">학생 화면</Link>
           <Link className="btn blue" href="/admin">관리 화면</Link>
         </div>
+        <InstallAppButton />
       </section>
     </main>
   );

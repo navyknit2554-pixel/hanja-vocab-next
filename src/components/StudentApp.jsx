@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
+import { InstallAppButton } from "./InstallAppButton";
 import { Mascot } from "./Mascot";
 
 const studentLoginStorageKey = "chologihanzi-student-login";
@@ -316,6 +317,7 @@ export function StudentApp() {
           <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
           <label className="rememberLogin"><input type="checkbox" checked={rememberLogin} onChange={(event) => setRememberLogin(event.target.checked)} />강사 코드, 아이디, 비밀번호 저장</label>
           <button className="btn primary" type="submit">로그인</button>
+          <InstallAppButton compact />
           {loginError && <strong className="errorText">{loginError}</strong>}
           <Link className="textLink" href="/admin">관리 화면</Link>
         </form>
