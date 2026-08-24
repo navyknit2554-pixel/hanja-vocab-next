@@ -12,7 +12,7 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const password = String(body.password || "").trim();
   const licenseKey = String(body.licenseKey || "").trim();
-  const isMaster = password ? isValidAdminPassword(password) : false;
+  const isMaster = !licenseKey && password ? isValidAdminPassword(password) : false;
   let licenseAccess = licenseKey ? getLicenseAccess(licenseKey) : null;
 
   if (!isMaster && licenseAccess?.licenseHash) {

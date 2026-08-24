@@ -217,10 +217,15 @@ export function AdminApp() {
   async function loginAdmin(event) {
     event.preventDefault();
     setAdminError("");
+    const trimmedLicenseKey = adminLicenseKey.trim();
+    const trimmedPassword = adminPassword.trim();
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: adminPassword, licenseKey: adminLicenseKey })
+      body: JSON.stringify({
+        licenseKey: trimmedLicenseKey,
+        password: trimmedLicenseKey ? "" : trimmedPassword
+      })
     });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
@@ -230,7 +235,11 @@ export function AdminApp() {
     setAuthenticated(true);
     setAdminInfo(await response.json().catch(() => null));
     if (rememberAdminLogin) {
-      window.localStorage.setItem(adminLoginStorageKey, JSON.stringify({ licenseKey: adminLicenseKey, password: adminPassword, remember: true }));
+      window.localStorage.setItem(adminLoginStorageKey, JSON.stringify({
+        licenseKey: trimmedLicenseKey,
+        password: trimmedLicenseKey ? "" : trimmedPassword,
+        remember: true
+      }));
     } else {
       window.localStorage.removeItem(adminLoginStorageKey);
       setAdminPassword("");

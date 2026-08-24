@@ -51,26 +51,6 @@ export async function getStudentLoginPayload(scopeKey, loginId, password) {
   return { ...(await getCompactPostgresStudentPayload(scopeKey, student)), scopeKey };
 }
 
-export async function findStudentLoginPayload(loginId, password) {
-  if (!usesPostgres()) return getStudentLoginPayload(stateKey, loginId, password);
-  const sql = await getSql();
-  await ensurePostgresSchema(sql);
-  const rows = await sql`
-    select key, student
-    from app_state
-    cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
-    where (
-        trim(coalesce(student->>'loginId', '')) = ${loginId}
-        or trim(coalesce(student->>'name', '')) = ${loginId}
-      )
-      and trim(coalesce(student->>'password', '')) = ${password}
-    order by case when key = ${stateKey} then 0 else 1 end, updated_at desc
-    limit 2
-  `;
-  if (rows.length !== 1) return { ambiguous: rows.length > 1 };
-  return { ...(await getCompactPostgresStudentPayload(rows[0].key, rows[0].student)), scopeKey: rows[0].key };
-}
-
 export async function getStudentSessionPayload(scopeKey, studentId) {
   if (!usesPostgres()) {
     const state = await getFileState(scopeKey);
