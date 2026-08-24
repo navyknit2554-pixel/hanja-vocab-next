@@ -17,8 +17,19 @@ function studentApiUrl(path) {
   }
 }
 
-function fetchStudentApi(path, options) {
-  return fetch(studentApiUrl(path), options);
+async function fetchStudentApi(path, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(studentApiUrl(path), { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("서버 응답이 지연되고 있습니다. 다시 로그인해 주세요.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 function friendlyStudentError(error, fallback = "학습 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.") {
@@ -110,7 +121,11 @@ export function StudentApp() {
         setLoginError(result.configError);
       }
     } catch (error) {
-      setLoginError(friendlyStudentError(error));
+      if (initial) {
+        setLoginError("");
+      } else {
+        setLoginError(friendlyStudentError(error));
+      }
       setStudent(null);
     } finally {
       if (initial) setCheckingSession(false);
