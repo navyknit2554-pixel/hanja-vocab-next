@@ -47,7 +47,7 @@ export async function saveAppState(state, { curriculumPatch = null } = {}) {
     body: useCompressed ? compressed : payload
   }, 30000);
   if (!response.ok) throw await buildApiError(response, "학습 데이터를 저장하지 못했습니다.");
-  return response.json();
+  return state;
 }
 
 export async function resetAppState() {

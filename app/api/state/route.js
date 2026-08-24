@@ -24,7 +24,11 @@ export async function PUT(request) {
     if (access.denied) return access.denied;
     const payload = await readStatePayload(request);
     const state = await expandStatePayload(payload, access.scopeKey);
-    return NextResponse.json(await withTimeout(setState(state, access.scopeKey), "학습 데이터 저장 시간이 초과되었습니다."));
+    const saved = await withTimeout(setState(state, access.scopeKey), "학습 데이터 저장 시간이 초과되었습니다.");
+    if (payload?.__omitCurriculum) {
+      return NextResponse.json({ ok: true, updatedAt: new Date().toISOString() });
+    }
+    return NextResponse.json(saved);
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 저장하지 못했습니다.");
   }
