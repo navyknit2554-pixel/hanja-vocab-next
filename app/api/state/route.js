@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { gunzipSync } from "zlib";
 import { adminCookieName, readAdminSession } from "../../../src/lib/adminAuth";
+import { upsertLesson } from "../../../src/lib/curriculum";
+import { buildSeedCurriculum } from "../../../src/lib/data";
 import { getState, resetState, setState } from "../../../src/lib/serverStore";
 
 export const dynamic = "force-dynamic";
@@ -56,8 +58,26 @@ async function readStatePayload(request) {
 async function expandStatePayload(payload, scopeKey) {
   if (!payload?.__omitCurriculum) return payload;
   const current = await getState(scopeKey);
-  const { __omitCurriculum, ...nextPayload } = payload;
-  return { ...current, ...nextPayload, curriculum: current.curriculum };
+  const { __omitCurriculum, __curriculumPatch, ...nextPayload } = payload;
+  return {
+    ...current,
+    ...nextPayload,
+    curriculum: applyCurriculumPatch(current.curriculum, __curriculumPatch)
+  };
+}
+
+function applyCurriculumPatch(curriculum, patch) {
+  if (!patch) return curriculum;
+  if (patch.type === "replaceSeed") return buildSeedCurriculum();
+  if (patch.type === "upsertLessons") {
+    return (Array.isArray(patch.lessons) ? patch.lessons : []).reduce((next, lesson) => upsertLesson(next, lesson), curriculum);
+  }
+  if (patch.type === "deleteLesson") {
+    const day = Number(patch.day);
+    const level = String(patch.level || "").trim();
+    return curriculum.filter((lesson) => !(Number(lesson.day) === day && String(lesson.level || "").trim() === level));
+  }
+  return curriculum;
 }
 
 function withTimeout(promise, message, timeoutMs = 20000) {

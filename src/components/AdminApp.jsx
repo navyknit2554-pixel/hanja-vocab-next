@@ -452,7 +452,7 @@ export function AdminApp() {
       return;
     }
     try {
-      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { includeCurriculum: true });
+      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { curriculumPatch: { type: "upsertLessons", lessons: [nextLesson] } });
       const savedAt = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
       setLessonSaveStatus(selectedLevel + " " + selectedDay + "일차 저장 완료 · " + savedAt);
     } catch (error) {
@@ -489,7 +489,7 @@ export function AdminApp() {
         }
       ]
     };
-    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { includeCurriculum: true });
+    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { curriculumPatch: { type: "upsertLessons", lessons: [nextLesson] } });
     setSelectedDay(nextDay);
     setSelectedLevel(plan.level);
   }
@@ -512,7 +512,7 @@ export function AdminApp() {
       delete record.completed?.[selectedDay];
       delete record.quiz?.[selectedDay];
     });
-    persist(nextState, { includeCurriculum: true });
+    persist(nextState, { curriculumPatch: { type: "deleteLesson", day: selectedDay, level: selectedLevel } });
     setSelectedDay(fallbackDay);
   }
 
@@ -789,7 +789,7 @@ export function AdminApp() {
     lessons.forEach((item) => {
       nextState.curriculum = upsertLesson(nextState.curriculum, item);
     });
-    persist(nextState, { includeCurriculum: true });
+    persist(nextState, { curriculumPatch: { type: "upsertLessons", lessons } });
     setSelectedDay(lessons[0].day);
     setSelectedLevel(lessons[0].level || plan.level);
     setAiPreview(lessons.map((item) => `${item.day}일차 적용 완료`).join("\n"));
@@ -799,7 +799,7 @@ export function AdminApp() {
     if (!window.confirm("초급/중급/고급 100일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
     const nextState = structuredClone(state);
     nextState.curriculum = buildSeedCurriculum();
-    persist(nextState, { includeCurriculum: true });
+    persist(nextState, { curriculumPatch: { type: "replaceSeed" } });
     setSelectedLevel("초급");
     setSelectedDay(1);
   }
