@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getState } from "../../../../src/lib/serverStore";
 import { readStudentSession, studentConfigError, studentCookieName } from "../../../../src/lib/studentAuth";
+import { studentPayload } from "../../../../src/lib/studentPayload";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +16,11 @@ export async function GET() {
   const state = await getState(session.scopeKey);
   const student = state.students.find((item) => item.id === session.studentId);
   if (!student) return NextResponse.json({ authenticated: false });
-  return NextResponse.json({
-    authenticated: true,
-    student: withoutPassword(student),
-    curriculum: state.curriculum,
-    progress: state.progress[student.id] || { completed: {}, quiz: {} }
-  });
+  return NextResponse.json({ ...studentPayload(state, student), authenticated: true });
 }
 
 export async function DELETE() {
   const response = NextResponse.json({ authenticated: false });
   response.cookies.delete(studentCookieName);
   return response;
-}
-
-function withoutPassword(student) {
-  const { password, ...safeStudent } = student;
-  return safeStudent;
 }

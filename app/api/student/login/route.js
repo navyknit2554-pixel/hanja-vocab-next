@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getState } from "../../../../src/lib/serverStore";
 import { createStudentSession, studentConfigError, studentCookieName } from "../../../../src/lib/studentAuth";
 import { scopeKeyFromTeacherCode } from "../../../../src/lib/licenseAuth";
+import { studentPayload } from "../../../../src/lib/studentPayload";
 
 export const dynamic = "force-dynamic";
 
@@ -25,18 +26,4 @@ export async function POST(request) {
     maxAge: 60 * 60 * 24 * 30
   });
   return response;
-}
-
-function studentPayload(state, student) {
-  return {
-    ok: true,
-    student: withoutPassword(student),
-    curriculum: state.curriculum,
-    progress: state.progress[student.id] || { completed: {}, quiz: {} }
-  };
-}
-
-function withoutPassword(student) {
-  const { password, ...safeStudent } = student;
-  return safeStudent;
 }

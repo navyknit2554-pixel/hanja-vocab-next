@@ -256,6 +256,7 @@ export function StudentApp() {
         setPendingStudent(result.student);
       }
       if (result.progress) setProgressRecord(result.progress);
+      if (result.curriculum) setCurriculum(result.curriculum);
     } catch (error) {
       setLoadError(friendlyStudentError(error, "학습 결과를 저장하지 못했습니다."));
     }
@@ -285,6 +286,7 @@ export function StudentApp() {
       }
       const payload = await response.json();
       if (payload.progress) setProgressRecord(payload.progress);
+      if (payload.curriculum) setCurriculum(payload.curriculum);
       setArcheryGame(null);
       setStage("review");
     } catch (error) {

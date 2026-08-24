@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getState, setState } from "../../../../src/lib/serverStore";
 import { readStudentSession, studentCookieName } from "../../../../src/lib/studentAuth";
+import { studentPayload, withoutPassword } from "../../../../src/lib/studentPayload";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function PUT(request) {
       finishedAt: new Date().toISOString()
     };
     await setState(state, session.scopeKey);
-    return NextResponse.json({ ok: true, student: withoutPassword(student), progress: state.progress[student.id] });
+    return NextResponse.json(studentPayload(state, student));
   }
 
   const mastered = Array.isArray(body.stats.wrong) ? body.stats.wrong.length === 0 : Boolean(body.stats.mastered);
@@ -53,8 +54,7 @@ export async function PUT(request) {
       ok: true,
       stale: true,
       message: "이미 완료한 이전 일차입니다. 현재 일차로 이동합니다.",
-      student: withoutPassword(student),
-      progress: state.progress[student.id]
+      ...studentPayload(state, student)
     });
   }
   state.progress[student.id].completed[lessonDay] = mastered;
@@ -78,7 +78,7 @@ export async function PUT(request) {
   }
 
   await setState(state, session.scopeKey);
-  return NextResponse.json({ ok: true, student: withoutPassword(student), progress: state.progress[student.id] });
+  return NextResponse.json(studentPayload(state, student));
 }
 
 function nextKoreanMidnightIso() {
@@ -86,9 +86,4 @@ function nextKoreanMidnightIso() {
   const koreanNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   const nextMidnightUtcMs = Date.UTC(koreanNow.getUTCFullYear(), koreanNow.getUTCMonth(), koreanNow.getUTCDate() + 1, -9, 0, 0, 0);
   return new Date(nextMidnightUtcMs).toISOString();
-}
-
-function withoutPassword(student) {
-  const { password, ...safeStudent } = student;
-  return safeStudent;
 }
