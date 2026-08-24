@@ -81,7 +81,7 @@ async function setPostgresState(state, scopeKey = stateKey) {
   await ensurePostgresSchema(sql);
   await sql`
     insert into app_state (key, data, updated_at)
-    values (${scopeKey}, ${JSON.stringify(next)}::jsonb, now())
+    values (${scopeKey}, ${sql.json(next)}, now())
     on conflict (key)
     do update set data = excluded.data, updated_at = now()
   `;
@@ -104,6 +104,7 @@ async function getSql() {
   const { default: postgres } = await import("postgres");
   postgresClient = postgres(connectionString, {
     max: 1,
+    prepare: false,
     ssl: "require",
     idle_timeout: 20,
     connect_timeout: 10

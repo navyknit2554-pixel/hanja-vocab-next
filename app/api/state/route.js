@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { gunzipSync } from "zlib";
 import { adminCookieName, readAdminSession } from "../../../src/lib/adminAuth";
 import { getState, resetState, setState } from "../../../src/lib/serverStore";
 
@@ -19,7 +20,7 @@ export async function PUT(request) {
   try {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
-    const state = await request.json();
+    const state = await readStatePayload(request);
     return NextResponse.json(await setState(state, access.scopeKey));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 저장하지 못했습니다.");
@@ -41,6 +42,14 @@ async function requireAdmin() {
   const session = readAdminSession(cookieStore.get(adminCookieName)?.value);
   if (session.authenticated) return session;
   return { denied: NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 }) };
+}
+
+async function readStatePayload(request) {
+  if (request.headers.get("x-hanja-content-encoding") === "gzip") {
+    const buffer = Buffer.from(await request.arrayBuffer());
+    return JSON.parse(gunzipSync(buffer).toString("utf8"));
+  }
+  return request.json();
 }
 
 function stateErrorResponse(error, fallback) {
