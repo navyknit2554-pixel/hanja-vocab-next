@@ -39,8 +39,85 @@ export async function getAllStateRows() {
   return sql`select key, data, updated_at from app_state order by updated_at desc`;
 }
 
+export async function getStudentLoginPayload(scopeKey, loginId, password) {
+  if (!usesPostgres()) {
+    const state = await getFileState(scopeKey);
+    const student = state.students.find((item) => item.loginId === loginId && item.password === password);
+    return student ? makeCompactStudentPayload(state, student) : null;
+  }
+  const students = await getPostgresStudents(scopeKey);
+  const student = students.find((item) => item.loginId === loginId && item.password === password);
+  if (!student) return null;
+  return getCompactPostgresStudentPayload(scopeKey, student);
+}
+
+export async function getStudentSessionPayload(scopeKey, studentId) {
+  if (!usesPostgres()) {
+    const state = await getFileState(scopeKey);
+    const student = state.students.find((item) => item.id === studentId);
+    return student ? makeCompactStudentPayload(state, student) : null;
+  }
+  const students = await getPostgresStudents(scopeKey);
+  const student = students.find((item) => item.id === studentId);
+  if (!student) return null;
+  return getCompactPostgresStudentPayload(scopeKey, student);
+}
+
 function usesPostgres() {
   return Boolean(getPostgresConnectionString());
+}
+
+async function getPostgresStudents(scopeKey) {
+  const sql = await getSql();
+  await ensurePostgresSchema(sql);
+  const rows = await sql`select coalesce(data->'students', '[]'::jsonb) as students from app_state where key = ${scopeKey}`;
+  return Array.isArray(rows[0]?.students) ? rows[0].students : [];
+}
+
+async function getCompactPostgresStudentPayload(scopeKey, student) {
+  const sql = await getSql();
+  const day = Math.max(1, Number(student?.day || 1));
+  const level = String(student?.level || "").trim();
+  const startDay = Math.max(1, day - 4);
+  const endDay = Math.min(100, day + 1);
+  const rows = await sql`
+    select
+      coalesce(data->'progress'->${student.id}, '{"completed":{},"quiz":{}}'::jsonb) as progress,
+      coalesce((
+        select jsonb_agg(lesson order by (lesson->>'day')::int)
+        from jsonb_array_elements(data->'curriculum') as lesson
+        where lesson->>'level' = ${level}
+          and (lesson->>'day')::int between ${startDay} and ${endDay}
+      ), '[]'::jsonb) as curriculum
+    from app_state
+    where key = ${scopeKey}
+  `;
+  return {
+    student: withoutPassword(student),
+    curriculum: Array.isArray(rows[0]?.curriculum) ? rows[0].curriculum : [],
+    progress: rows[0]?.progress || { completed: {}, quiz: {} }
+  };
+}
+
+function makeCompactStudentPayload(state, student) {
+  const day = Math.max(1, Number(student?.day || 1));
+  const level = String(student?.level || "").trim();
+  const startDay = Math.max(1, day - 4);
+  const endDay = Math.min(100, day + 1);
+  return {
+    student: withoutPassword(student),
+    curriculum: (Array.isArray(state.curriculum) ? state.curriculum : []).filter((lesson) => {
+      const lessonLevel = String(lesson?.level || "").trim();
+      const lessonDay = Number(lesson?.day || 0);
+      return lessonLevel === level && lessonDay >= startDay && lessonDay <= endDay;
+    }),
+    progress: state.progress?.[student.id] || { completed: {}, quiz: {} }
+  };
+}
+
+function withoutPassword(student) {
+  const { password, ...safeStudent } = student;
+  return safeStudent;
 }
 
 async function getFileState(scopeKey = stateKey) {
