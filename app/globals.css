@@ -313,6 +313,32 @@ textarea {
   font-weight: 800;
 }
 
+.adminFrame .topBar {
+  align-items: flex-start;
+}
+
+.adminFrame .topBar > div:first-child {
+  flex: 0 0 auto;
+  padding-top: 6px;
+}
+
+.adminFrame .topActions {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  overflow-x: auto;
+  padding: 0 0 7px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.adminFrame .topActions .btn,
+.adminFrame .topActions .fileBtn {
+  flex: 0 0 auto;
+  min-width: max-content;
+  padding: 11px 17px;
+  white-space: nowrap;
+}
+
 .progress {
   height: 18px;
   background: #e7f4ef;
