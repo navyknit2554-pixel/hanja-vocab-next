@@ -828,6 +828,22 @@ export function AdminApp() {
     );
   }
 
+  async function exportFullDatabaseSql() {
+    try {
+      const response = await fetch("/api/admin/full-backup?format=sql", { cache: "no-store" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        alert(result.message || "전체 DB 백업을 만들지 못했습니다.");
+        return;
+      }
+      const blob = await response.blob();
+      const filename = filenameFromDisposition(response.headers.get("content-disposition")) || `hanja-app-state-restore-${new Date().toISOString().slice(0, 10)}.sql`;
+      downloadBlob(filename, blob);
+    } catch (error) {
+      alert(error.message || "전체 DB 백업을 만들지 못했습니다.");
+    }
+  }
+
   function exportProgressCsv() {
     const headers = ["학생", "아이디", "비밀번호", "학년", "난이도", "현재 일차", "진도", "정답률", "정답 수", "응시 문항 수", "응시 횟수", "오답", "복습 이력"];
     const rows = state.students.map((student) => {
@@ -951,6 +967,10 @@ export function AdminApp() {
 
   function downloadFile(filename, content, type) {
     const blob = new Blob([content], { type });
+    downloadBlob(filename, blob);
+  }
+
+  function downloadBlob(filename, blob) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -959,6 +979,11 @@ export function AdminApp() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function filenameFromDisposition(disposition) {
+    const match = String(disposition || "").match(/filename="([^"]+)"/i);
+    return match?.[1] || "";
   }
 
   async function importState(event) {
@@ -1034,6 +1059,7 @@ export function AdminApp() {
         <div className="topActions">
           <Link className="btn ghost" href="/student">학생 화면</Link>
           <button className="btn" type="button" onClick={exportState}>백업</button>
+          {adminInfo?.role === "master" && <button className="btn" type="button" onClick={exportFullDatabaseSql}>전체 DB SQL</button>}
           <button className="btn" type="button" onClick={exportProgressCsv}>학습도 CSV</button>
           <button className="btn" type="button" onClick={exportProgressHistoryCsv}>전체 이력 CSV</button>
           <label className="btn fileBtn">가져오기<input type="file" accept="application/json,.json" onChange={importState} /></label>

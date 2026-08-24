@@ -26,6 +26,19 @@ export function storageMode() {
   return usesPostgres() ? "postgres" : "local-file";
 }
 
+export async function getAllStateRows() {
+  if (!usesPostgres()) {
+    return [{
+      key: stateKey,
+      data: await getFileState(stateKey),
+      updated_at: new Date().toISOString()
+    }];
+  }
+  const sql = await getSql();
+  await ensurePostgresSchema(sql);
+  return sql`select key, data, updated_at from app_state order by updated_at desc`;
+}
+
 function usesPostgres() {
   return Boolean(getPostgresConnectionString());
 }
