@@ -26,7 +26,7 @@ check("Deployment guide", exists("DEPLOYMENT.md"), "DEPLOYMENT.md 체크리스�
 check("Local data ignored", gitignore.includes(".data"), ".data는 로컬 저장 파일이라 배포에서 제외해야 합니다.");
 check("Env files ignored", gitignore.includes(".env*") && gitignore.includes("!.env.example"), ".env는 숨기고 .env.example만 남겨야 합니다.");
 
-["POSTGRES_URL", "ADMIN_PASSWORD", "ADMIN_SESSION_SECRET", "STUDENT_SESSION_SECRET", "HANJA_LICENSE_SECRET"].forEach((key) => {
+["SUPABASE_DATABASE_URL", "ADMIN_PASSWORD", "ADMIN_SESSION_SECRET", "STUDENT_SESSION_SECRET", "HANJA_LICENSE_SECRET"].forEach((key) => {
   check(`Env example: ${key}`, envExample.includes(key), `.env.example에 ${key} 안내가 필요합니다.`);
 });
 

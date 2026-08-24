@@ -5,6 +5,7 @@ import { normalizeStudentProgression } from "./progression";
 
 const statePath = join(process.cwd(), ".data", "app-state.json");
 const stateKey = "main";
+let postgresClient = null;
 
 export async function getState(scopeKey = stateKey) {
   if (usesPostgres()) return getPostgresState(scopeKey);
@@ -26,7 +27,7 @@ export function storageMode() {
 }
 
 function usesPostgres() {
-  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL);
+  return Boolean(getPostgresConnectionString());
 }
 
 async function getFileState(scopeKey = stateKey) {
@@ -85,9 +86,20 @@ async function ensurePostgresSchema(sql) {
 }
 
 async function getSql() {
-  const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
-  const { neon } = await import("@neondatabase/serverless");
-  return neon(connectionString);
+  if (postgresClient) return postgresClient;
+  const connectionString = getPostgresConnectionString();
+  const { default: postgres } = await import("postgres");
+  postgresClient = postgres(connectionString, {
+    max: 1,
+    ssl: "require",
+    idle_timeout: 20,
+    connect_timeout: 10
+  });
+  return postgresClient;
+}
+
+function getPostgresConnectionString() {
+  return process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || "";
 }
 
 export function seedForScope(scopeKey = stateKey) {
