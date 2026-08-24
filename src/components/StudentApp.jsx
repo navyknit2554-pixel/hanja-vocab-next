@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
+import { cleanExampleText, findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
 import { InstallAppButton } from "./InstallAppButton";
 import { Mascot } from "./Mascot";
 
@@ -491,7 +491,10 @@ function LearningCard({ card, index, total, growth, onPrev, onNext }) {
           <div className="wordHanja">{card.item.hanja}</div>
           <h2>{card.item.word}</h2>
           <p>{card.item.meaning}</p>
-          <div className="examples">{card.item.examples.map((example) => <p key={example}>{highlight(example, card.item.word)}</p>)}</div>
+          <div className="examples">{card.item.examples.map((example) => {
+            const cleanExample = cleanExampleText(example);
+            return <p key={example}>{highlight(cleanExample, card.item.word)}</p>;
+          })}</div>
         </article>
       )}
       <div className="navRow">

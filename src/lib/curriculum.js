@@ -34,7 +34,8 @@ export function quizItems(lesson) {
     const fallback = ["어떤 일을 믿고 맡김", "뜻을 전달하는 표시", "새롭게 만들어 냄", "자세히 읽음"];
     const wordFallback = ["신뢰", "발견", "정리", "관찰"];
     const isBlank = index % 2 === 1;
-    const example = item.examples?.find((sentence) => sentence.includes(item.word)) || item.examples?.[0] || "";
+    const examples = (item.examples || []).map(cleanExampleText);
+    const example = examples.find((sentence) => sentence.includes(item.word)) || examples[0] || "";
     const blankSentence = example ? example.replaceAll(item.word, "_____") : `문장 속 빈칸에 들어갈 알맞은 어휘를 고르세요.`;
     const answer = isBlank ? item.word : item.meaning;
     const distractors = isBlank ? [...wordPool, ...wordFallback] : [...meaningPool, ...fallback];
@@ -50,6 +51,13 @@ export function quizItems(lesson) {
     };
   });
   return shuffle(vocabItems);
+}
+
+export function cleanExampleText(value) {
+  return String(value || "")
+    .replace(/^\s*[\[(<【]?\s*(문장|대화|예문)\s*(\d+|[一二三])?\s*[\])>】]?\s*[:：.\-–—]*\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function buildChoices(answer, distractors) {

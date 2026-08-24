@@ -345,7 +345,10 @@ function tagRaw(xml, name) {
 }
 
 function cleanText(value) {
-  return decodeEntities(String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+  return decodeEntities(String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim())
+    .replace(/^\s*[\[(<【]?\s*(문장|대화|예문)\s*(\d+|[一二三])?\s*[\])>】]?\s*[:：.\-–—]*\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function decodeEntities(value) {
