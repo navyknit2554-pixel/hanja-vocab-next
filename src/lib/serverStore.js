@@ -42,13 +42,30 @@ export async function getAllStateRows() {
 export async function getStudentLoginPayload(scopeKey, loginId, password) {
   if (!usesPostgres()) {
     const state = await getFileState(scopeKey);
-    const student = state.students.find((item) => item.loginId === loginId && item.password === password);
+    const student = findStudentByCredentials(state.students, loginId, password);
     return student ? makeCompactStudentPayload(state, student) : null;
   }
   const students = await getPostgresStudents(scopeKey);
-  const student = students.find((item) => item.loginId === loginId && item.password === password);
+  const student = findStudentByCredentials(students, loginId, password);
   if (!student) return null;
-  return getCompactPostgresStudentPayload(scopeKey, student);
+  return { ...(await getCompactPostgresStudentPayload(scopeKey, student)), scopeKey };
+}
+
+export async function findStudentLoginPayload(loginId, password) {
+  if (!usesPostgres()) return getStudentLoginPayload(stateKey, loginId, password);
+  const sql = await getSql();
+  await ensurePostgresSchema(sql);
+  const rows = await sql`
+    select key, student
+    from app_state
+    cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
+    where trim(student->>'loginId') = ${loginId}
+      and trim(student->>'password') = ${password}
+    order by case when key = ${stateKey} then 0 else 1 end, updated_at desc
+    limit 2
+  `;
+  if (rows.length !== 1) return { ambiguous: rows.length > 1 };
+  return { ...(await getCompactPostgresStudentPayload(rows[0].key, rows[0].student)), scopeKey: rows[0].key };
 }
 
 export async function getStudentSessionPayload(scopeKey, studentId) {
@@ -60,7 +77,16 @@ export async function getStudentSessionPayload(scopeKey, studentId) {
   const students = await getPostgresStudents(scopeKey);
   const student = students.find((item) => item.id === studentId);
   if (!student) return null;
-  return getCompactPostgresStudentPayload(scopeKey, student);
+  return { ...(await getCompactPostgresStudentPayload(scopeKey, student)), scopeKey };
+}
+
+function findStudentByCredentials(students, loginId, password) {
+  const targetLoginId = String(loginId || "").trim();
+  const targetPassword = String(password || "").trim();
+  return (Array.isArray(students) ? students : []).find((item) =>
+    String(item?.loginId || "").trim() === targetLoginId &&
+    String(item?.password || "").trim() === targetPassword
+  );
 }
 
 function usesPostgres() {
