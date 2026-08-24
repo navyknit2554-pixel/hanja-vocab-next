@@ -121,7 +121,7 @@ export function AdminApp() {
     nextState.students.forEach((student) => {
       student.parentToken ||= makeParentToken();
     });
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students } });
   }, [state]);
 
   const lesson = useMemo(() => findLesson(state?.curriculum, selectedDay, selectedLevel), [selectedDay, selectedLevel, state]);
@@ -289,7 +289,7 @@ export function AdminApp() {
     const nextState = structuredClone(state);
     nextState.students.push(nextStudent);
     nextState.progress[nextStudent.id] = { completed: {}, quiz: {} };
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students, progressByStudent: { [nextStudent.id]: nextState.progress[nextStudent.id] } } });
     setStudentForm(defaultStudentForm);
   }
 
@@ -353,7 +353,12 @@ export function AdminApp() {
       nextState.students.push(student);
       nextState.progress[student.id] = { completed: {}, quiz: {} };
     });
-    await persist(nextState);
+    await persist(nextState, {
+      dataPatch: {
+        students: nextState.students,
+        progressByStudent: Object.fromEntries(nextStudents.map((student) => [student.id, nextState.progress[student.id]]))
+      }
+    });
     alert(`${nextStudents.length}명의 학생 계정을 가져왔습니다.`);
   }
 
@@ -362,7 +367,7 @@ export function AdminApp() {
     const student = nextState.students.find((item) => item.id === studentId);
     if (!student) return;
     student.day = Number(day);
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students } });
   }
 
   function unlockStudentDay(studentId, targetDay) {
@@ -377,7 +382,7 @@ export function AdminApp() {
     nextState.progress[studentId] ||= { completed: {}, quiz: {} };
     nextState.progress[studentId].unlocks ||= {};
     nextState.progress[studentId].unlocks[day] = "open";
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students, progressByStudent: { [studentId]: nextState.progress[studentId] } } });
   }
 
   function assignFilteredStudentsDay() {
@@ -390,7 +395,7 @@ export function AdminApp() {
     nextState.students.forEach((student) => {
       if (targetIds.has(student.id)) student.day = targetDay;
     });
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students } });
   }
 
   async function copyParentLink(student) {
@@ -401,7 +406,7 @@ export function AdminApp() {
       if (!nextStudent) return;
       nextStudent.parentToken = makeParentToken();
       targetStudent = nextStudent;
-      await persist(nextState);
+      await persist(nextState, { dataPatch: { students: nextState.students } });
     }
     const link = parentLinkForStudent(targetStudent, adminInfo);
     try {
@@ -417,7 +422,7 @@ export function AdminApp() {
     if (!student || !window.confirm(`${student.name} 학생의 학습 기록을 초기화할까요?`)) return;
     const nextState = structuredClone(state);
     nextState.progress[studentId] = { completed: {}, quiz: {} };
-    persist(nextState);
+    persist(nextState, { dataPatch: { progressByStudent: { [studentId]: nextState.progress[studentId] } } });
   }
 
   function deleteStudent(studentId) {
@@ -426,7 +431,7 @@ export function AdminApp() {
     const nextState = structuredClone(state);
     nextState.students = nextState.students.filter((item) => item.id !== studentId);
     delete nextState.progress[studentId];
-    persist(nextState);
+    persist(nextState, { dataPatch: { students: nextState.students, removeProgressStudentIds: [studentId] } });
   }
 
   async function saveLesson(event) {
@@ -512,7 +517,7 @@ export function AdminApp() {
       delete record.completed?.[selectedDay];
       delete record.quiz?.[selectedDay];
     });
-    persist(nextState, { curriculumPatch: { type: "deleteLesson", day: selectedDay, level: selectedLevel } });
+    persist(nextState, { curriculumPatch: { type: "deleteLesson", day: selectedDay, level: selectedLevel }, dataPatch: { clearProgressDay: selectedDay } });
     setSelectedDay(fallbackDay);
   }
 
@@ -1008,7 +1013,7 @@ export function AdminApp() {
       return;
     }
     if (!window.confirm("현재 데이터를 백업 파일 내용으로 교체할까요?")) return;
-    await persist(nextState);
+    await persist(nextState, { includeFullState: true });
     setSelectedDay(nextState.curriculum[0]?.day || 1);
   }
 

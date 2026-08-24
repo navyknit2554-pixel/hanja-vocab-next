@@ -29,13 +29,18 @@ export async function loadAppState() {
   return response.json();
 }
 
-export async function saveAppState(state, { curriculumPatch = null } = {}) {
-  const payloadState = {
-    ...state,
-    curriculum: undefined,
-    __omitCurriculum: true,
-    ...(curriculumPatch ? { __curriculumPatch: curriculumPatch } : {})
-  };
+export async function saveAppState(state, { curriculumPatch = null, dataPatch = null, includeFullState = false } = {}) {
+  const payloadState = includeFullState
+    ? state
+    : {
+      ...state,
+      curriculum: undefined,
+      progress: undefined,
+      __omitCurriculum: true,
+      __omitProgress: true,
+      ...(curriculumPatch ? { __curriculumPatch: curriculumPatch } : {}),
+      ...(dataPatch ? { __dataPatch: dataPatch } : {})
+    };
   const payload = JSON.stringify(payloadState);
   const compressed = await gzipText(payload);
   const useCompressed = Boolean(compressed && compressed.size < payload.length);

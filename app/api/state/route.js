@@ -62,12 +62,44 @@ async function readStatePayload(request) {
 async function expandStatePayload(payload, scopeKey) {
   if (!payload?.__omitCurriculum) return payload;
   const current = await getState(scopeKey);
-  const { __omitCurriculum, __curriculumPatch, ...nextPayload } = payload;
-  return {
+  const { __omitCurriculum, __omitProgress, __curriculumPatch, __dataPatch, ...nextPayload } = payload;
+  const merged = applyDataPatch({
     ...current,
     ...nextPayload,
+    progress: payload?.__omitProgress ? current.progress : nextPayload.progress
+  }, __dataPatch);
+  return {
+    ...merged,
     curriculum: applyCurriculumPatch(current.curriculum, __curriculumPatch)
   };
+}
+
+function applyDataPatch(state, patch) {
+  if (!patch) return state;
+  const next = { ...state };
+  if (Array.isArray(patch.students)) next.students = patch.students;
+  if (patch.progressByStudent && typeof patch.progressByStudent === "object") {
+    next.progress = { ...(next.progress || {}) };
+    Object.entries(patch.progressByStudent).forEach(([studentId, record]) => {
+      next.progress[studentId] = record;
+    });
+  }
+  if (Array.isArray(patch.removeProgressStudentIds)) {
+    next.progress = { ...(next.progress || {}) };
+    patch.removeProgressStudentIds.forEach((studentId) => {
+      delete next.progress[studentId];
+    });
+  }
+  if (patch.clearProgressDay) {
+    const day = String(Number(patch.clearProgressDay));
+    next.progress = { ...(next.progress || {}) };
+    Object.values(next.progress).forEach((record) => {
+      if (!record || typeof record !== "object") return;
+      delete record.completed?.[day];
+      delete record.quiz?.[day];
+    });
+  }
+  return next;
 }
 
 function applyCurriculumPatch(curriculum, patch) {
