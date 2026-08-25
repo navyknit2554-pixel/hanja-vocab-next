@@ -16,7 +16,7 @@ export async function POST(request) {
   const scopeKey = scopeKeyFromTeacherCode(teacherCode || "master");
   let payload;
   try {
-    payload = await withTimeout(getStudentLoginPayload(scopeKey, loginId, password));
+    payload = await withTimeout(getStudentLoginPayload(scopeKey, loginId, password), 25000);
   } catch {
     return NextResponse.json({ ok: false, message: "로그인 확인 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요." }, { status: 504 });
   }

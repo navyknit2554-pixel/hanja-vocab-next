@@ -46,8 +46,7 @@ export async function getStudentLoginPayload(scopeKey, loginId, password) {
     const student = findStudentByCredentials(state.students, loginId, password);
     return student ? makeCompactStudentPayload(state, student) : null;
   }
-  const students = await getPostgresStudents(scopeKey);
-  const student = findStudentByCredentials(students, loginId, password);
+  const student = await getPostgresStudentByCredentials(scopeKey, loginId, password);
   if (!student) return null;
   return { ...(await getCompactPostgresStudentPayload(scopeKey, student)), scopeKey };
 }
@@ -58,8 +57,7 @@ export async function getStudentSessionPayload(scopeKey, studentId) {
     const student = state.students.find((item) => item.id === studentId);
     return student ? makeCompactStudentPayload(state, student) : null;
   }
-  const students = await getPostgresStudents(scopeKey);
-  const student = students.find((item) => item.id === studentId);
+  const student = await getPostgresStudentById(scopeKey, studentId);
   if (!student) return null;
   return { ...(await getCompactPostgresStudentPayload(scopeKey, student)), scopeKey };
 }
@@ -82,6 +80,41 @@ async function getPostgresStudents(scopeKey) {
   await ensurePostgresSchema(sql);
   const rows = await sql`select coalesce(data->'students', '[]'::jsonb) as students from app_state where key = ${scopeKey}`;
   return Array.isArray(rows[0]?.students) ? rows[0].students : [];
+}
+
+async function getPostgresStudentByCredentials(scopeKey, loginId, password) {
+  const sql = await getSql();
+  await ensurePostgresSchema(sql);
+  const targetLoginId = String(loginId || "").trim();
+  const targetPassword = String(password || "").trim();
+  const rows = await sql`
+    select student
+    from app_state
+    cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
+    where key = ${scopeKey}
+      and trim(coalesce(student->>'password', '')) = ${targetPassword}
+      and (
+        trim(coalesce(student->>'loginId', '')) = ${targetLoginId}
+        or trim(coalesce(student->>'name', '')) = ${targetLoginId}
+      )
+    limit 1
+  `;
+  return rows[0]?.student || null;
+}
+
+async function getPostgresStudentById(scopeKey, studentId) {
+  const sql = await getSql();
+  await ensurePostgresSchema(sql);
+  const targetStudentId = String(studentId || "").trim();
+  const rows = await sql`
+    select student
+    from app_state
+    cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
+    where key = ${scopeKey}
+      and trim(coalesce(student->>'id', '')) = ${targetStudentId}
+    limit 1
+  `;
+  return rows[0]?.student || null;
 }
 
 async function getCompactPostgresStudentPayload(scopeKey, student) {

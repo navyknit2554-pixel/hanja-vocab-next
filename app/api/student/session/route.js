@@ -13,7 +13,7 @@ export async function GET() {
   const session = readStudentSession(cookieStore.get(studentCookieName)?.value);
   if (!session?.studentId) return NextResponse.json({ authenticated: false });
   try {
-    const payload = await withTimeout(getStudentSessionPayload(session.scopeKey, session.studentId));
+    const payload = await withTimeout(getStudentSessionPayload(session.scopeKey, session.studentId), 20000);
     if (!payload?.student) return NextResponse.json({ authenticated: false });
     return NextResponse.json({ ok: true, ...payload, authenticated: true });
   } catch {

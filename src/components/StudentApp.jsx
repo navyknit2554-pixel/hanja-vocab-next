@@ -17,7 +17,7 @@ function studentApiUrl(path) {
   }
 }
 
-async function fetchStudentApi(path, options = {}, timeoutMs = 12000) {
+async function fetchStudentApi(path, options = {}, timeoutMs = 18000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -164,7 +164,7 @@ export function StudentApp() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(login)
-      }, 15000);
+      }, 30000);
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
         setLoginError(result.message || "아이디 또는 비밀번호를 확인해 주세요.");
