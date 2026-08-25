@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const access = await requireAdmin();
     if (access.denied) return access.denied;
-    return NextResponse.json(await withTimeout(getState(access.scopeKey), "학습 데이터 조회 시간이 초과되었습니다."));
+    return NextResponse.json(await withTimeout(getState(access.scopeKey), "학습 데이터 조회 시간이 초과되었습니다.", 55000));
   } catch (error) {
     return stateErrorResponse(error, "학습 데이터를 불러오지 못했습니다.");
   }

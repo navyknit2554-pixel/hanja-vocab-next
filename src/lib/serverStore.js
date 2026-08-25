@@ -6,6 +6,7 @@ import { normalizeStudentProgression } from "./progression";
 const statePath = join(process.cwd(), ".data", "app-state.json");
 const stateKey = "main";
 let postgresClient = null;
+let seedCurriculumCache = null;
 
 export async function getState(scopeKey = stateKey) {
   if (usesPostgres()) return getPostgresState(scopeKey);
@@ -238,11 +239,16 @@ function normalizeState(state, scopeKey = stateKey) {
 
 function mergeDefaultCurriculum(curriculum) {
   const byKey = new Map();
-  buildSeedCurriculum().forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
+  getSeedCurriculum().forEach((lesson) => byKey.set(lessonKey(lesson), lesson));
   curriculum.forEach((lesson) => {
     if (!isIncompleteLesson(lesson)) byKey.set(lessonKey(lesson), lesson);
   });
   return [...byKey.values()];
+}
+
+function getSeedCurriculum() {
+  if (!seedCurriculumCache) seedCurriculumCache = buildSeedCurriculum();
+  return seedCurriculumCache;
 }
 
 function lessonKey(lesson) {
