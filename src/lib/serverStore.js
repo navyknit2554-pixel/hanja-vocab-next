@@ -87,7 +87,26 @@ async function getPostgresStudentByCredentials(scopeKey, loginId, password) {
   await ensurePostgresSchema(sql);
   const targetLoginId = String(loginId || "").trim();
   const targetPassword = String(password || "").trim();
-  const rows = await sql`
+  let rows = await sql`
+    select data as student
+    from app_students
+    where scope_key = ${scopeKey}
+      and password = ${targetPassword}
+      and (login_id = ${targetLoginId} or name = ${targetLoginId})
+    limit 1
+  `;
+  if (rows[0]?.student) return rows[0].student;
+  await refreshPostgresStudentIndex(sql, scopeKey);
+  rows = await sql`
+    select data as student
+    from app_students
+    where scope_key = ${scopeKey}
+      and password = ${targetPassword}
+      and (login_id = ${targetLoginId} or name = ${targetLoginId})
+    limit 1
+  `;
+  if (rows[0]?.student) return rows[0].student;
+  rows = await sql`
     select student
     from app_state
     cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
@@ -106,7 +125,24 @@ async function getPostgresStudentById(scopeKey, studentId) {
   const sql = await getSql();
   await ensurePostgresSchema(sql);
   const targetStudentId = String(studentId || "").trim();
-  const rows = await sql`
+  let rows = await sql`
+    select data as student
+    from app_students
+    where scope_key = ${scopeKey}
+      and student_id = ${targetStudentId}
+    limit 1
+  `;
+  if (rows[0]?.student) return rows[0].student;
+  await refreshPostgresStudentIndex(sql, scopeKey);
+  rows = await sql`
+    select data as student
+    from app_students
+    where scope_key = ${scopeKey}
+      and student_id = ${targetStudentId}
+    limit 1
+  `;
+  if (rows[0]?.student) return rows[0].student;
+  rows = await sql`
     select student
     from app_state
     cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
@@ -115,6 +151,32 @@ async function getPostgresStudentById(scopeKey, studentId) {
     limit 1
   `;
   return rows[0]?.student || null;
+}
+
+async function refreshPostgresStudentIndex(sql, scopeKey) {
+  await sql`delete from app_students where scope_key = ${scopeKey}`;
+  await sql`
+    insert into app_students (scope_key, student_id, login_id, name, password, data, updated_at)
+    select
+      ${scopeKey},
+      coalesce(student->>'id', ''),
+      trim(coalesce(student->>'loginId', '')),
+      trim(coalesce(student->>'name', '')),
+      trim(coalesce(student->>'password', '')),
+      student,
+      now()
+    from app_state
+    cross join lateral jsonb_array_elements(coalesce(data->'students', '[]'::jsonb)) as student
+    where key = ${scopeKey}
+      and coalesce(student->>'id', '') <> ''
+    on conflict (scope_key, student_id)
+    do update set
+      login_id = excluded.login_id,
+      name = excluded.name,
+      password = excluded.password,
+      data = excluded.data,
+      updated_at = now()
+  `;
 }
 
 async function getCompactPostgresStudentPayload(scopeKey, student) {
@@ -205,6 +267,7 @@ async function setPostgresState(state, scopeKey = stateKey) {
     on conflict (key)
     do update set data = excluded.data, updated_at = now()
   `;
+  await refreshPostgresStudentIndex(sql, scopeKey);
   return next;
 }
 
@@ -216,6 +279,20 @@ async function ensurePostgresSchema(sql) {
       updated_at timestamptz not null default now()
     )
   `;
+  await sql`
+    create table if not exists app_students (
+      scope_key text not null,
+      student_id text not null,
+      login_id text not null default '',
+      name text not null default '',
+      password text not null default '',
+      data jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (scope_key, student_id)
+    )
+  `;
+  await sql`create index if not exists app_students_login_idx on app_students (scope_key, login_id, password)`;
+  await sql`create index if not exists app_students_name_idx on app_students (scope_key, name, password)`;
 }
 
 async function getSql() {

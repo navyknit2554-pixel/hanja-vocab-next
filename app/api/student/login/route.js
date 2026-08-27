@@ -4,6 +4,7 @@ import { createStudentSession, studentConfigError, studentCookieName } from "../
 import { scopeKeyFromTeacherCode } from "../../../../src/lib/licenseAuth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function POST(request) {
   const configError = studentConfigError();

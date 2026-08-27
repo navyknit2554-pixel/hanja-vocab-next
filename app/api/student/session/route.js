@@ -4,6 +4,7 @@ import { getStudentSessionPayload } from "../../../../src/lib/serverStore";
 import { readStudentSession, studentConfigError, studentCookieName } from "../../../../src/lib/studentAuth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET() {
   const configError = studentConfigError();
