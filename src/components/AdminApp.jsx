@@ -560,6 +560,17 @@ export function AdminApp() {
     });
   }
 
+  function updateVocabExample(hanjaIndex, vocabIndex, exampleIndex, value) {
+    updateHanjaJson((hanjaSet) => {
+      const hanja = hanjaSet[hanjaIndex];
+      if (!hanja) return;
+      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
+      if (!hanja.vocab[vocabIndex]) return;
+      if (!Array.isArray(hanja.vocab[vocabIndex].examples)) hanja.vocab[vocabIndex].examples = ["", "", ""];
+      hanja.vocab[vocabIndex].examples[exampleIndex] = value;
+    });
+  }
+
   function addVocab(hanjaIndex) {
     updateHanjaJson((hanjaSet) => {
       const hanja = hanjaSet[hanjaIndex];
@@ -582,63 +593,7 @@ export function AdminApp() {
     });
   }
 
-  async function fillExamplesFromDictionary() {
-    let hanjaSet;
-    try {
-      hanjaSet = JSON.parse(hanjaJson || "[]");
-    } catch {
-      alert("한자 묶음 JSON 형식을 먼저 확인해 주세요.");
-      return;
-    }
-    const words = [...new Set(
-      (Array.isArray(hanjaSet) ? hanjaSet : [])
-        .flatMap((hanja) => Array.isArray(hanja.vocab) ? hanja.vocab : [])
-        .map((vocab) => String(vocab.word || "").trim())
-        .filter(Boolean)
-    )];
-    if (!words.length) {
-      alert("가져올 어휘가 없습니다.");
-      return;
-    }
-    setDictionaryStatus(`국어원 API에서 ${words.length}개 어휘를 확인하는 중...`);
-    try {
-      const response = await fetch("/api/admin/dictionary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ words })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 API 결과를 가져오지 못했습니다.");
-      const results = payload.results || {};
-      let definitions = 0;
-      let examples = 0;
-      let missing = 0;
-      const nextHanjaSet = structuredClone(hanjaSet);
-      nextHanjaSet.forEach((hanja) => {
-        (hanja.vocab || []).forEach((vocab) => {
-          const result = results[vocab.word];
-          if (result?.definition) {
-            vocab.meaning = result.definition;
-            definitions += 1;
-          }
-          if (result?.examples?.length) {
-            vocab.examples = result.examples.slice(0, 3);
-            examples += 1;
-          } else {
-            vocab.examples = makeNeedsReviewExamples(vocab.word);
-            missing += 1;
-          }
-          vocab.source = result?.examples?.length ? "한국어기초사전" : "확인 필요";
-        });
-      });
-      setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
-      setDictionaryStatus(`국어원 반영: 뜻 ${definitions}개, 용례 ${examples}개 완료, ${missing}개 확인 필요`);
-    } catch (error) {
-      setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
-    }
-  }
-
-  async function rebuildVocabFromDictionary() {
+  async function importCurrentLessonFromDictionary() {
     let hanjaSet;
     try {
       hanjaSet = JSON.parse(hanjaJson || "[]");
@@ -651,8 +606,9 @@ export function AdminApp() {
       alert("어휘를 구성할 한자가 없습니다.");
       return;
     }
-    if (!window.confirm("현재 일차의 어휘를 국어원 등재 어휘 기준으로 다시 구성할까요? 기존 어휘는 교체됩니다.")) return;
-    setDictionaryStatus(`국어원에서 ${activeHanjaSet.length}개 한자의 등재 어휘를 찾는 중...`);
+    if (!window.confirm(`${selectedLevel} ${selectedDay}일차의 어휘를 국어원 등재 어휘 기준으로 다시 가져올까요? 현재 어휘는 교체됩니다.`)) return;
+    setDictionaryBulkRunning(true);
+    setDictionaryStatus(`${selectedLevel} ${selectedDay}일차 국어원 어휘·뜻·용례를 가져오는 중...`);
     try {
       const response = await fetch("/api/admin/dictionary", {
         method: "POST",
@@ -671,108 +627,14 @@ export function AdminApp() {
           hanja.vocab = candidates.slice(0, 8);
           replaced += candidates.length;
         } else {
+          hanja.vocab = [];
           missing += 1;
         }
       });
       setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
-      setDictionaryStatus(`국어원 어휘 재구성: ${replaced}개 반영, 후보 부족 한자 ${missing}개`);
+      setDictionaryStatus(`${selectedLevel} ${selectedDay}일차 반영 완료: 어휘 ${replaced}개, 후보 부족 한자 ${missing}개. 확인 후 저장을 눌러 주세요.`);
     } catch (error) {
       setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
-    }
-  }
-
-  function applyDictionaryVocabResults(hanjaSet, results, count) {
-    let replaced = 0;
-    let missing = 0;
-    hanjaSet.slice(0, Number(count) || 4).forEach((hanja) => {
-      const candidates = results[hanja.character] || [];
-      if (candidates.length) {
-        hanja.vocab = candidates.slice(0, 8);
-        replaced += candidates.length;
-      } else {
-        missing += 1;
-      }
-    });
-    return { replaced, missing };
-  }
-
-  async function fetchDictionaryVocabForHanjaSet(hanjaSet, count) {
-    const activeHanjaSet = (Array.isArray(hanjaSet) ? hanjaSet : []).slice(0, Number(count) || 4);
-    const response = await fetch("/api/admin/dictionary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "hanja-vocab", hanjaSet: activeHanjaSet })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 어휘 후보를 가져오지 못했습니다.");
-    return payload.results || {};
-  }
-
-  async function rebuildBulkVocabFromDictionary() {
-    if (dictionaryBulkRunning) return;
-    if (!window.confirm("초급 1일차부터 고급 100일차까지 한자 구성은 유지하고, 어휘/뜻/용례만 국어원 자료 기준으로 다시 저장할까요? 처리 시간이 걸릴 수 있습니다.")) return;
-
-    setDictionaryBulkRunning(true);
-    const batches = ["초급", "중급", "고급"].flatMap((level) =>
-      Array.from({ length: 20 }, (_, index) => {
-        const startDay = index * 5 + 1;
-        return { level, startDay, endDay: startDay + 4 };
-      })
-    );
-    const total = { lessons: 0, hanja: 0, replaced: 0, missing: 0 };
-    try {
-      for (let index = 0; index < batches.length; index += 1) {
-        const batch = batches[index];
-        setDictionaryStatus(`국어원 일괄 구성 중: ${batch.level} ${batch.startDay}-${batch.endDay}일차 (${index + 1}/${batches.length})`);
-        const response = await fetch("/api/admin/dictionary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "bulk-curriculum-vocab", ...batch, maxLessons: 5 })
-        });
-        const text = await response.text();
-        const payload = text ? JSON.parse(text) : {};
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.message || `${batch.level} ${batch.startDay}-${batch.endDay}일차 처리 중 서버 응답을 확인하지 못했습니다.`);
-        }
-        const summary = payload.summary || {};
-        total.lessons += summary.lessons || 0;
-        total.hanja += summary.hanja || 0;
-        total.replaced += summary.replaced || 0;
-        total.missing += summary.missing || 0;
-      }
-      const nextState = await loadAppState();
-      setState(nextState);
-      const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
-      setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
-      setDictionaryStatus(`국어원 일괄 구성 완료: ${total.lessons}개 일차, ${total.hanja}개 한자, 어휘 ${total.replaced}개 반영, 후보 부족 한자 ${total.missing}개`);
-    } catch (error) {
-      setDictionaryStatus(error.message || "국어원 전체 일괄 구성 중 문제가 발생했습니다. 완료된 구간은 이미 저장되었습니다.");
-    } finally {
-      setDictionaryBulkRunning(false);
-    }
-  }
-
-  async function removeNoExampleVocab() {
-    if (dictionaryBulkRunning) return;
-    if (!window.confirm("전체 커리큘럼에서 실제 용례가 없는 어휘를 삭제할까요? 삭제 후에는 백업이 없다면 되돌릴 수 없습니다.")) return;
-    setDictionaryBulkRunning(true);
-    setDictionaryStatus("용례 없는 어휘를 찾고 삭제하는 중...");
-    try {
-      const response = await fetch("/api/admin/dictionary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "prune-no-example-vocab" })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.message || "용례 없는 어휘 삭제를 완료하지 못했습니다.");
-      const nextState = await loadAppState();
-      setState(nextState);
-      const refreshedLesson = findLesson(nextState.curriculum, selectedDay, selectedLevel);
-      setHanjaJson(JSON.stringify(refreshedLesson?.hanjaSet || [], null, 2));
-      const summary = payload.summary || {};
-      setDictionaryStatus(`용례 없는 어휘 삭제 완료: ${summary.removed || 0}개 삭제, ${summary.remaining || 0}개 유지`);
-    } catch (error) {
-      setDictionaryStatus(error.message || "용례 없는 어휘 삭제 중 문제가 발생했습니다.");
     } finally {
       setDictionaryBulkRunning(false);
     }
@@ -1305,17 +1167,17 @@ export function AdminApp() {
                 <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
               </div>
               <div className="dictionaryTools">
-                <button className="miniBtn blue" type="button" onClick={rebuildBulkVocabFromDictionary} disabled={dictionaryBulkRunning}>1~100일차 국어원 일괄 구성</button>
-                <button className="miniBtn danger" type="button" onClick={removeNoExampleVocab} disabled={dictionaryBulkRunning}>용례 없는 어휘 삭제</button>
-                <button className="miniBtn blue" type="button" onClick={rebuildVocabFromDictionary} disabled={dictionaryBulkRunning}>현재 일차 국어원 어휘</button>
-                <button className="miniBtn blue" type="button" onClick={fillExamplesFromDictionary} disabled={dictionaryBulkRunning}>국어원 뜻/용례 가져오기</button>
-                <span>{dictionaryStatus || "API 키 설정 후 현재 일차 어휘의 실제 용례를 가져올 수 있습니다."}</span>
+                <button className="miniBtn blue" type="button" onClick={importCurrentLessonFromDictionary} disabled={dictionaryBulkRunning}>
+                  {dictionaryBulkRunning ? "가져오는 중..." : "현재 일차 국어원 어휘·뜻·용례 가져오기"}
+                </button>
+                <span>{dictionaryStatus || "선택한 일차의 한자에 맞는 국어원 등재 어휘와 실제 용례만 가져옵니다."}</span>
               </div>
               <HanjaQuickEditor
                 hanjaSet={contentPreview.hanjaSet}
                 dailyCount={dailyCount}
                 onHanjaChange={updateHanjaField}
                 onVocabChange={updateVocabField}
+                onExampleChange={updateVocabExample}
                 onAddVocab={addVocab}
                 onRemoveVocab={removeVocab}
               />
@@ -1719,7 +1581,7 @@ function LevelDayOverview({ lessons, selectedDay, onSelect }) {
   );
 }
 
-function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, onAddVocab, onRemoveVocab }) {
+function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, onExampleChange, onAddVocab, onRemoveVocab }) {
   const visibleHanja = hanjaSet.slice(0, Number(dailyCount) || hanjaSet.length);
 
   if (!visibleHanja.length) {
@@ -1751,19 +1613,34 @@ function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, 
               <label>음<input value={hanja.sound || ""} onChange={(event) => onHanjaChange(hanjaIndex, "sound", event.target.value)} /></label>
               <label>뜻<input value={hanja.meaning || ""} onChange={(event) => onHanjaChange(hanjaIndex, "meaning", event.target.value)} /></label>
             </div>
-            <label>형성 원리<textarea value={hanja.origin || ""} onChange={(event) => onHanjaChange(hanjaIndex, "origin", event.target.value)} /></label>
-            <label>관계 설명<textarea value={hanja.relation || ""} onChange={(event) => onHanjaChange(hanjaIndex, "relation", event.target.value)} /></label>
+            <div className="quickHanjaMetaFields">
+              <label>형성 원리<input value={hanja.origin || ""} onChange={(event) => onHanjaChange(hanjaIndex, "origin", event.target.value)} /></label>
+              <label>관계 설명<input value={hanja.relation || ""} onChange={(event) => onHanjaChange(hanjaIndex, "relation", event.target.value)} /></label>
+            </div>
             <div className="quickVocabHead">
               <strong>어휘 {hanja.vocab?.length || 0}개</strong>
               <button className="miniBtn" type="button" onClick={() => onAddVocab(hanjaIndex)}>어휘 추가</button>
             </div>
             <div className="quickVocabList">
               {(hanja.vocab || []).map((vocab, vocabIndex) => (
-                <div className="quickVocabRow" key={`${vocab.word}-${vocabIndex}`}>
-                  <input aria-label="한자어" value={vocab.hanja || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "hanja", event.target.value)} />
-                  <input aria-label="단어" value={vocab.word || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "word", event.target.value)} />
-                  <input aria-label="뜻" value={vocab.meaning || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "meaning", event.target.value)} />
-                  <button className="miniBtn danger" type="button" onClick={() => onRemoveVocab(hanjaIndex, vocabIndex)}>삭제</button>
+                <div className="quickVocabItem" key={`${vocab.word}-${vocabIndex}`}>
+                  <div className="quickVocabRow">
+                    <input aria-label="한자어" value={vocab.hanja || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "hanja", event.target.value)} />
+                    <input aria-label="단어" value={vocab.word || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "word", event.target.value)} />
+                    <input aria-label="뜻" value={vocab.meaning || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "meaning", event.target.value)} />
+                    <button className="miniBtn danger" type="button" onClick={() => onRemoveVocab(hanjaIndex, vocabIndex)}>삭제</button>
+                  </div>
+                  <div className="quickExampleGrid">
+                    {[0, 1, 2].map((exampleIndex) => (
+                      <input
+                        key={`${vocab.word}-${vocabIndex}-example-${exampleIndex}`}
+                        aria-label={`용례 ${exampleIndex + 1}`}
+                        placeholder={`용례 ${exampleIndex + 1}`}
+                        value={(Array.isArray(vocab.examples) ? vocab.examples : [])[exampleIndex] || ""}
+                        onChange={(event) => onExampleChange(hanjaIndex, vocabIndex, exampleIndex, event.target.value)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

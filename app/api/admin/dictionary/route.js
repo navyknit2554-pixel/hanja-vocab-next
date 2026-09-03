@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminCookieName, readAdminSession } from "../../../../src/lib/adminAuth";
 import { cookies } from "next/headers";
-import { getState, setState } from "../../../../src/lib/serverStore";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +22,6 @@ export async function POST(request) {
   }
 
   const requestBody = await request.json().catch(() => ({}));
-  if (requestBody.mode === "prune-no-example-vocab") {
-    const state = await getState(session.scopeKey);
-    const summary = pruneNoExampleVocab(state);
-    await setState(state, session.scopeKey);
-    return NextResponse.json({ ok: true, summary });
-  }
 
   const apiKey = process.env.KOREAN_DICT_API_KEY || process.env.KRDICT_API_KEY;
   if (!apiKey) {
@@ -40,13 +33,6 @@ export async function POST(request) {
 
   try {
     const body = requestBody;
-    if (body.mode === "bulk-curriculum-vocab") {
-      const state = await getState(session.scopeKey);
-      const summary = await rebuildCurriculumVocab(apiKey, state, body);
-      await setState(state, session.scopeKey);
-      return NextResponse.json({ ok: true, summary });
-    }
-
     if (body.mode === "hanja-vocab") {
       const hanjaSet = Array.isArray(body.hanjaSet) ? body.hanjaSet : [];
       const results = {};
@@ -72,98 +58,6 @@ export async function POST(request) {
   }
 }
 
-function pruneNoExampleVocab(state) {
-  let lessons = 0;
-  let hanja = 0;
-  let removed = 0;
-  let remaining = 0;
-  const removedSamples = [];
-
-  (Array.isArray(state.curriculum) ? state.curriculum : []).forEach((lesson) => {
-    lessons += 1;
-    const dailyCount = Number(lesson.dailyCount || 4);
-    const hanjaSet = Array.isArray(lesson.hanjaSet) ? lesson.hanjaSet : [];
-    hanjaSet.slice(0, dailyCount).forEach((item) => {
-      hanja += 1;
-      const before = Array.isArray(item.vocab) ? item.vocab : [];
-      const kept = before.filter((word) => hasUsableExamples(word));
-      before.forEach((word) => {
-        if (!hasUsableExamples(word) && removedSamples.length < 20) {
-          removedSamples.push({
-            level: lesson.level,
-            day: lesson.day,
-            hanja: item.character,
-            word: word?.word || word?.hanja || ""
-          });
-        }
-      });
-      removed += before.length - kept.length;
-      remaining += kept.length;
-      item.vocab = kept;
-    });
-  });
-
-  return { lessons, hanja, removed, remaining, removedSamples };
-}
-
-function hasUsableExamples(word) {
-  const plainWord = String(word?.word || "").trim();
-  const examples = Array.isArray(word?.examples) ? word.examples : [];
-  return examples.some((example) => {
-    const text = String(example || "").trim();
-    return plainWord && text.includes(plainWord) && isUsefulExample(text);
-  });
-}
-
-async function rebuildCurriculumVocab(apiKey, state, options = {}) {
-  const allowedLevels = new Set(["\uCD08\uAE09", "\uC911\uAE09", "\uACE0\uAE09"]);
-  const requestedLevel = String(options.level || "").trim();
-  const startDay = Math.max(1, Number(options.startDay || 1));
-  const endDay = Math.min(100, Number(options.endDay || 100));
-  const maxLessons = Math.min(20, Math.max(1, Number(options.maxLessons || 5)));
-  const targets = (Array.isArray(state.curriculum) ? state.curriculum : [])
-    .filter((lesson) => {
-      const level = String(lesson.level || "").trim();
-      const day = Number(lesson.day);
-      if (!allowedLevels.has(level)) return false;
-      if (requestedLevel && level !== requestedLevel) return false;
-      return day >= startDay && day <= endDay;
-    })
-    .sort((left, right) => levelOrder(left.level) - levelOrder(right.level) || Number(left.day) - Number(right.day));
-  const selectedTargets = targets.slice(0, maxLessons);
-  const cache = new Map();
-  let lessons = 0;
-  let hanja = 0;
-  let replaced = 0;
-  let missing = 0;
-
-  for (const lesson of selectedTargets) {
-    lessons += 1;
-    const dailyCount = Number(lesson.dailyCount || 4);
-    const hanjaSet = Array.isArray(lesson.hanjaSet) ? lesson.hanjaSet : [];
-    for (const item of hanjaSet.slice(0, dailyCount)) {
-      const character = String(item?.character || "").trim();
-      if (!character) continue;
-      hanja += 1;
-      if (!cache.has(character)) cache.set(character, await lookupHanjaVocab(apiKey, item));
-      const candidates = cache.get(character) || [];
-      if (candidates.length) {
-        item.vocab = candidates;
-        replaced += candidates.length;
-      } else {
-        item.vocab = [];
-        missing += 1;
-      }
-    }
-  }
-
-  return { level: requestedLevel || "전체", startDay, endDay, lessons, hanja, replaced, missing };
-}
-
-function levelOrder(level) {
-  return { "\uCD08\uAE09": 1, "\uC911\uAE09": 2, "\uACE0\uAE09": 3 }[String(level || "").trim()] || 9;
-}
-
 async function lookupHanjaVocab(apiKey, hanja) {
   const character = String(hanja?.character || "").trim();
   const candidates = await fetchDictionaryPart(apiKey, character, "word", {
@@ -182,16 +76,13 @@ async function lookupHanjaVocab(apiKey, hanja) {
     if (selected.length >= 8) break;
     const viewExamples = item.targetCode ? await fetchDictionaryViewExamples(apiKey, item.targetCode, item.word) : [];
     const examples = viewExamples.length ? viewExamples : await fetchDictionarySearchExamples(apiKey, item.word);
+    if (!examples.length) continue;
     selected.push({
-      hanja: extractHanjaWord(item.origin, character) || item.origin || item.word,
+      hanja: extractHanjaWord(item.origin, character),
       word: item.word,
       meaning: item.definition,
-      examples: examples.length ? examples.slice(0, 3) : [
-        `${item.word} 용례 확인 필요.`,
-        `${item.word} 용례 확인 필요.`,
-        `${item.word} 용례 확인 필요.`
-      ],
-      source: examples.length ? "한국어기초사전" : "한국어기초사전 확인 필요"
+      examples: examples.slice(0, 3),
+      source: "한국어기초사전"
     });
   }
 

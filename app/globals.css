@@ -1317,7 +1317,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 10px;
   border: 2px solid #d9f7c7;
   border-radius: 12px;
@@ -1328,6 +1328,7 @@ textarea {
   color: var(--muted);
   font-size: .78rem;
   font-weight: 900;
+  line-height: 1.35;
 }
 
 .contentForm label {
@@ -1465,6 +1466,12 @@ textarea {
   gap: 7px;
 }
 
+.quickHanjaMetaFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7px;
+}
+
 .quickHanjaCard textarea {
   height: 64px;
   min-height: 64px;
@@ -1473,7 +1480,16 @@ textarea {
 
 .quickVocabList {
   display: grid;
+  gap: 8px;
+}
+
+.quickVocabItem {
+  display: grid;
   gap: 6px;
+  padding: 8px;
+  border: 1px solid #e3f0ff;
+  border-radius: 12px;
+  background: #fbfdff;
 }
 
 .quickVocabRow {
@@ -1485,6 +1501,12 @@ textarea {
 
 .quickVocabRow input {
   min-width: 0;
+}
+
+.quickExampleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .contentForm input,
@@ -2601,8 +2623,15 @@ td span {
   .curriculumWorkspace,
   .editorControls,
   .quickHanjaFields,
+  .quickHanjaMetaFields,
+  .quickExampleGrid,
   .quickVocabRow {
     grid-template-columns: 1fr;
+  }
+
+  .dictionaryTools {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .curriculumSidebar {
