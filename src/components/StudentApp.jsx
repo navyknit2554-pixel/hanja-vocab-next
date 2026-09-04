@@ -293,23 +293,6 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
 
   return (
     <article className="swipeCard" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      <button
-        className="cardPageButton prev"
-        type="button"
-        onClick={goPrev}
-        disabled={isFirst}
-        aria-label="이전 카드"
-      >
-        ‹
-      </button>
-      <button
-        className="cardPageButton next"
-        type="button"
-        onClick={goNext}
-        aria-label={isLast ? "문제 풀기" : "다음 카드"}
-      >
-        ›
-      </button>
       <Mascot variant={item.type === "hanja" ? "study" : "discover"} small label={item.type === "hanja" ? "공부 중" : "어휘 발견"} />
       <p className="eyebrow">{index + 1} / {total}</p>
       {item.type === "hanja" ? (
