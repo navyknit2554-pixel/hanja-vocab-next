@@ -361,6 +361,7 @@ export function AdminApp() {
                 <label>난이도<select value={level} onChange={(event) => setLevel(event.target.value)}><option>초급</option><option>중급</option><option>고급</option></select></label>
                 <label>일차<input type="number" min="1" max="100" value={day} onChange={(event) => setDay(Number(event.target.value))} /></label>
               </div>
+              <LessonHanjaOverview lessonData={lessonData} level={level} day={day} />
               <button className="btn primary" type="button" onClick={importDictionary} disabled={loading}>
                 {loading ? "가져오는 중..." : "현재 일차 국어원 어휘·뜻·용례 가져오기"}
               </button>
@@ -423,6 +424,32 @@ export function AdminApp() {
         </>
       ) : null}
     </main>
+  );
+}
+
+function LessonHanjaOverview({ lessonData, level, day }) {
+  const hanja = lessonData?.hanja || [];
+
+  return (
+    <div className="lessonOverview">
+      <div className="lessonOverviewHeader">
+        <strong>{level} {day}일차 한자 구성</strong>
+        <span>{hanja.length ? `${hanja.length}개 한자 · ${countVocab(hanja)}개 어휘` : "불러온 구성이 없습니다"}</span>
+      </div>
+      {hanja.length ? (
+        <div className="lessonHanjaList">
+          {hanja.map((item) => (
+            <div className="lessonHanjaChip" key={item.id}>
+              <b>{item.character}</b>
+              <span>음 {item.sound} · 뜻 {item.meaning}</span>
+              <small>어휘 {item.vocab.length}개</small>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mutedText">이 일차의 한자 구성을 확인하려면 난이도와 일차를 선택해 주세요.</p>
+      )}
+    </div>
   );
 }
 
