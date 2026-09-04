@@ -16,26 +16,10 @@ export async function lookupHanjaVocabulary(character, limit = 8) {
     .filter((item) => isValidCandidate(item, character))
     .sort((left, right) => scoreCandidate(right, character) - scoreCandidate(left, character));
 
-  const selected = [];
-  for (const item of filtered.slice(0, 14)) {
-    if (selected.length >= limit) break;
-    const examples = await optionalLookup(() => item.targetCode
-      ? fetchDictionaryViewExamples(apiKey, item.targetCode, item.word)
-      : Promise.resolve([]));
-    const fallbackExamples = examples.length ? [] : await optionalLookup(() => fetchDictionarySearchExamples(apiKey, item.word));
-    const usableExamples = [...new Set([...examples, ...fallbackExamples])]
-      .filter((example) => example.includes(item.word) && isUsefulExample(example))
-      .slice(0, 3);
-    if (!usableExamples.length) continue;
-    selected.push({
-      targetCode: item.targetCode,
-      hanjaWord: extractHanjaWord(item.origin, character),
-      word: item.word,
-      meaning: item.definition,
-      examples: usableExamples
-    });
-  }
-  return selected;
+  const enriched = await Promise.all(
+    filtered.slice(0, limit).map((item) => enrichCandidate(apiKey, item, character))
+  );
+  return enriched.filter(Boolean).slice(0, limit);
 }
 
 async function optionalLookup(task) {
@@ -44,6 +28,24 @@ async function optionalLookup(task) {
   } catch {
     return [];
   }
+}
+
+async function enrichCandidate(apiKey, item, character) {
+  const examples = await optionalLookup(() => item.targetCode
+    ? fetchDictionaryViewExamples(apiKey, item.targetCode, item.word)
+    : Promise.resolve([]));
+  const fallbackExamples = examples.length ? [] : await optionalLookup(() => fetchDictionarySearchExamples(apiKey, item.word));
+  const usableExamples = [...new Set([...examples, ...fallbackExamples])]
+    .filter((example) => example.includes(item.word) && isUsefulExample(example))
+    .slice(0, 3);
+  if (!usableExamples.length) return null;
+  return {
+    targetCode: item.targetCode,
+    hanjaWord: extractHanjaWord(item.origin, character),
+    word: item.word,
+    meaning: item.definition,
+    examples: usableExamples
+  };
 }
 
 async function fetchDictionaryPart(apiKey, word, part, options = {}) {
@@ -78,7 +80,7 @@ async function fetchDictionaryViewExamples(apiKey, targetCode, word) {
   return parseExamplesFromView(xml, word);
 }
 
-async function fetchWithTimeout(url, timeoutMs = 8000) {
+async function fetchWithTimeout(url, timeoutMs = 3500) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -90,8 +92,7 @@ async function fetchWithTimeout(url, timeoutMs = 8000) {
 
 async function fetchDictionarySearchExamples(apiKey, word) {
   const exact = await fetchDictionaryPart(apiKey, word, "exam", { method: "exact", num: "20" });
-  const include = exact.length ? [] : await fetchDictionaryPart(apiKey, word, "exam", { method: "include", num: "20" });
-  return [...exact, ...include].map((item) => cleanText(item.example));
+  return exact.map((item) => cleanText(item.example));
 }
 
 function assertDictionaryResponse(xml, responseOk) {
