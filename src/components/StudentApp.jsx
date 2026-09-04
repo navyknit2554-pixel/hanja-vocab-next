@@ -227,6 +227,16 @@ function HomeLesson({ hanja, onCards, onQuiz }) {
 
 function StudyCard({ item, index, total, onPrev, onNext }) {
   const touchStartX = useRef(null);
+  const isFirst = index === 0;
+  const isLast = index + 1 >= total;
+
+  function goPrev() {
+    if (!isFirst) onPrev();
+  }
+
+  function goNext() {
+    onNext();
+  }
 
   function handleTouchStart(event) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -238,12 +248,29 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
     const distance = endX - touchStartX.current;
     touchStartX.current = null;
     if (Math.abs(distance) < 55) return;
-    if (distance > 0) onPrev();
-    else onNext();
+    if (distance > 0) goPrev();
+    else goNext();
   }
 
   return (
     <article className="swipeCard" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <button
+        className="cardPageButton prev"
+        type="button"
+        onClick={goPrev}
+        disabled={isFirst}
+        aria-label="앞 페이지"
+      >
+        ‹
+      </button>
+      <button
+        className="cardPageButton next"
+        type="button"
+        onClick={goNext}
+        aria-label={isLast ? "문제 풀기" : "뒤 페이지"}
+      >
+        ›
+      </button>
       <Mascot variant={item.type === "hanja" ? "study" : "discover"} small label={item.type === "hanja" ? "공부 중" : "어휘 발견"} />
       <p className="eyebrow">{index + 1} / {total}</p>
       {item.type === "hanja" ? (
@@ -263,8 +290,8 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
         </>
       )}
       <div className="navRow">
-        <button className="btn secondary" type="button" onClick={onPrev} disabled={index === 0}>이전</button>
-        <button className="btn primary" type="button" onClick={onNext}>{index + 1 >= total ? "문제 풀기" : "다음"}</button>
+        <button className="btn secondary" type="button" onClick={goPrev} disabled={isFirst}>앞 페이지</button>
+        <button className="btn primary" type="button" onClick={goNext}>{isLast ? "문제 풀기" : "뒤 페이지"}</button>
       </div>
     </article>
   );
