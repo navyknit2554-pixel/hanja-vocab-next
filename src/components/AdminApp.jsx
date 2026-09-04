@@ -189,22 +189,47 @@ export function AdminApp() {
     setLoading(true);
     setStatus(`${level} ${day}일차 국어원 자료를 가져오는 중...`);
     try {
-      const response = await fetch("/api/admin/dictionary-import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level, day })
-      });
-      const text = await response.text();
-      const data = parseJsonResponse(text);
-      if (handleExpiredAdmin(response, data)) return;
-      if (!response.ok) throw new Error(data.message || "국어원 자료를 가져오지 못했습니다.");
-      setStatus(formatDictionarySummary(data.summary));
+      const lesson = await fetchLessonForImport();
+      const hanjaItems = lesson.hanja || [];
+      const summary = { level, day, hanjaCount: hanjaItems.length, vocabCount: 0, missing: [], failed: [] };
+
+      for (let index = 0; index < hanjaItems.length; index += 1) {
+        const hanja = hanjaItems[index];
+        setStatus(`${level} ${day}일차 국어원 자료를 가져오는 중... ${index + 1}/${hanjaItems.length} ${hanja.character}`);
+        const response = await fetch("/api/admin/dictionary-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level, day, hanjaId: hanja.id })
+        });
+        const text = await response.text();
+        const data = parseJsonResponse(text);
+        if (handleExpiredAdmin(response, data)) return;
+        if (!response.ok) {
+          summary.failed.push(`${hanja.character}: ${data.message || "조회 실패"}`);
+          continue;
+        }
+        summary.vocabCount += Number(data.summary?.vocabCount || 0);
+        summary.missing.push(...(data.summary?.missing || []));
+        summary.failed.push(...(data.summary?.failed || []));
+      }
+
+      setStatus(formatDictionarySummary(summary));
       await loadLesson();
     } catch (error) {
       setStatus(error.message || "처리 중 문제가 생겼습니다.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchLessonForImport() {
+    const response = await fetch(`/api/admin/lesson?level=${encodeURIComponent(level)}&day=${day}`, { cache: "no-store" });
+    const text = await response.text();
+    const data = parseJsonResponse(text);
+    if (handleExpiredAdmin(response, data)) throw new Error("관리자 로그인이 만료되었습니다.");
+    if (!response.ok) throw new Error(data.message || "일차 데이터를 불러오지 못했습니다.");
+    setLessonData(data);
+    return data;
   }
 
   async function saveVocab(vocab) {

@@ -12,6 +12,7 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const level = String(body.level || "").trim();
     const day = Number(body.day || 0);
+    const hanjaId = String(body.hanjaId || "").trim();
     if (!["초급", "중급", "고급"].includes(level) || day < 1 || day > 100) {
       return NextResponse.json({ ok: false, message: "난이도와 일차를 확인해 주세요." }, { status: 400 });
     }
@@ -21,24 +22,35 @@ export async function POST(request) {
     const lesson = lessonRows[0];
     if (!lesson) return NextResponse.json({ ok: false, message: "해당 일차가 아직 없습니다." }, { status: 404 });
 
-    const hanjaRows = await db`
+    const hanjaRows = hanjaId ? await db`
+      select id, character
+      from hanja_items
+      where curriculum_day_id = ${lesson.id}
+        and id = ${hanjaId}
+      order by position asc
+    ` : await db`
       select id, character
       from hanja_items
       where curriculum_day_id = ${lesson.id}
       order by position asc
     `;
+    if (hanjaId && !hanjaRows.length) {
+      return NextResponse.json({ ok: false, message: "가져올 한자를 찾지 못했습니다." }, { status: 404 });
+    }
     let vocabCount = 0;
     const missing = [];
     const failed = [];
 
-    const lookupResults = await Promise.all(hanjaRows.map(async (hanja) => {
+    const lookupResults = hanjaId ? [await lookupOneHanja(hanjaRows[0])] : await Promise.all(hanjaRows.map(lookupOneHanja));
+
+    async function lookupOneHanja(hanja) {
       try {
         const words = await lookupHanjaVocabulary(hanja.character, 8);
         return { hanja, words };
       } catch (error) {
         return { hanja, words: [], error };
       }
-    }));
+    }
 
     for (const result of lookupResults) {
       const { hanja, words, error } = result;
