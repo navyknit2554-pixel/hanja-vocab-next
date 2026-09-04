@@ -198,7 +198,7 @@ export function AdminApp() {
       const data = parseJsonResponse(text);
       if (handleExpiredAdmin(response, data)) return;
       if (!response.ok) throw new Error(data.message || "국어원 자료를 가져오지 못했습니다.");
-      setStatus(`${data.summary.level} ${data.summary.day}일차: 한자 ${data.summary.hanjaCount}개, 어휘 ${data.summary.vocabCount}개 반영. 부족: ${data.summary.missing.join(", ") || "없음"}`);
+      setStatus(formatDictionarySummary(data.summary));
       await loadLesson();
     } catch (error) {
       setStatus(error.message || "처리 중 문제가 생겼습니다.");
@@ -579,6 +579,12 @@ function parseJsonResponse(text) {
   } catch {
     return { message: "서버 응답을 읽지 못했습니다. 터미널 오류 메시지를 확인해 주세요." };
   }
+}
+
+function formatDictionarySummary(summary) {
+  const missing = summary.missing?.join(", ") || "없음";
+  const failed = summary.failed?.join(" / ") || "없음";
+  return `${summary.level} ${summary.day}일차: 한자 ${summary.hanjaCount}개, 어휘 ${summary.vocabCount}개 반영. 부족: ${missing}. 실패: ${failed}`;
 }
 
 function countVocab(hanjaItems) {

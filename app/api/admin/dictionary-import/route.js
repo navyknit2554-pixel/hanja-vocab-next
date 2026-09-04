@@ -29,14 +29,28 @@ export async function POST(request) {
     `;
     let vocabCount = 0;
     const missing = [];
+    const failed = [];
 
-    for (const hanja of hanjaRows) {
-      const words = await lookupHanjaVocabulary(hanja.character, 8);
-      await db`delete from vocab_items where hanja_item_id = ${hanja.id}`;
+    const lookupResults = await Promise.all(hanjaRows.map(async (hanja) => {
+      try {
+        const words = await lookupHanjaVocabulary(hanja.character, 8);
+        return { hanja, words };
+      } catch (error) {
+        return { hanja, words: [], error };
+      }
+    }));
+
+    for (const result of lookupResults) {
+      const { hanja, words, error } = result;
+      if (error) {
+        failed.push(`${hanja.character}: ${error.message || "조회 실패"}`);
+        continue;
+      }
       if (!words.length) {
         missing.push(hanja.character);
         continue;
       }
+      await db`delete from vocab_items where hanja_item_id = ${hanja.id}`;
       for (let index = 0; index < words.length; index += 1) {
         const item = words[index];
         const vocabRows = await db`
@@ -61,7 +75,8 @@ export async function POST(request) {
         day,
         hanjaCount: hanjaRows.length,
         vocabCount,
-        missing
+        missing,
+        failed
       }
     });
   } catch (error) {

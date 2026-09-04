@@ -17,12 +17,12 @@ export async function lookupHanjaVocabulary(character, limit = 8) {
     .sort((left, right) => scoreCandidate(right, character) - scoreCandidate(left, character));
 
   const selected = [];
-  for (const item of filtered) {
+  for (const item of filtered.slice(0, 14)) {
     if (selected.length >= limit) break;
-    const examples = item.targetCode
-      ? await fetchDictionaryViewExamples(apiKey, item.targetCode, item.word)
-      : [];
-    const fallbackExamples = examples.length ? [] : await fetchDictionarySearchExamples(apiKey, item.word);
+    const examples = await optionalLookup(() => item.targetCode
+      ? fetchDictionaryViewExamples(apiKey, item.targetCode, item.word)
+      : Promise.resolve([]));
+    const fallbackExamples = examples.length ? [] : await optionalLookup(() => fetchDictionarySearchExamples(apiKey, item.word));
     const usableExamples = [...new Set([...examples, ...fallbackExamples])]
       .filter((example) => example.includes(item.word) && isUsefulExample(example))
       .slice(0, 3);
@@ -36,6 +36,14 @@ export async function lookupHanjaVocabulary(character, limit = 8) {
     });
   }
   return selected;
+}
+
+async function optionalLookup(task) {
+  try {
+    return await task();
+  } catch {
+    return [];
+  }
 }
 
 async function fetchDictionaryPart(apiKey, word, part, options = {}) {
@@ -52,7 +60,7 @@ async function fetchDictionaryPart(apiKey, word, part, options = {}) {
   if (options.type2) params.set("type2", options.type2);
   if (options.target) params.set("target", options.target);
   if (options.lang) params.set("lang", options.lang);
-  const response = await fetch(`${searchUrl}?${params.toString()}`, { cache: "no-store" });
+  const response = await fetchWithTimeout(`${searchUrl}?${params.toString()}`);
   const xml = await response.text();
   assertDictionaryResponse(xml, response.ok);
   return parseItems(xml, part);
@@ -64,10 +72,20 @@ async function fetchDictionaryViewExamples(apiKey, targetCode, word) {
     method: "target_code",
     q: String(targetCode)
   });
-  const response = await fetch(`${viewUrl}?${params.toString()}`, { cache: "no-store" });
+  const response = await fetchWithTimeout(`${viewUrl}?${params.toString()}`);
   const xml = await response.text();
   assertDictionaryResponse(xml, response.ok);
   return parseExamplesFromView(xml, word);
+}
+
+async function fetchWithTimeout(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { cache: "no-store", signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchDictionarySearchExamples(apiKey, word) {
