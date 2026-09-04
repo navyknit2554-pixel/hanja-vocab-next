@@ -25,6 +25,12 @@ export function AdminApp() {
   const [savingId, setSavingId] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("reset") === "1") {
+      logout().finally(() => {
+        window.history.replaceState({}, "", window.location.pathname);
+      });
+      return;
+    }
     loadAdminSession();
   }, []);
 
@@ -293,6 +299,7 @@ export function AdminApp() {
           <label>마스터 비밀번호<input type="password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} placeholder="마스터만 입력" /></label>
           <label>라이선스 키<textarea value={loginForm.licenseKey} onChange={(event) => setLoginForm({ ...loginForm, licenseKey: event.target.value })} placeholder="원장님·강사님은 HANJA-... 키 입력" /></label>
           <button className="btn primary">로그인</button>
+          <button className="btn textBtn" type="button" onClick={logout}>세션 초기화</button>
           {loginStatus ? <p className="errorText">{loginStatus}</p> : null}
         </form>
       </main>
