@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasDatabase, sql } from "../../../src/lib/db";
+import { getDatabaseTarget, hasDatabase, sql } from "../../../src/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
@@ -28,6 +28,7 @@ export async function GET() {
       ok: true,
       storage: "postgres",
       nodeEnv: process.env.NODE_ENV || "development",
+      dbTarget: getDatabaseTarget(),
       counts: rows[0],
       warnings: []
     });
@@ -36,6 +37,7 @@ export async function GET() {
       {
         ok: false,
         storage: "postgres",
+        dbTarget: getDatabaseTarget(),
         message: error?.message || "DB 연결 확인에 실패했습니다.",
         code: error?.code || ""
       },

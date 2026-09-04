@@ -6,6 +6,24 @@ export function hasDatabase() {
   return Boolean(getConnectionString());
 }
 
+export function getDatabaseTarget() {
+  const connectionString = getConnectionString();
+  if (!connectionString) return { host: "", projectRef: "" };
+
+  try {
+    const url = new URL(connectionString);
+    const username = decodeURIComponent(url.username || "");
+    const host = url.hostname || "";
+    const match = username.match(/^postgres[.:]([^.@:/?]+)$/);
+    return {
+      host,
+      projectRef: match?.[1] || ""
+    };
+  } catch {
+    return { host: "invalid-url", projectRef: "" };
+  }
+}
+
 export async function sql() {
   if (client) return client;
   const connectionString = getConnectionString();
