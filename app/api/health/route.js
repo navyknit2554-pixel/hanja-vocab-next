@@ -1,44 +1,45 @@
 import { NextResponse } from "next/server";
-import { adminConfigError } from "../../../src/lib/adminAuth";
-import { studentConfigError } from "../../../src/lib/studentAuth";
-import { getState, storageMode } from "../../../src/lib/serverStore";
+import { hasDatabase, sql } from "../../../src/lib/db";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 export async function GET() {
-  const warnings = [];
-  const adminError = adminConfigError();
-  const studentError = studentConfigError();
-  const storage = storageMode();
-
-  if (adminError) warnings.push(adminError);
-  if (studentError) warnings.push(studentError);
-  if (process.env.NODE_ENV === "production" && (!process.env.HANJA_LICENSE_SECRET || process.env.HANJA_LICENSE_SECRET === "change-this-license-secret")) {
-    warnings.push("강사용 라이선스를 사용하려면 HANJA_LICENSE_SECRET을 긴 무작위 문자열로 설정해야 합니다.");
-  }
-  if (process.env.NODE_ENV === "production" && storage !== "postgres") {
-    warnings.push("Vercel 운영 배포에서는 SUPABASE_DATABASE_URL, DATABASE_URL, 또는 POSTGRES_URL을 설정해야 학습 기록이 안정적으로 저장됩니다.");
+  if (!hasDatabase()) {
+    return NextResponse.json(
+      { ok: false, storage: "missing", message: "SUPABASE_DATABASE_URL 또는 DATABASE_URL이 필요합니다." },
+      { status: 500 }
+    );
   }
 
   try {
-    const state = await getState();
+    const db = await sql();
+    const rows = await db`
+      select
+        (select count(*)::int from teachers) as teachers,
+        (select count(*)::int from students) as students,
+        (select count(*)::int from curriculum_days) as curriculum_days,
+        (select count(*)::int from hanja_items) as hanja_items,
+        (select count(*)::int from vocab_items) as vocab_items,
+        (select count(*)::int from student_progress) as student_progress
+    `;
+
     return NextResponse.json({
-      ok: warnings.length === 0,
-      storage,
+      ok: true,
+      storage: "postgres",
       nodeEnv: process.env.NODE_ENV || "development",
-      counts: {
-        students: state.students?.length || 0,
-        lessons: state.curriculum?.length || 0
-      },
-      warnings
+      counts: rows[0],
+      warnings: []
     });
   } catch (error) {
-    return NextResponse.json({
-      ok: false,
-      storage,
-      nodeEnv: process.env.NODE_ENV || "development",
-      error: error.message,
-      warnings
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        storage: "postgres",
+        message: error?.message || "DB 연결 확인에 실패했습니다.",
+        code: error?.code || ""
+      },
+      { status: 500 }
+    );
   }
 }

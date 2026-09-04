@@ -1,851 +1,392 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { cleanExampleText, findLesson, hanjaItems, learningCards, lessonVocab, quizItems } from "../lib/curriculum";
-import { InstallAppButton } from "./InstallAppButton";
 import { Mascot } from "./Mascot";
 
-const studentLoginStorageKey = "chologihanzi-student-login";
-
-function studentApiUrl(path) {
-  if (typeof window === "undefined") return path;
-  try {
-    return new URL(path, window.location.origin).toString();
-  } catch {
-    return path;
-  }
-}
-
-async function fetchStudentApi(path, options = {}, timeoutMs = 18000) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(studentApiUrl(path), { ...options, signal: controller.signal });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("서버 응답이 지연되고 있습니다. 다시 로그인해 주세요.");
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
-
-function friendlyStudentError(error, fallback = "학습 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.") {
-  const message = String(error?.message || error || "");
-  if (/string did not match the expected pattern/i.test(message)) {
-    return "앱 주소 또는 저장된 로그인 정보가 올바르지 않습니다. 다시 로그인해 주세요.";
-  }
-  return message || fallback;
-}
-
-function normalizeSavedLogin(saved) {
-  if (!saved || typeof saved !== "object") return null;
-  return {
-    teacherCode: typeof saved.teacherCode === "string" ? saved.teacherCode : "",
-    loginId: typeof saved.loginId === "string" ? saved.loginId : "",
-    password: typeof saved.password === "string" ? saved.password : "",
-    remember: saved.remember !== false
-  };
-}
-
 export function StudentApp() {
-  const [student, setStudent] = useState(null);
-  const [curriculum, setCurriculum] = useState([]);
-  const [progressRecord, setProgressRecord] = useState({ completed: {}, quiz: {} });
-  const [loadError, setLoadError] = useState("");
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [login, setLogin] = useState({ teacherCode: "", loginId: "", password: "" });
-  const [rememberLogin, setRememberLogin] = useState(true);
-  const [stage, setStage] = useState("learn");
+  const [login, setLogin] = useState({ teacherCode: "master", loginId: "", password: "" });
+  const [status, setStatus] = useState("확인하는 중...");
+  const [payload, setPayload] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState("home");
   const [cardIndex, setCardIndex] = useState(0);
+  const [quizQueue, setQuizQueue] = useState([]);
   const [quizIndex, setQuizIndex] = useState(0);
-  const [queue, setQueue] = useState([]);
-  const [retry, setRetry] = useState([]);
-  const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
-  const [pendingStudent, setPendingStudent] = useState(null);
-  const latestStatsRef = useRef(stats);
+  const [retryQueue, setRetryQueue] = useState([]);
   const [feedback, setFeedback] = useState(null);
-  const [loginError, setLoginError] = useState("");
-  const [loggingIn, setLoggingIn] = useState(false);
-  const [archeryGame, setArcheryGame] = useState(null);
+  const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
 
   useEffect(() => {
+    loadToday();
+  }, []);
+
+  const lessonItems = useMemo(() => buildLessonItems(payload?.hanja || []), [payload]);
+  const quizItems = useMemo(() => buildQuizItems(payload?.hanja || []), [payload]);
+  const currentCard = lessonItems[cardIndex];
+  const currentQuiz = quizQueue[quizIndex];
+
+  async function loadToday() {
     try {
-      const saved = normalizeSavedLogin(JSON.parse(window.localStorage.getItem(studentLoginStorageKey) || "null"));
-      if (saved) {
-        setLogin({
-          teacherCode: saved.teacherCode,
-          loginId: saved.loginId,
-          password: saved.password
-        });
-        setRememberLogin(saved.remember);
+      const response = await fetch("/api/student/today", { cache: "no-store" });
+      const data = await response.json();
+      if (data.authenticated) {
+        setPayload(data);
+        setStatus("");
+      } else {
+        setStatus("");
       }
     } catch {
-      window.localStorage.removeItem(studentLoginStorageKey);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshStudentSession({ initial: true });
-  }, []);
-
-  useEffect(() => {
-    function refreshWhenVisible() {
-      if (document.visibilityState === "visible") refreshStudentSession();
-    }
-    window.addEventListener("focus", refreshWhenVisible);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      window.removeEventListener("focus", refreshWhenVisible);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, [student, stage]);
-
-  const lesson = useMemo(() => findLesson(curriculum, student?.day, student?.level), [curriculum, student]);
-  const cards = useMemo(() => learningCards(lesson), [lesson]);
-  const hanja = useMemo(() => hanjaItems(lesson), [lesson]);
-  const vocab = useMemo(() => lessonVocab(lesson), [lesson]);
-  const reviewGame = useMemo(() => buildReviewGame(curriculum, lesson, student?.level, progressRecord), [curriculum, lesson, student, progressRecord]);
-  const currentQuiz = queue[quizIndex];
-
-  async function refreshStudentSession({ initial = false } = {}) {
-    try {
-      const response = await fetchStudentApi("/api/student/session", { cache: "no-store" });
-      const result = await response.json();
-      if (result.authenticated) {
-        setLoadError("");
-        setLoginError("");
-        applyStudentPayload(result);
-      } else if (result.configError) {
-        setLoginError(result.configError);
-      }
-    } catch (error) {
-      if (initial) {
-        setLoginError("");
-      } else {
-        setLoginError(friendlyStudentError(error));
-      }
-      setStudent(null);
-    } finally {
-      if (initial) setCheckingSession(false);
+      setStatus("서버 확인에 실패했습니다.");
     }
   }
 
-  function applyStudentPayload(result) {
-    const nextStudent = result.student;
-    if (!nextStudent) return;
-    const previousDay = Number(student?.day || nextStudent.day || 1);
-    const nextDay = Number(nextStudent.day || previousDay);
-    setStudent(nextStudent);
-    setCurriculum(result.curriculum || []);
-    setProgressRecord(result.progress || { completed: {}, quiz: {} });
-    if (nextDay !== previousDay && stage !== "quiz" && stage !== "archery") {
-      setStage("learn");
-      setCardIndex(0);
-      setQuizIndex(0);
-      setQueue([]);
-      setRetry([]);
-      setPendingStudent(null);
-      setArcheryGame(null);
-      resetStats();
-    }
-  }
-
-  async function handleLogin(event) {
+  async function submitLogin(event) {
     event.preventDefault();
-    if (loggingIn) return;
-    setLoginError("");
-    setLoadError("");
-    setLoggingIn(true);
+    setLoading(true);
+    setStatus("");
     try {
-      const response = await fetchStudentApi("/api/student/login", {
+      const response = await fetch("/api/auth/student-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(login)
-      }, 30000);
+      });
+      const data = await response.json();
       if (!response.ok) {
-        const result = await response.json().catch(() => ({}));
-        setLoginError(result.message || "아이디 또는 비밀번호를 확인해 주세요.");
+        setStatus(data.message || "로그인을 확인해 주세요.");
         return;
       }
-      const result = await response.json();
-      applyStudentPayload(result);
-      setStage("learn");
-      setCardIndex(0);
-      setQuizIndex(0);
-      setQueue([]);
-      setRetry([]);
-      setArcheryGame(null);
-      setPendingStudent(null);
-      resetStats();
-      if (rememberLogin) {
-        window.localStorage.setItem(studentLoginStorageKey, JSON.stringify({ ...login, remember: true }));
-      } else {
-        window.localStorage.removeItem(studentLoginStorageKey);
-        setLogin({ teacherCode: "", loginId: "", password: "" });
-      }
-    } catch (error) {
-      setLoginError(friendlyStudentError(error, "로그인 요청을 처리하지 못했습니다."));
+      await loadToday();
+      setStage("home");
+    } catch {
+      setStatus("로그인 요청 중 문제가 생겼습니다.");
     } finally {
-      setLoggingIn(false);
+      setLoading(false);
     }
   }
 
-  async function logoutStudent() {
-    await fetchStudentApi("/api/student/session", { method: "DELETE" });
-    setStudent(null);
-    setCurriculum([]);
-    setProgressRecord({ completed: {}, quiz: {} });
-    resetStats();
-    setStage("learn");
-    setArcheryGame(null);
-    setPendingStudent(null);
+  function startCards() {
+    setStage("cards");
+    setCardIndex(0);
+    setFeedback(null);
   }
 
-  function startQuiz() {
-    setQueue(shuffleLocal(quizItems(lesson)));
-    setRetry([]);
+  function startQuiz(items = quizItems) {
+    const queue = shuffle(items);
+    setQuizQueue(queue);
     setQuizIndex(0);
-    setPendingStudent(null);
-    setArcheryGame(null);
-    resetStats();
-    setStage("quiz");
+    setRetryQueue([]);
+    setFeedback(null);
+    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+    setStage(queue.length ? "quiz" : "done");
   }
 
-  function resetStats() {
-    const initialStats = { correct: 0, total: 0, wrong: [], wrongHistory: [] };
-    latestStatsRef.current = initialStats;
-    setStats(initialStats);
-  }
-
-  function choose(choice) {
+  function answerQuiz(choice) {
     if (!currentQuiz || feedback) return;
     const correct = choice === currentQuiz.answer;
-    const wrongKey = currentQuiz.item?.word || currentQuiz.answer;
-    setStats((prev) => {
-      const wrong = correct ? prev.wrong.filter((word) => word !== wrongKey) : [...new Set([...prev.wrong, wrongKey])];
-      const wrongHistory = correct ? prev.wrongHistory : [...new Set([...prev.wrongHistory, wrongKey])];
-      const nextStats = { correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1, wrong, wrongHistory };
-      latestStatsRef.current = nextStats;
-      return nextStats;
-    });
-    if (!correct) setRetry((prev) => [...prev, currentQuiz]);
+    const wrongKey = currentQuiz.word;
+    setStats((previous) => ({
+      correct: previous.correct + (correct ? 1 : 0),
+      total: previous.total + 1,
+      wrong: correct ? previous.wrong.filter((word) => word !== wrongKey) : [...new Set([...previous.wrong, wrongKey])],
+      wrongHistory: correct ? previous.wrongHistory : [...new Set([...previous.wrongHistory, wrongKey])]
+    }));
+    if (!correct) setRetryQueue((previous) => [...previous, currentQuiz]);
     setFeedback(correct ? "correct" : "wrong");
     window.setTimeout(() => {
       setFeedback(null);
-      setQuizIndex((prev) => prev + 1);
-    }, 900);
+      setQuizIndex((previous) => previous + 1);
+    }, 650);
   }
 
   useEffect(() => {
-    if (stage !== "quiz" || !queue.length || feedback) return;
-    if (quizIndex < queue.length) return;
-    if (retry.length) {
-      setQueue(shuffleLocal(retry));
-      setRetry([]);
+    if (stage !== "quiz" || feedback || !quizQueue.length) return;
+    if (quizIndex < quizQueue.length) return;
+    if (retryQueue.length) {
+      setQuizQueue(shuffle(retryQueue));
+      setRetryQueue([]);
       setQuizIndex(0);
       return;
     }
-    saveProgress(latestStatsRef.current);
-    setStage("review");
-  }, [quizIndex, queue, retry, stage, feedback]);
+    saveProgress();
+  }, [stage, feedback, quizIndex, quizQueue, retryQueue]);
 
-  async function saveProgress(finalStats) {
+  async function saveProgress() {
+    setStage("saving");
     try {
-      const response = await fetchStudentApi("/api/student/progress", {
+      const response = await fetch("/api/student/progress", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lessonDay: lesson.day, stats: finalStats })
+        body: JSON.stringify({ lessonDay: payload.lesson.day, stats })
       });
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}));
-        throw new Error(result.message || "학습 결과를 저장하지 못했습니다.");
-      }
-      const result = await response.json();
-      if (result.stale && result.student) {
-        setStudent(result.student);
-        setPendingStudent(null);
-        setStage("learn");
-        setCardIndex(0);
-        setQuizIndex(0);
-        setQueue([]);
-        setRetry([]);
-      } else if (result.student) {
-        setPendingStudent(result.student);
-      }
-      if (result.progress) setProgressRecord(result.progress);
-      if (result.curriculum) setCurriculum(result.curriculum);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "학습 결과를 저장하지 못했습니다.");
+      setPayload(data);
+      setStage("done");
     } catch (error) {
-      setLoadError(friendlyStudentError(error, "학습 결과를 저장하지 못했습니다."));
+      setStatus(error.message || "학습 결과를 저장하지 못했습니다.");
+      setStage("done");
     }
   }
 
-  async function saveGameProgress(result) {
-    if (!archeryGame || !lesson) return;
-    try {
-      const response = await fetchStudentApi("/api/student/progress", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lessonDay: lesson.day,
-          game: {
-            ...result,
-            type: "archery",
-            key: archeryGame.key,
-            rangeStart: archeryGame.rangeStart,
-            rangeEnd: archeryGame.rangeEnd,
-            level: archeryGame.level
-          }
-        })
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "게임 결과를 저장하지 못했습니다.");
-      }
-      const payload = await response.json();
-      if (payload.progress) setProgressRecord(payload.progress);
-      if (payload.curriculum) setCurriculum(payload.curriculum);
-      setArcheryGame(null);
-      setStage("review");
-    } catch (error) {
-      setLoadError(friendlyStudentError(error, "게임 결과를 저장하지 못했습니다."));
-    }
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setPayload(null);
+    setStage("home");
+    setCardIndex(0);
+    setQuizQueue([]);
+    setQuizIndex(0);
+    setRetryQueue([]);
+    setFeedback(null);
+    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+    setStatus("");
   }
 
-  if (loadError) return (
-    <main className="centerPage">
-      <section className="loginCard">
-        <Mascot mood="sad" />
-        <h1>학습 화면 오류</h1>
-        <strong className="errorText">{loadError}</strong>
-        <button className="btn primary" type="button" onClick={() => window.location.reload()}>다시 불러오기</button>
-        <button className="btn ghost" type="button" onClick={logoutStudent}>다시 로그인</button>
-      </section>
-    </main>
-  );
-  if (checkingSession) return <main className="centerPage">확인하는 중...</main>;
-
-  if (!student) {
+  if (payload?.student) {
     return (
-      <main className="centerPage">
-        <form className="loginCard" onSubmit={handleLogin}>
-          <Mascot />
-          <h1>한자 어휘 로그인</h1>
-          <p>선생님이 알려 준 강사 코드, 아이디, 비밀번호를 입력하세요.</p>
-          <label>강사 코드<input value={login.teacherCode} onChange={(event) => setLogin({ ...login, teacherCode: event.target.value })} placeholder="마스터 계정 학생은 비워 두세요" /></label>
-          <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
-          <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
-          <label className="rememberLogin"><input type="checkbox" checked={rememberLogin} onChange={(event) => setRememberLogin(event.target.checked)} />강사 코드, 아이디, 비밀번호 저장</label>
-          <button className="btn primary" type="submit" disabled={loggingIn}>{loggingIn ? "로그인 중..." : "로그인"}</button>
-          <InstallAppButton compact />
-          {loginError && <strong className="errorText">{loginError}</strong>}
-          <Link className="textLink" href="/admin">관리 화면</Link>
-        </form>
+      <main className="phonePage">
+        <section className="panel studentHome">
+          <div className="studentTopActions">
+            <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
+          </div>
+          <Mascot variant="wink" level={Math.floor((Number(payload.student.current_day || 1) - 1) / 5) + 1} />
+          <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
+          <h1>{payload.student.current_day}일차 학습</h1>
+          {payload.lesson ? (
+            <>
+              <LessonStats hanja={payload.hanja} />
+              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
+              {stage === "cards" && currentCard ? (
+                <StudyCard
+                  item={currentCard}
+                  index={cardIndex}
+                  total={lessonItems.length}
+                  onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))}
+                  onNext={() => {
+                    if (cardIndex + 1 >= lessonItems.length) startQuiz();
+                    else setCardIndex(cardIndex + 1);
+                  }}
+                />
+              ) : null}
+              {stage === "quiz" && currentQuiz ? (
+                <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
+              ) : null}
+              {stage === "saving" ? <LoadingLesson /> : null}
+              {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
+            </>
+          ) : (
+            <p className="errorText">오늘 배정된 일차 데이터가 아직 없습니다.</p>
+          )}
+        </section>
       </main>
     );
   }
 
-  if (!lesson) return <main className="centerPage">오늘 학습할 한자가 아직 없습니다.</main>;
-
-  const quizTotal = Math.max(1, queue.length);
-  const isRetryRound = stage === "quiz" && queue.length > 0 && queue.length < vocab.length;
-  const progress = stage === "learn" ? ((cardIndex + 1) / Math.max(1, cards.length)) * 100 : stage === "quiz" ? (quizIndex / quizTotal) * 100 : 100;
-  const lessonProgress = progressRecord.quiz?.[lesson.day] || null;
-  const lessonCompleted = Boolean(progressRecord.completed?.[lesson.day]) && !lessonProgress?.wrong?.length;
-  const rawUnlockAt = progressRecord.unlocks?.[lesson.day];
-  const unlockAt = rawUnlockAt === "open" ? "" : rawUnlockAt;
-  const lessonLocked = Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime() && !lessonCompleted);
-  const growth = buildMascotGrowth(progressRecord);
-
   return (
-    <main className="appFrame">
-      <header className="topBar">
-        <div><strong>{student.name}</strong><span>{student.grade} · {lesson.day}일차</span></div>
-        <div className="topActions">
-          <Link className="btn ghost" href="/admin">관리</Link>
-          <button className="btn" onClick={logoutStudent}>로그아웃</button>
-        </div>
-      </header>
-      <LessonOverview lesson={lesson} hanja={hanja} vocab={vocab} stage={stage} cardIndex={cardIndex} quizIndex={quizIndex} lessonProgress={lessonProgress} lessonCompleted={lessonCompleted} growth={growth} />
-      {lessonLocked ? (
-        <LockedLesson lesson={lesson} unlockAt={unlockAt} growth={growth} />
-      ) : (
-        <>
-      <div className="progress"><span style={{ width: `${Math.max(8, Math.min(100, progress))}%` }} /></div>
-      {stage === "learn" && <LearningCard card={cards[cardIndex]} index={cardIndex} total={cards.length} growth={growth} onPrev={() => setCardIndex(Math.max(0, cardIndex - 1))} onNext={() => cardIndex + 1 >= cards.length ? startQuiz() : setCardIndex(cardIndex + 1)} />}
-      {stage === "quiz" && currentQuiz && <QuizCard quiz={currentQuiz} feedback={feedback} onChoose={choose} remainingWrong={stats.wrong.length} index={quizIndex} total={queue.length} isRetryRound={isRetryRound} />}
-      {stage === "archery" && archeryGame && (
-        <ArcheryGame
-          game={archeryGame}
-          onComplete={saveGameProgress}
-          onExit={() => {
-            setArcheryGame(null);
-            setStage("review");
-          }}
-        />
-      )}
-      {stage === "review" && (
-        <Review
-          stats={stats}
-          vocab={vocab}
-          reviewGame={reviewGame}
-          growth={growth}
-          onStartGame={reviewGame ? () => { setArcheryGame(reviewGame); setStage("archery"); } : null}
-          onRestart={() => {
-            if (pendingStudent) {
-              setStudent(pendingStudent);
-              setPendingStudent(null);
-            }
-            setStage("learn");
-            setCardIndex(0);
-            setQuizIndex(0);
-            setQueue([]);
-            setRetry([]);
-          }}
-          onRetryQuiz={startQuiz}
-          onNextDay={pendingStudent ? () => {
-            setStudent(pendingStudent);
-            setPendingStudent(null);
-            setStage("learn");
-            setCardIndex(0);
-            setQuizIndex(0);
-            setQueue([]);
-            setRetry([]);
-          } : null}
-        />
-      )}
-        </>
-      )}
+    <main className="page center">
+      <form className="panel loginCard" onSubmit={submitLogin}>
+        <Mascot variant="book" />
+        <h1>한자 어휘 로그인</h1>
+        <label>강사 코드<input value={login.teacherCode} onChange={(event) => setLogin({ ...login, teacherCode: event.target.value })} /></label>
+        <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
+        <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
+        <button className="btn primary" disabled={loading}>{loading ? "로그인 중..." : "로그인"}</button>
+        {status ? <p className="errorText">{status}</p> : null}
+      </form>
     </main>
   );
 }
 
-function LockedLesson({ lesson, unlockAt, growth }) {
-  const unlockText = formatKoreanUnlockTime(unlockAt, "long");
+function LessonStats({ hanja }) {
   return (
-    <section className="lockedLesson">
-      <Mascot mood="happy" growth={growth} />
-      <p className="eyebrow">{lesson.day}일차 준비 중</p>
-      <h2>다음 학습은 {unlockText}부터 열려요.</h2>
-      <p>오늘 학습을 잘 끝냈어요. 내일 00:00 이후에 다음 일차를 시작할 수 있습니다.</p>
-      <Link className="btn ghost" href="/">홈으로</Link>
-    </section>
-  );
-}
-
-function formatKoreanUnlockTime(value, monthStyle = "numeric") {
-  const date = new Date(value);
-  const koreanDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  const month = koreanDate.getUTCMonth() + 1;
-  const day = koreanDate.getUTCDate();
-  const hour = koreanDate.getUTCHours();
-  const minute = String(koreanDate.getUTCMinutes()).padStart(2, "0");
-  const period = hour < 12 ? "오전" : "오후";
-  const displayHour = hour < 12 ? hour : hour - 12;
-  const monthText = monthStyle === "long" ? `${month}월` : `${month}.`;
-  return `${monthText} ${day}일 ${period} ${String(displayHour).padStart(2, "0")}:${minute}`;
-}
-
-function LessonOverview({ lesson, hanja, vocab, stage, cardIndex, quizIndex, lessonProgress, lessonCompleted, growth }) {
-  const stageLabel = stage === "learn" ? "카드 학습" : stage === "quiz" ? "퀴즈" : stage === "archery" ? "복습 게임" : "학습 완성";
-  const current = stage === "learn" ? `${cardIndex + 1}번째 카드` : stage === "quiz" ? `${quizIndex + 1}번째 문제` : stage === "archery" ? "활쏘기" : "완료";
-  const savedRate = lessonProgress?.total ? Math.round((lessonProgress.correct / lessonProgress.total) * 100) : 0;
-  const savedStatus = lessonCompleted ? "학습 완성" : lessonProgress?.wrong?.length ? "복습 필요" : lessonProgress?.total ? "진행 중" : "시작 전";
-  const attempts = lessonProgress?.attempts || (lessonProgress?.total ? 1 : 0);
-  const savedDetail = lessonProgress?.total ? `${savedRate}% · ${lessonProgress.correct}/${lessonProgress.total} · ${attempts}회 응시` : "기록 없음";
-  return (
-    <section className="lessonOverview">
-      <div>
-        <p className="eyebrow">{lesson.day}일차</p>
-        <h1>{hanja.map((item) => item.character).join(" · ")}</h1>
-      </div>
-      <div className="lessonStats">
-        <span><b>{hanja.length}</b>한자</span>
-        <span><b>{vocab.length}</b>어휘</span>
-        <span><b>{stageLabel}</b>{current}</span>
-      </div>
-      <MascotGrowthCard growth={growth} />
-      <div className={`lessonSaved ${lessonCompleted ? "complete" : lessonProgress?.wrong?.length ? "retry" : ""}`}>
-        <b>{savedStatus}</b>
-        <span>{savedDetail}</span>
-        {lessonProgress?.wrong?.length ? <small>남은 오답: {lessonProgress.wrong.join(", ")}</small> : lessonProgress?.wrongHistory?.length ? <small>복습한 어휘: {lessonProgress.wrongHistory.join(", ")}</small> : null}
-      </div>
-    </section>
-  );
-}
-
-function MascotGrowthCard({ growth }) {
-  return (
-    <div className="mascotGrowthCard">
-      <Mascot small growth={growth} />
-      <div>
-        <strong>{growth.stage.name} Lv. {growth.level}</strong>
-        <span>{growth.completedDays}일차 완료 · 다음 레벨까지 {growth.daysToNextLevel}일</span>
-      </div>
-      <div className="levelMeter" aria-hidden="true">
-        <i style={{ width: `${growth.progressToNext}%` }} />
-      </div>
-      <small>{growth.nextLevelText}</small>
+    <div className="lessonStats">
+      <span><b>{hanja.length}</b>한자</span>
+      <span><b>{hanja.reduce((total, item) => total + item.vocab.length, 0)}</b>어휘</span>
     </div>
   );
 }
 
-function LearningCard({ card, index, total, growth, onPrev, onNext }) {
-  const isHanja = card.type === "hanja";
+function HomeLesson({ hanja, onCards, onQuiz }) {
   return (
-    <section className="studyStage">
-      <Mascot small growth={growth} />
+    <>
+      <div className="hanjaGrid previewGrid">
+        {hanja.map((item) => (
+          <article key={item.id} className="hanjaCard">
+            <strong>{item.character}</strong>
+            <p><em>음</em> {item.sound} <em>뜻</em> {item.meaning}</p>
+            <p className="mutedText">어휘 {item.vocab.length}개</p>
+          </article>
+        ))}
+      </div>
+      <div className="studyActions">
+        <button className="btn primary" type="button" onClick={onCards}>카드 학습 시작</button>
+        <button className="btn secondary" type="button" onClick={onQuiz}>문제 바로 풀기</button>
+      </div>
+    </>
+  );
+}
+
+function StudyCard({ item, index, total, onPrev, onNext }) {
+  const touchStartX = useRef(null);
+
+  function handleTouchStart(event) {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function handleTouchEnd(event) {
+    if (touchStartX.current === null) return;
+    const endX = event.changedTouches[0]?.clientX ?? touchStartX.current;
+    const distance = endX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(distance) < 55) return;
+    if (distance > 0) onPrev();
+    else onNext();
+  }
+
+  return (
+    <article className="swipeCard" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <Mascot variant={item.type === "hanja" ? "study" : "discover"} small label={item.type === "hanja" ? "공부 중" : "어휘 발견"} />
       <p className="eyebrow">{index + 1} / {total}</p>
-      {isHanja ? (
-        <article className="hanjaCard">
-          <div className="bigHanja">{card.hanja.character}</div>
+      {item.type === "hanja" ? (
+        <>
+          <strong className="studyHanja">{item.character}</strong>
           <div className="metaGrid">
-            <span><small>음</small>{card.hanja.sound}</span>
-            <span><small>뜻</small>{card.hanja.meaning}</span>
+            <span><small>음</small>{item.sound}</span>
+            <span><small>뜻</small>{item.meaning}</span>
           </div>
-          <p>{card.hanja.origin}</p>
-          <p className="smallText">{card.hanja.relation}</p>
-        </article>
+        </>
       ) : (
-        <article className="hanjaCard">
-          <div className="wordHanja">{card.item.hanja}</div>
-          <h2>{card.item.word}</h2>
-          <p>{card.item.meaning}</p>
-          <div className="examples">{card.item.examples.map((example) => {
-            const cleanExample = cleanExampleText(example);
-            return <p key={example}>{highlight(cleanExample, card.item.word)}</p>;
-          })}</div>
-        </article>
+        <>
+          <strong className="studyWord">{item.hanjaWord}</strong>
+          <h2>{item.word}</h2>
+          <p>{item.meaning}</p>
+          {item.example ? <blockquote>{highlightWord(item.example, item.word)}</blockquote> : null}
+        </>
       )}
       <div className="navRow">
-        <button className="btn" onClick={onPrev} disabled={index === 0}>이전</button>
-        <button className="btn primary" onClick={onNext}>{index + 1 >= total ? "퀴즈 시작" : "다음"}</button>
+        <button className="btn secondary" type="button" onClick={onPrev} disabled={index === 0}>이전</button>
+        <button className="btn primary" type="button" onClick={onNext}>{index + 1 >= total ? "문제 풀기" : "다음"}</button>
       </div>
-    </section>
+    </article>
   );
 }
 
-function QuizCard({ quiz, feedback, onChoose, remainingWrong, index, total, isRetryRound }) {
-  const quizTypeLabel = quiz.type === "blank" ? "문장 빈칸" : "뜻 고르기";
+function QuizCard({ quiz, feedback, index, total, onAnswer }) {
   return (
     <section className="quizStage">
-      <article className={`questionCard ${quiz.type === "blank" ? "blankQuestion" : ""}`}>
-        <p className="eyebrow">{isRetryRound ? `오답 다시 풀기 · ${index + 1} / ${total}` : `퀴즈 · ${index + 1} / ${total}`}</p>
-        {remainingWrong > 0 && <span className="retryCount">남은 오답 {remainingWrong}개</span>}
-        <span className="quizType">{quizTypeLabel}</span>
-        <h1>{quiz.prompt}</h1>
-        <p className="smallText">{quiz.helper}</p>
-        <p>{quiz.sub}</p>
+      <article className="questionCard">
+        <p className="eyebrow">문제 {index + 1} / {total}</p>
+        <span className="quizType">{quiz.type === "meaning" ? "뜻 고르기" : "어휘 고르기"}</span>
+        <h2>{quiz.prompt}</h2>
+        <p>{quiz.helper}</p>
       </article>
-      <div className="choices">{quiz.choices.map((choice) => <button className="choice" key={choice} onClick={() => onChoose(choice)}>{choice}</button>)}</div>
-      {feedback && <div className={`feedback ${feedback}`}><Mascot mood={feedback === "correct" ? "happy" : "sad"} /><strong>{feedback === "correct" ? "좋았어!" : "다시 만나자!"}</strong></div>}
+      <div className="choices">
+        {quiz.choices.map((choice) => (
+          <button className="choice" key={choice} type="button" onClick={() => onAnswer(choice)}>{choice}</button>
+        ))}
+      </div>
+      {feedback ? (
+        <div className={`feedback ${feedback}`}>
+          <Mascot variant={feedback === "correct" ? "correct" : "wrong"} small label={feedback === "correct" ? "정답" : "오답"} />
+          <strong>{feedback === "correct" ? "정답!" : "다시 풀어볼게요"}</strong>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function Review({ stats, vocab, reviewGame, growth, onStartGame, onRestart, onRetryQuiz, onNextDay }) {
+function DoneCard({ stats, status, onCards, onQuiz }) {
   const rate = stats.total ? Math.round((stats.correct / stats.total) * 100) : 0;
-  const wrongHistory = new Set(stats.wrongHistory || []);
   return (
-    <section className="reviewCard">
-      <Mascot growth={growth} />
-      <div className="levelUpBanner">
-        <strong>{growth.stage.name} Lv. {growth.level}</strong>
-        <span>{growth.nextLevelText}</span>
-      </div>
-      <h1>{stats.wrong.length ? "복습 필요" : "학습 완성"}</h1>
+    <article className="doneCard">
+      <Mascot variant={rate >= 80 ? "levelup" : "streak"} label={rate >= 80 ? "레벨업" : "연속 학습"} />
+      <h2>{stats.wrong.length ? "복습 완료" : "학습 완료"}</h2>
       <p>정답률 {rate}% · {stats.correct}/{stats.total}</p>
-      <p>{stats.wrong.length ? `남은 오답 어휘: ${stats.wrong.join(", ")}` : "오답까지 다시 풀어 모두 맞혔습니다."}</p>
-      <div className="reviewWords">
-        {vocab.map((item) => {
-          const practiced = wrongHistory.has(item.word);
-          return (
-            <article className={practiced ? "reviewed" : ""} key={item.word}>
-              <strong>{item.word}</strong>
-              <span>{item.hanja}</span>
-              <small>{item.meaning}</small>
-            </article>
-          );
-        })}
+      {stats.wrongHistory.length ? <p className="mutedText">다시 만난 어휘: {stats.wrongHistory.join(", ")}</p> : null}
+      {status ? <p className="errorText">{status}</p> : null}
+      <div className="studyActions">
+        <button className="btn secondary" type="button" onClick={onCards}>카드 다시 보기</button>
+        <button className="btn primary" type="button" onClick={onQuiz}>문제 다시 풀기</button>
       </div>
-      <div className="buttonRow">
-        {reviewGame && (
-          <button className="btn blue" onClick={onStartGame}>
-            {reviewGame.completed ? "복습 활쏘기 다시 하기" : `${reviewGame.rangeStart}-${reviewGame.rangeEnd}일차 복습 활쏘기`}
-          </button>
-        )}
-        <button className="btn" onClick={onRestart}>카드 다시 보기</button>
-        <button className="btn primary" onClick={onRetryQuiz}>퀴즈 다시 풀기</button>
-        {onNextDay && <button className="btn blue" onClick={onNextDay}>다음 일차 확인</button>}
-      </div>
-    </section>
+    </article>
   );
 }
 
-function ArcheryGame({ game, onComplete, onExit }) {
-  const fieldRef = useRef(null);
-  const questions = useMemo(() => buildArcheryQuestions(game.items), [game.items]);
-  const [index, setIndex] = useState(0);
-  const [hits, setHits] = useState(0);
-  const [missed, setMissed] = useState(0);
-  const [aim, setAim] = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const [shot, setShot] = useState(null);
-  const [answers, setAnswers] = useState([]);
-  const [questionStartedAt, setQuestionStartedAt] = useState(Date.now());
-  const current = questions[index];
-  const blocks = useMemo(() => buildArcheryBlocks(current, game.items), [current, game.items]);
-  const fallDuration = Math.max(1800, 3200 - index * 140);
+function LoadingLesson() {
+  return (
+    <div className="loadingMascot">
+      <Mascot variant="loading" small label="저장 중" />
+      <p className="statusText">학습 결과 저장 중...</p>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    setQuestionStartedAt(Date.now());
-    setAim(null);
-    setDragging(false);
-  }, [index]);
+function buildLessonItems(hanja) {
+  return hanja.flatMap((item) => [
+    { type: "hanja", id: `h-${item.id}`, character: item.character, sound: item.sound, meaning: item.meaning },
+    ...item.vocab.slice(0, 3).map((vocab) => ({
+      type: "vocab",
+      id: `v-${vocab.id}`,
+      hanjaWord: vocab.hanja_word,
+      word: vocab.word,
+      meaning: vocab.meaning,
+      example: cleanExample(vocab.examples?.[0]?.text || "")
+    }))
+  ]);
+}
 
-  useEffect(() => {
-    if (!questions.length || shot) return;
-    const timer = window.setTimeout(() => {
-      setShot({ correct: false, targetWord: "", timedOut: true });
-      window.setTimeout(() => finishQuestion(false, "", true), 520);
-    }, fallDuration);
-    return () => window.clearTimeout(timer);
-  }, [index, questions.length, shot, fallDuration]);
-
-  if (!questions.length) {
-    return (
-      <section className="archeryGame emptyGame">
-        <Mascot />
-        <h2>복습 게임을 만들 어휘가 아직 부족해요.</h2>
-        <button className="btn" onClick={onExit}>돌아가기</button>
-      </section>
-    );
-  }
-
-  function pointFromEvent(event) {
-    const rect = fieldRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    return {
-      x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
-      y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
-      width: rect.width,
-      height: rect.height
-    };
-  }
-
-  function handlePointerDown(event) {
-    if (shot) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setDragging(true);
-    setAim(pointFromEvent(event));
-  }
-
-  function handlePointerMove(event) {
-    if (!dragging || shot) return;
-    setAim(pointFromEvent(event));
-  }
-
-  function handlePointerUp(event) {
-    if (!dragging || shot || !current) return;
-    const point = pointFromEvent(event);
-    setDragging(false);
-    setAim(point);
-    const target = findTargetBlock(point, blocks, questionStartedAt, fallDuration);
-    const correct = target?.word === current.word;
-    setShot({ correct, targetWord: target?.word || "" });
-    window.setTimeout(() => finishQuestion(correct, target?.word || "", false), 700);
-  }
-
-  function finishQuestion(correct, selectedWord = "", timedOut = false) {
-    const nextHits = hits + (correct ? 1 : 0);
-    const nextMissed = missed + (correct ? 0 : 1);
-    const nextAnswers = [
-      ...answers,
+function buildQuizItems(hanja) {
+  const words = hanja.flatMap((item) => item.vocab.map((vocab) => ({
+    id: vocab.id,
+    character: item.character,
+    hanjaWord: vocab.hanja_word,
+    word: vocab.word,
+    meaning: vocab.meaning,
+    example: cleanExample(vocab.examples?.[0]?.text || "")
+  }))).filter((item) => item.word && item.meaning);
+  return words.flatMap((item, index) => {
+    const prompt = item.example && item.example.includes(item.word)
+      ? item.example.replaceAll(item.word, "____")
+      : `${item.meaning}에 맞는 어휘는?`;
+    return [
       {
-        word: current.word,
-        hanja: current.hanja,
-        meaning: current.meaning,
-        selectedWord,
-        correct,
-        timedOut
+        type: "meaning",
+        word: item.word,
+        prompt: `${item.hanjaWord} · ${item.word}`,
+        helper: `${item.character} 한자가 들어간 어휘의 뜻을 골라요.`,
+        answer: item.meaning,
+        choices: makeChoices(item.meaning, words.map((word) => word.meaning), index)
+      },
+      {
+        type: "blank",
+        word: item.word,
+        prompt,
+        helper: "빈칸에 들어갈 어휘를 골라요.",
+        answer: item.word,
+        choices: makeChoices(item.word, words.map((word) => word.word), index + 7)
       }
     ];
-    setHits(nextHits);
-    setMissed(nextMissed);
-    setAnswers(nextAnswers);
-    setShot(null);
-    setAim(null);
-    if (index + 1 >= questions.length) {
-      const accuracy = Math.round((nextHits / questions.length) * 100);
-      onComplete({
-        score: nextHits * 100,
-        hits: nextHits,
-        total: questions.length,
-        missed: nextMissed,
-        accuracy,
-        cleared: accuracy >= 80,
-        reviewedWords: nextAnswers.map((item) => item.word),
-        hitWords: nextAnswers.filter((item) => item.correct).map((item) => item.word),
-        missedWords: nextAnswers.filter((item) => !item.correct).map((item) => item.word),
-        answers: nextAnswers
-      });
-      return;
-    }
-    setIndex((value) => value + 1);
-  }
-
-  const aimStyle = aim ? {
-    "--aim-x": `${aim.x}px`,
-    "--aim-y": `${aim.y}px`
-  } : undefined;
-
-  return (
-    <section className="archeryGame">
-      <div className="archeryHud">
-        <div>
-          <p className="eyebrow">{game.rangeStart}-{game.rangeEnd}일차 복습</p>
-          <h2>뜻에 맞는 단어 블록을 맞혀요</h2>
-        </div>
-        <div className="archeryScore">
-          <span>{index + 1}/{questions.length}</span>
-          <b>{hits * 100}점</b>
-        </div>
-      </div>
-      <article className="archeryPrompt">
-        <span>이번 뜻</span>
-        <strong>{current.meaning}</strong>
-        <small>{current.parent?.character}({current.parent?.sound}) 한자가 들어간 어휘예요.</small>
-      </article>
-      <div
-        ref={fieldRef}
-        className={`archeryField ${shot ? shot.correct ? "hit" : "miss" : ""}`}
-        style={aimStyle}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => setDragging(false)}
-      >
-        {blocks.map((block, blockIndex) => (
-          <div
-            className={`wordBlock ${shot?.correct && block.word === current.word ? "broken" : ""}`}
-            key={`${block.word}-${blockIndex}`}
-            style={{
-              left: `${block.x}%`,
-              "--fall-duration": `${fallDuration}ms`,
-              "--fall-delay": `${blockIndex * 80}ms`
-            }}
-          >
-            <strong>{block.word}</strong>
-            <small>{block.hanja}</small>
-          </div>
-        ))}
-        {aim && <span className="aimLine" />}
-        <div className="archerKid">
-          <span className="kidFace"><i /><i /></span>
-          <span className="bowShape" />
-          <span className="arrowShape" />
-        </div>
-        {shot && (
-          <div className={`shotResult ${shot.correct ? "correct" : "wrong"}`}>
-            <Mascot mood={shot.correct ? "happy" : "sad"} small />
-            <strong>{shot.correct ? "명중!" : shot.timedOut ? "놓쳤어요" : "아쉬워요"}</strong>
-          </div>
-        )}
-      </div>
-      <div className="archeryControls">
-        <p>블록이 바닥에 닿기 전에 단어 블록 쪽으로 드래그해서 맞혀요.</p>
-        <button className="btn ghost" onClick={onExit}>그만하기</button>
-      </div>
-    </section>
-  );
-}
-
-function buildReviewGame(curriculum, lesson, level, progressRecord) {
-  if (!lesson || Number(lesson.day) % 5 !== 0) return null;
-  const rangeEnd = Number(lesson.day);
-  const rangeStart = Math.max(1, rangeEnd - 4);
-  const lessons = [];
-  for (let day = rangeStart; day <= rangeEnd; day += 1) {
-    const target = findLesson(curriculum, day, level);
-    if (target && Number(target.day) === day) lessons.push(target);
-  }
-  const items = lessons.flatMap((item) => lessonVocab(item)).filter((item) => item.word && item.meaning);
-  if (items.length < 4) return null;
-  const key = `archery:${level}:${rangeStart}-${rangeEnd}`;
-  return {
-    key,
-    level,
-    rangeStart,
-    rangeEnd,
-    items,
-    completed: Boolean(progressRecord.games?.[key]?.cleared)
-  };
-}
-
-function buildArcheryQuestions(items) {
-  return shuffleLocal(items).slice(0, Math.min(10, items.length));
-}
-
-function buildArcheryBlocks(current, items) {
-  if (!current) return [];
-  const options = [current, ...shuffleLocal(items.filter((item) => item.word !== current.word)).slice(0, 3)];
-  const lanes = [18, 40, 62, 82];
-  return shuffleLocal(options).map((item, index) => ({ ...item, x: lanes[index] }));
-}
-
-function findTargetBlock(point, blocks, startedAt, duration) {
-  if (!point) return null;
-  const elapsed = Math.max(0, Date.now() - startedAt);
-  const fallProgress = Math.min(1, elapsed / Math.max(1, duration));
-  const currentYPercent = -8 + fallProgress * 86;
-  let nearest = null;
-  let nearestDistance = Infinity;
-  blocks.forEach((block) => {
-    const blockX = (point.width * block.x) / 100;
-    const blockY = (point.height * currentYPercent) / 100;
-    const distance = Math.hypot(point.x - blockX, point.y - blockY);
-    if (distance < nearestDistance) {
-      nearest = block;
-      nearestDistance = distance;
-    }
   });
-  return nearestDistance <= 130 ? nearest : null;
 }
 
-function shuffleLocal(items) {
-  return [...items].sort(() => Math.random() - 0.5);
+function makeChoices(answer, pool, offset = 0) {
+  const shuffled = shuffle(pool.filter((item) => item && item !== answer));
+  const choices = [answer, ...shuffled.slice(offset % 3, offset % 3 + 3)];
+  return shuffle([...new Set(choices)].slice(0, 4));
 }
 
-function buildMascotGrowth(progressRecord) {
-  const completedDays = Object.entries(progressRecord?.completed || {}).filter(([, completed]) => completed).length;
-  const level = Math.max(1, Math.floor(completedDays / 5) + 1);
-  const daysIntoLevel = completedDays % 5;
-  const daysToNextLevel = 5 - daysIntoLevel;
-  const stageIndex = Math.min(mascotStages.length - 1, level < 10 ? 0 : Math.floor(level / 10));
-  const stage = mascotStages[stageIndex];
-  const currentStageStart = stageIndex === 0 ? 1 : stageIndex * 10;
-  const nextEvolutionLevel = stageIndex === 0 ? 10 : (stageIndex + 1) * 10;
-  const nextStage = mascotStages[stageIndex + 1];
-  const progressToNext = nextStage ? Math.min(100, ((level - currentStageStart) / Math.max(1, nextEvolutionLevel - currentStageStart)) * 100) : 100;
-  const nextLevelText = nextStage
-    ? `Lv.${nextEvolutionLevel}이 되면 ${nextStage.name}로 진화해요.`
-    : "최고 단계까지 자랐어요.";
-  return { completedDays, level, stage, progressToNext, nextLevelText, daysToNextLevel };
+function cleanExample(value) {
+  return String(value || "")
+    .replace(/^\s*(문장|대화|예문)\s*\d*\s*[:：.\-–—]?\s*/i, "")
+    .trim();
 }
 
-const mascotStages = [
-  { name: "초록이", color: "#58cc02", accent: "#6c37ff" },
-  { name: "파랑이", color: "#1cb0f6", accent: "#0d75aa" },
-  { name: "노랑이", color: "#ffd43b", accent: "#b87800" },
-  { name: "분홍이", color: "#ff6fa3", accent: "#c22663" },
-  { name: "보라이", color: "#8b5cf6", accent: "#5b32b4" }
-];
-
-function highlight(sentence, word) {
-  const parts = sentence.split(word);
+function highlightWord(sentence, word) {
+  const parts = String(sentence || "").split(word);
   return parts.map((part, index) => (
-    <span key={`${part}-${index}`}>{part}{index < parts.length - 1 && <strong>{word}</strong>}</span>
+    <span key={`${part}-${index}`}>{part}{index < parts.length - 1 ? <b>{word}</b> : null}</span>
   ));
+}
+
+function shuffle(items) {
+  return [...items].sort(() => Math.random() - 0.5);
 }

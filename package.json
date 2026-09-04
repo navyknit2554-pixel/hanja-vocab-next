@@ -1,15 +1,18 @@
 {
-  "name": "hanja-vocab-next",
+  "name": "hanja-vocab-v2",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
     "build": "next build",
     "start": "next start",
     "deploy:check": "node scripts/deploy-check.js",
-    "license:make": "node scripts/make-license.js",
     "secrets:make": "node scripts/make-secrets.js",
-    "lint": "next lint"
+    "check:data": "node scripts/check-data.js",
+    "import:legacy-students": "node scripts/import-legacy-students.js",
+    "import:legacy-curriculum": "node scripts/import-legacy-curriculum.js",
+    "import:legacy-licenses": "node scripts/import-legacy-licenses.js"
   },
   "dependencies": {
     "next": "16.2.9",

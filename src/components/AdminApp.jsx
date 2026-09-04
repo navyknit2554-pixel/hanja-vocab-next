@@ -1,1922 +1,580 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { buildAiPrompt, findLesson, lessonVocab, parseAiLessons, upsertLesson, validateAppStateShape, validateLesson } from "../lib/curriculum";
-import { buildSeedCurriculum, levelCriteria } from "../lib/data";
-import { loadAppState, resetAppState, saveAppState } from "../lib/store";
+import { useEffect, useState } from "react";
 import { Mascot } from "./Mascot";
 
-const adminLoginStorageKey = "chologihanzi-admin-login";
-const gradeOptions = ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
-const defaultStudentForm = { name: "", phone: "", loginId: "", password: "", grade: "초1", level: "초급" };
+const emptyStudent = { name: "", loginId: "", password: "", phone: "", grade: "초1", level: "초급", currentDay: 1 };
+
+export function AdminApp() {
+  const [admin, setAdmin] = useState(null);
+  const [loginForm, setLoginForm] = useState({ password: "", licenseKey: "" });
+  const [loginStatus, setLoginStatus] = useState("");
+  const [view, setView] = useState("students");
+  const [students, setStudents] = useState([]);
+  const [studentForm, setStudentForm] = useState(emptyStudent);
+  const [studentStatus, setStudentStatus] = useState("");
+  const [editingStudentId, setEditingStudentId] = useState("");
+  const [progressLevel, setProgressLevel] = useState("초급");
+  const [progressData, setProgressData] = useState(null);
+  const [progressStatus, setProgressStatus] = useState("");
+  const [level, setLevel] = useState("초급");
+  const [day, setDay] = useState(1);
+  const [status, setStatus] = useState("v2는 현재 새 구조를 세우는 단계입니다.");
+  const [loading, setLoading] = useState(false);
+  const [lessonData, setLessonData] = useState(null);
+  const [savingId, setSavingId] = useState("");
+
+  useEffect(() => {
+    loadAdminSession();
+  }, []);
+
+  useEffect(() => {
+    if (admin) loadStudents();
+  }, [admin]);
+
+  useEffect(() => {
+    if (admin && view === "progress") loadProgress();
+  }, [admin, view, progressLevel]);
+
+  useEffect(() => {
+    if (admin?.role === "master" && view === "content") loadLesson();
+  }, [admin, view, level, day]);
+
+  async function loadAdminSession() {
+    try {
+      const response = await fetch("/api/admin/session", { cache: "no-store" });
+      const data = await response.json();
+      if (data.authenticated) setAdmin(data.admin);
+    } catch {
+      setLoginStatus("");
+    }
+  }
+
+  async function submitAdminLogin(event) {
+    event.preventDefault();
+    setLoginStatus("확인하는 중...");
+    try {
+      const response = await fetch("/api/auth/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginForm)
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (!response.ok) {
+        setLoginStatus(data.message || "관리자 로그인을 확인해 주세요.");
+        return;
+      }
+      setAdmin(data.admin);
+      setView("students");
+      setLoginStatus("");
+    } catch (error) {
+      setLoginStatus(error.message || "관리자 로그인 중 문제가 생겼습니다.");
+    }
+  }
+
+  async function loadStudents() {
+    setStudentStatus("학생 목록을 불러오는 중...");
+    try {
+      const response = await fetch("/api/admin/students", { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "학생 목록을 불러오지 못했습니다.");
+      setStudents(data.students || []);
+      setStudentStatus(`학생 ${data.students?.length || 0}명`);
+    } catch (error) {
+      setStudents([]);
+      setStudentStatus(error.message || "학생 목록을 불러오지 못했습니다.");
+    }
+  }
+
+  async function loadProgress() {
+    setProgressStatus("학습도를 불러오는 중...");
+    try {
+      const response = await fetch(`/api/admin/progress?level=${encodeURIComponent(progressLevel)}`, { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "학습도를 불러오지 못했습니다.");
+      setProgressData(data);
+      setProgressStatus(`${data.level} 학생 ${data.students?.length || 0}명 · 일차 ${data.days?.length || 0}개`);
+    } catch (error) {
+      setProgressData(null);
+      setProgressStatus(error.message || "학습도를 불러오지 못했습니다.");
+    }
+  }
+
+  async function saveStudent(event) {
+    event.preventDefault();
+    setStudentStatus("학생 정보를 저장하는 중...");
+    try {
+      const response = await fetch("/api/admin/students", {
+        method: editingStudentId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...studentForm, id: editingStudentId })
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "학생 정보를 저장하지 못했습니다.");
+      setStudentForm(emptyStudent);
+      setEditingStudentId("");
+      await loadStudents();
+      if (view === "progress") await loadProgress();
+    } catch (error) {
+      setStudentStatus(error.message || "학생 정보를 저장하지 못했습니다.");
+    }
+  }
+
+  async function deleteStudent(student) {
+    setStudentStatus(`${student.name} 삭제 중...`);
+    try {
+      const response = await fetch(`/api/admin/students?id=${encodeURIComponent(student.id)}`, { method: "DELETE" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "학생을 삭제하지 못했습니다.");
+      if (editingStudentId === student.id) {
+        setEditingStudentId("");
+        setStudentForm(emptyStudent);
+      }
+      await loadStudents();
+      if (view === "progress") await loadProgress();
+    } catch (error) {
+      setStudentStatus(error.message || "학생을 삭제하지 못했습니다.");
+    }
+  }
+
+  function editStudent(student) {
+    setEditingStudentId(student.id);
+    setStudentForm({
+      name: student.name || "",
+      loginId: student.login_id || "",
+      password: student.password || "",
+      phone: student.phone || "",
+      grade: student.grade || "초1",
+      level: student.level || "초급",
+      currentDay: Number(student.current_day || 1)
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function loadLesson() {
+    try {
+      const response = await fetch(`/api/admin/lesson?level=${encodeURIComponent(level)}&day=${day}`, { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) {
+        setLessonData(null);
+        setStatus(data.message || "일차 데이터를 불러오지 못했습니다.");
+        return;
+      }
+      setLessonData(data);
+      setStatus(`${data.lesson.level} ${data.lesson.day}일차: 한자 ${data.hanja.length}개, 어휘 ${countVocab(data.hanja)}개`);
+    } catch (error) {
+      setLessonData(null);
+      setStatus(error.message || "일차 데이터를 불러오지 못했습니다.");
+    }
+  }
+
+  async function importDictionary() {
+    setLoading(true);
+    setStatus(`${level} ${day}일차 국어원 자료를 가져오는 중...`);
+    try {
+      const response = await fetch("/api/admin/dictionary-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level, day })
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "국어원 자료를 가져오지 못했습니다.");
+      setStatus(`${data.summary.level} ${data.summary.day}일차: 한자 ${data.summary.hanjaCount}개, 어휘 ${data.summary.vocabCount}개 반영. 부족: ${data.summary.missing.join(", ") || "없음"}`);
+      await loadLesson();
+    } catch (error) {
+      setStatus(error.message || "처리 중 문제가 생겼습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveVocab(vocab) {
+    setSavingId(vocab.id);
+    try {
+      const response = await fetch("/api/admin/vocab", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: vocab.id,
+          hanjaWord: vocab.hanja_word,
+          word: vocab.word,
+          meaning: vocab.meaning,
+          examples: vocab.examples.map((example) => example.text)
+        })
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "어휘를 저장하지 못했습니다.");
+      setStatus(`${vocab.word} 저장 완료`);
+      await loadLesson();
+    } catch (error) {
+      setStatus(error.message || "어휘를 저장하지 못했습니다.");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function deleteVocab(vocab) {
+    setSavingId(vocab.id);
+    try {
+      const response = await fetch(`/api/admin/vocab?id=${encodeURIComponent(vocab.id)}`, { method: "DELETE" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "어휘를 삭제하지 못했습니다.");
+      setStatus(`${vocab.word} 삭제 완료`);
+      await loadLesson();
+    } catch (error) {
+      setStatus(error.message || "어휘를 삭제하지 못했습니다.");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setAdmin(null);
+    setView("students");
+    setLoginStatus("");
+    setStudents([]);
+    setStudentStatus("");
+    setProgressData(null);
+    setProgressStatus("");
+    setLessonData(null);
+    setStatus("v2는 현재 새 구조를 세우는 단계입니다.");
+  }
+
+  function handleExpiredAdmin(response, data) {
+    if (response.status !== 401 && response.status !== 403) return false;
+    setAdmin(null);
+    setStudents([]);
+    setProgressData(null);
+    setLessonData(null);
+    setStudentStatus("");
+    setProgressStatus("");
+    setStatus("v2는 현재 새 구조를 세우는 단계입니다.");
+    setLoginStatus(data.message || "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요.");
+    return true;
+  }
+
+  function updateVocab(hanjaId, vocabId, patch) {
+    setLessonData((current) => ({
+      ...current,
+      hanja: current.hanja.map((hanja) => {
+        if (hanja.id !== hanjaId) return hanja;
+        return {
+          ...hanja,
+          vocab: hanja.vocab.map((vocab) => vocab.id === vocabId ? { ...vocab, ...patch } : vocab)
+        };
+      })
+    }));
+  }
+
+  if (!admin) {
+    return (
+      <main className="page center">
+        <form className="panel loginCard" onSubmit={submitAdminLogin}>
+          <Mascot variant="search" />
+          <h1>관리자 로그인</h1>
+          <label>마스터 비밀번호<input type="password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} placeholder="마스터만 입력" /></label>
+          <label>라이선스 키<textarea value={loginForm.licenseKey} onChange={(event) => setLoginForm({ ...loginForm, licenseKey: event.target.value })} placeholder="원장님·강사님은 HANJA-... 키 입력" /></label>
+          <button className="btn primary">로그인</button>
+          {loginStatus ? <p className="errorText">{loginStatus}</p> : null}
+        </form>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page">
+      <header className="topbar">
+        <div>
+          <h1>초록이한자학습 v2</h1>
+          <p>학생·커리큘럼·어휘·진도를 테이블로 분리한 새 버전 · {admin.teacherCode}</p>
+        </div>
+        <div className="topbarActions">
+          <Mascot variant="curious" small label="관리 중" />
+          <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
+        </div>
+      </header>
+      <nav className="adminTabs">
+        <button className={view === "students" ? "active" : ""} onClick={() => setView("students")} type="button">학생 관리</button>
+        <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")} type="button">학습도</button>
+        {admin.role === "master" ? <button className={view === "content" ? "active" : ""} onClick={() => setView("content")} type="button">한자·어휘 관리</button> : null}
+      </nav>
+      {view === "students" ? (
+        <section className="adminGrid">
+          <StudentForm studentForm={studentForm} setStudentForm={setStudentForm} editingStudentId={editingStudentId} onSave={saveStudent} onCancel={() => {
+            setEditingStudentId("");
+            setStudentForm(emptyStudent);
+          }} />
+          <StudentList students={students} status={studentStatus} onRefresh={loadStudents} onEdit={editStudent} onDelete={deleteStudent} />
+        </section>
+      ) : null}
+      {view === "progress" ? (
+        <ProgressPanel
+          level={progressLevel}
+          setLevel={setProgressLevel}
+          status={progressStatus}
+          data={progressData}
+          onRefresh={loadProgress}
+        />
+      ) : null}
+      {view === "content" && admin.role === "master" ? (
+        <>
+          <section className="adminGrid">
+            <article className="panel">
+              <Mascot variant="book" small label="기준" />
+              <h2>마스터 관리 기준</h2>
+              <ul className="plainList">
+                <li>한자·어휘는 공통 데이터로 관리</li>
+                <li>강사 계정은 자기 학생만 관리</li>
+                <li>국어원 API는 현재 일차 단위로만 실행</li>
+                <li>용례 없는 어휘는 자동 저장하지 않음</li>
+              </ul>
+            </article>
+            <article className="panel">
+              <Mascot variant="discover" small label="자료 찾기" />
+              <h2>일차별 한자 관리</h2>
+              <div className="formGrid">
+                <label>난이도<select value={level} onChange={(event) => setLevel(event.target.value)}><option>초급</option><option>중급</option><option>고급</option></select></label>
+                <label>일차<input type="number" min="1" max="100" value={day} onChange={(event) => setDay(Number(event.target.value))} /></label>
+              </div>
+              <button className="btn primary" type="button" onClick={importDictionary} disabled={loading}>
+                {loading ? "가져오는 중..." : "현재 일차 국어원 어휘·뜻·용례 가져오기"}
+              </button>
+              <p className="statusText">{status}</p>
+            </article>
+          </section>
+          <section className="panel reviewPanel">
+        <div className="sectionHeader">
+          <div>
+            <h2>어휘 검수</h2>
+            <p>국어원에서 가져온 항목을 학생에게 보이기 전에 직접 다듬습니다.</p>
+          </div>
+          <button className="btn secondary" type="button" onClick={loadLesson}>새로고침</button>
+        </div>
+        {lessonData?.hanja?.length ? (
+          <div className="reviewGrid">
+            {lessonData.hanja.map((hanja) => (
+              <article className="reviewHanja" key={hanja.id}>
+                <header>
+                  <strong>{hanja.character}</strong>
+                  <span>음 {hanja.sound} · 뜻 {hanja.meaning}</span>
+                </header>
+                <div className="vocabEditorList">
+                  {hanja.vocab.map((vocab) => (
+                    <div className="vocabEditor" key={vocab.id}>
+                      <div className="vocabFields">
+                        <label>한자어<input value={vocab.hanja_word} onChange={(event) => updateVocab(hanja.id, vocab.id, { hanja_word: event.target.value })} /></label>
+                        <label>어휘<input value={vocab.word} onChange={(event) => updateVocab(hanja.id, vocab.id, { word: event.target.value })} /></label>
+                      </div>
+                      <label>뜻<input value={vocab.meaning} onChange={(event) => updateVocab(hanja.id, vocab.id, { meaning: event.target.value })} /></label>
+                      <label>
+                        용례
+                        <textarea
+                          value={[0, 1, 2].map((index) => vocab.examples[index]?.text || "").join("\n")}
+                          onChange={(event) => updateVocab(hanja.id, vocab.id, {
+                            examples: event.target.value.split("\n").slice(0, 3).map((line, index) => ({
+                              id: `${vocab.id}-${index}`,
+                              position: index + 1,
+                              text: line
+                            }))
+                          })}
+                        />
+                      </label>
+                      <div className="editorActions">
+                        <button className="btn secondary" type="button" onClick={() => deleteVocab(vocab)} disabled={savingId === vocab.id}>삭제</button>
+                        <button className="btn primary" type="button" onClick={() => saveVocab(vocab)} disabled={savingId === vocab.id}>
+                          {savingId === vocab.id ? "저장 중..." : "저장"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="statusText">검수할 어휘가 아직 없습니다.</p>
+        )}
+          </section>
+        </>
+      ) : null}
+    </main>
+  );
+}
+
+function StudentForm({ studentForm, setStudentForm, editingStudentId, onSave, onCancel }) {
+  function updatePhone(phone) {
+    const password = passwordFromPhone(phone);
+    setStudentForm({ ...studentForm, phone, password });
+  }
+
+  return (
+    <form className="panel studentManager" onSubmit={onSave}>
+      <div className="sectionHeader">
+        <div>
+          <h2>{editingStudentId ? "학생 수정" : "학생 추가"}</h2>
+          <p>로그인 정보와 현재 학습 일차를 관리합니다.</p>
+        </div>
+      </div>
+      <div className="studentFormGrid">
+        <label>이름<input value={studentForm.name} onChange={(event) => setStudentForm({ ...studentForm, name: event.target.value })} /></label>
+        <label>아이디<input value={studentForm.loginId} onChange={(event) => setStudentForm({ ...studentForm, loginId: event.target.value })} /></label>
+        <label>비밀번호<input value={studentForm.password} onChange={(event) => setStudentForm({ ...studentForm, password: event.target.value })} placeholder="전화번호 입력 시 자동 생성" /></label>
+        <label>전화번호<input value={studentForm.phone} onChange={(event) => updatePhone(event.target.value)} placeholder="01012345678 → 12345678" /></label>
+        <label>학년<input value={studentForm.grade} onChange={(event) => setStudentForm({ ...studentForm, grade: event.target.value })} /></label>
+        <label>난이도<select value={studentForm.level} onChange={(event) => setStudentForm({ ...studentForm, level: event.target.value })}><option>초급</option><option>중급</option><option>고급</option></select></label>
+        <label>현재 일차<input type="number" min="1" max="100" value={studentForm.currentDay} onChange={(event) => setStudentForm({ ...studentForm, currentDay: Number(event.target.value) })} /></label>
+      </div>
+      <div className="editorActions">
+        {editingStudentId ? <button className="btn secondary" type="button" onClick={onCancel}>취소</button> : null}
+        <button className="btn primary">{editingStudentId ? "수정 저장" : "학생 추가"}</button>
+      </div>
+    </form>
+  );
+}
+
+function StudentList({ students, status, onRefresh, onEdit, onDelete }) {
+  return (
+    <section className="panel">
+      <div className="sectionHeader">
+        <div>
+          <h2>학생 목록</h2>
+          <p>{status}</p>
+        </div>
+        <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+      </div>
+      <div className="studentList">
+        {students.map((student) => (
+          <article className="studentRow" key={student.id}>
+            <div>
+              <strong>{student.name}</strong>
+              <span>{student.login_id} / {student.password} · {student.grade} · {student.level} · {student.current_day}일차</span>
+              <small>완료 {student.completed_count} · 복습 {student.review_count} · {student.teacher_code}</small>
+            </div>
+            <div className="studentRowActions">
+              <button className="btn secondary" type="button" onClick={() => onEdit(student)}>수정</button>
+              <button className="btn secondary" type="button" onClick={() => onDelete(student)}>삭제</button>
+            </div>
+          </article>
+        ))}
+        {!students.length ? <p className="statusText">등록된 학생이 없습니다.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
+  const progressMap = buildProgressMap(data?.progress || []);
+  return (
+    <section className="panel progressPanel">
+      <div className="sectionHeader">
+        <div>
+          <h2>일차별 학습도</h2>
+          <p>{status}</p>
+        </div>
+        <div className="progressTools">
+          <select value={level} onChange={(event) => setLevel(event.target.value)}>
+            <option>초급</option>
+            <option>중급</option>
+            <option>고급</option>
+          </select>
+          <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+        </div>
+      </div>
+      <div className="legend">
+        <span><i className="done" />완료</span>
+        <span><i className="review" />복습</span>
+        <span><i className="active" />진행</span>
+        <span><i className="current" />현재</span>
+      </div>
+      <div className="progressTableWrap">
+        <table className="progressTable">
+          <thead>
+            <tr>
+              <th>학생</th>
+              {(data?.days || []).map((day) => <th key={day.id}>{day.day}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.students || []).map((student) => (
+              <tr key={student.id}>
+                <th>
+                  <strong>{student.name}</strong>
+                  <span>{student.grade} · {student.current_day}일차</span>
+                </th>
+                {(data?.days || []).map((day) => {
+                  const record = progressMap.get(`${student.id}:${day.day}`);
+                  const state = progressCellState(student, day.day, record);
+                  return (
+                    <td key={day.id}>
+                      <span className={`progressDot ${state.key}`} title={state.title}>{state.label}</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!(data?.students || []).length ? <p className="statusText">표시할 학생이 없습니다.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function parseJsonResponse(text) {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: "서버 응답을 읽지 못했습니다. 터미널 오류 메시지를 확인해 주세요." };
+  }
+}
+
+function countVocab(hanjaItems) {
+  return hanjaItems.reduce((total, item) => total + item.vocab.length, 0);
+}
 
 function passwordFromPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
   return digits.startsWith("010") ? digits.slice(3) : digits;
 }
 
-function makeParentToken() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+function buildProgressMap(progress) {
+  return progress.reduce((map, item) => {
+    map.set(`${item.student_id}:${item.day}`, item);
+    return map;
+  }, new Map());
 }
 
-function parentLinkForStudent(student, adminInfo) {
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const teacherCode = adminInfo?.teacherCode || "master";
-  const params = new URLSearchParams({
-    teacher: teacherCode,
-    student: student.id,
-    token: student.parentToken || ""
-  });
-  return `${origin}/parent?${params.toString()}`;
+function progressCellState(student, day, record) {
+  if (record?.status === "completed") {
+    return { key: "done", label: "완", title: `${day}일차 완료` };
+  }
+  if (record?.status === "needs_review") {
+    return { key: "review", label: "복", title: `${day}일차 복습 필요` };
+  }
+  if (record?.status === "in_progress") {
+    return { key: "active", label: "진", title: `${day}일차 진행 중` };
+  }
+  if (Number(student.current_day) === Number(day)) {
+    return { key: "current", label: "현", title: `${day}일차 현재 배정` };
+  }
+  return { key: "empty", label: "", title: `${day}일차 기록 없음` };
 }
-
-function normalizeGradeLabel(grade) {
-  const value = String(grade || "").trim();
-  const elementaryMatch = value.match(/^([1-6])학년$/);
-  if (elementaryMatch) return `초${elementaryMatch[1]}`;
-  return gradeOptions.includes(value) ? value : "초1";
-}
-
-export function AdminApp() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminLicenseKey, setAdminLicenseKey] = useState("");
-  const [rememberAdminLogin, setRememberAdminLogin] = useState(true);
-  const [adminInfo, setAdminInfo] = useState(null);
-  const [adminError, setAdminError] = useState("");
-  const [state, setState] = useState(null);
-  const [loadError, setLoadError] = useState("");
-  const [studentForm, setStudentForm] = useState(defaultStudentForm);
-  const [plan, setPlan] = useState({ grade: "초1", level: "초급", startDay: 1, days: 3 });
-  const [selectedDay, setSelectedDay] = useState(1);
-  const [selectedLevel, setSelectedLevel] = useState("초급");
-  const [worksheetLevel, setWorksheetLevel] = useState("초급");
-  const [worksheetEndDay, setWorksheetEndDay] = useState(5);
-  const [worksheetQuestionCount, setWorksheetQuestionCount] = useState(30);
-  const [hanjaJson, setHanjaJson] = useState("");
-  const [dailyCount, setDailyCount] = useState(4);
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiResult, setAiResult] = useState("");
-  const [aiPreview, setAiPreview] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
-  const [progressFilter, setProgressFilter] = useState("all");
-  const [studentGradeFilter, setStudentGradeFilter] = useState("all");
-  const [studentDayFilter, setStudentDayFilter] = useState("all");
-  const [adminView, setAdminView] = useState("students");
-  const [bulkDay, setBulkDay] = useState(1);
-  const [reviewModalStudent, setReviewModalStudent] = useState(null);
-  const [dictionaryStatus, setDictionaryStatus] = useState("");
-  const [dictionaryBulkRunning, setDictionaryBulkRunning] = useState(false);
-  const [lessonSaveStatus, setLessonSaveStatus] = useState("");
-  const [lessonSaving, setLessonSaving] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(adminLoginStorageKey) || "null");
-      if (saved) {
-        setAdminLicenseKey(saved.licenseKey || "");
-        setAdminPassword(saved.password || "");
-        setRememberAdminLogin(saved.remember !== false);
-      }
-    } catch {
-      window.localStorage.removeItem(adminLoginStorageKey);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/admin/session", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((result) => {
-        setAuthenticated(Boolean(result.authenticated));
-        if (result.authenticated) setAdminInfo(result);
-        if (result.configError) setAdminError(result.configError);
-      })
-      .catch(() => setAuthenticated(false))
-      .finally(() => setCheckingAuth(false));
-  }, []);
-
-  useEffect(() => {
-    if (!authenticated) return;
-    loadAppState().then((nextState) => {
-      setState(nextState);
-      setLoadError("");
-    }).catch((error) => {
-      if (error.status === 401) {
-        setAuthenticated(false);
-        setAdminInfo(null);
-        setLoadError("");
-        setAdminError("관리자 로그인이 필요합니다. 다시 로그인해 주세요.");
-        return;
-      }
-      setLoadError(error.message);
-    });
-  }, [authenticated]);
-
-  useEffect(() => {
-    if (!state?.students?.some((student) => !student.parentToken)) return;
-    const nextState = structuredClone(state);
-    nextState.students.forEach((student) => {
-      student.parentToken ||= makeParentToken();
-    });
-    persist(nextState, { dataPatch: { students: nextState.students } });
-  }, [state]);
-
-  const lesson = useMemo(() => findLesson(state?.curriculum, selectedDay, selectedLevel), [selectedDay, selectedLevel, state]);
-  const dayOptions = useMemo(() => {
-    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
-    return [...new Set(lessons.map((item) => Number(item.day)).filter(Boolean))].sort((a, b) => a - b);
-  }, [selectedLevel, state]);
-  const worksheetBlocks = useMemo(() => {
-    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === worksheetLevel) || [];
-    const lessonDays = new Set(lessons.map((item) => Number(item.day)).filter(Boolean));
-    const maxDay = Math.max(0, ...lessonDays);
-    const blocks = [];
-    for (let endDay = 5; endDay <= maxDay; endDay += 5) {
-      const startDay = endDay - 4;
-      const availableDays = [];
-      for (let day = startDay; day <= endDay; day += 1) {
-        if (lessonDays.has(day)) availableDays.push(day);
-      }
-      if (availableDays.length) blocks.push({ startDay, endDay, label: `${startDay}-${endDay}일차`, availableDays });
-    }
-    return blocks;
-  }, [state, worksheetLevel]);
-  const levelLessonSummary = useMemo(() => {
-    const lessons = state?.curriculum.filter((item) => String(item.level || "").trim() === selectedLevel) || [];
-    return lessons
-      .map((item) => ({
-        day: Number(item.day),
-        label: (item.hanjaSet || []).slice(0, Number(item.dailyCount || 4)).map((hanja) => `${hanja.character}(${hanja.sound})`).join(" · ")
-      }))
-      .filter((item) => item.day)
-      .sort((a, b) => a.day - b.day);
-  }, [selectedLevel, state]);
-  const baseFilteredStudents = useMemo(() => {
-    if (!state) return [];
-    const query = studentSearch.trim().toLowerCase();
-    return state.students.filter((student) => {
-      const matchesText = !query || [student.name, student.loginId, student.grade, student.level, `${student.day}일차`]
-        .some((value) => String(value || "").toLowerCase().includes(query));
-      const matchesGrade = studentGradeFilter === "all" || String(student.grade || "") === studentGradeFilter;
-      const matchesDay = studentDayFilter === "all" || Number(student.day) === Number(studentDayFilter);
-      return matchesText && matchesGrade && matchesDay;
-    });
-  }, [state, studentDayFilter, studentGradeFilter, studentSearch]);
-  const filteredStudents = useMemo(() => {
-    if (!state) return [];
-    return baseFilteredStudents.filter((student) => progressFilter === "all" || getProgressStatus(state, student).key === progressFilter);
-  }, [baseFilteredStudents, progressFilter, state]);
-  const progressSummary = useMemo(() => {
-    if (!state) return { completed: 0, retry: 0, active: 0, locked: 0, idle: 0 };
-    return baseFilteredStudents.reduce((summary, student) => {
-      const status = getProgressStatus(state, student).key;
-      summary[status] += 1;
-      return summary;
-    }, { completed: 0, retry: 0, active: 0, locked: 0, idle: 0 });
-  }, [baseFilteredStudents, state]);
-  const progressDays = useMemo(() => {
-    const days = state?.curriculum.map((lesson) => Number(lesson.day)).filter(Boolean) || [];
-    return [...new Set(days)].sort((a, b) => a - b).slice(0, 100);
-  }, [state]);
-  const matrixDays = useMemo(() => {
-    return studentDayFilter === "all" ? progressDays : [Number(studentDayFilter)];
-  }, [progressDays, studentDayFilter]);
-  const selectedCriteria = levelCriteria[selectedLevel];
-  const contentPreview = useMemo(() => {
-    if (!lesson) return { hanjaSet: [], errors: [], vocabCount: 0 };
-    try {
-      const hanjaSet = JSON.parse(hanjaJson || "[]");
-      const previewLesson = { ...lesson, day: Number(selectedDay), dailyCount: Number(dailyCount), hanjaSet };
-      const errors = validateLesson(previewLesson);
-      const vocabCount = Array.isArray(hanjaSet) ? hanjaSet.reduce((total, hanja) => total + (Array.isArray(hanja.vocab) ? hanja.vocab.length : 0), 0) : 0;
-      return { hanjaSet: Array.isArray(hanjaSet) ? hanjaSet : [], errors, vocabCount };
-    } catch {
-      return { hanjaSet: [], errors: ["한자 묶음 JSON 형식을 확인해 주세요."], vocabCount: 0 };
-    }
-  }, [dailyCount, hanjaJson, lesson, selectedDay]);
-
-  useEffect(() => {
-    if (!lesson) return;
-    setDailyCount(lesson.dailyCount || lesson.hanjaSet?.length || 4);
-    setHanjaJson(JSON.stringify(lesson.hanjaSet || [], null, 2));
-  }, [lesson]);
-
-  useEffect(() => {
-    if (!dayOptions.length) return;
-    setBulkDay((current) => dayOptions.includes(Number(current)) ? Number(current) : dayOptions[0]);
-  }, [dayOptions]);
-
-  useEffect(() => {
-    if (!dayOptions.length) return;
-    setSelectedDay((current) => dayOptions.includes(Number(current)) ? Number(current) : dayOptions[0]);
-  }, [dayOptions]);
-
-  async function loginAdmin(event) {
-    event.preventDefault();
-    setAdminError("");
-    const trimmedLicenseKey = adminLicenseKey.trim();
-    const trimmedPassword = adminPassword.trim();
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        licenseKey: trimmedLicenseKey,
-        password: trimmedLicenseKey ? "" : trimmedPassword
-      })
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      setAdminError(result.message || "관리자 비밀번호를 확인해 주세요.");
-      return;
-    }
-    setAuthenticated(true);
-    setAdminInfo(await response.json().catch(() => null));
-    if (rememberAdminLogin) {
-      window.localStorage.setItem(adminLoginStorageKey, JSON.stringify({
-        licenseKey: trimmedLicenseKey,
-        password: trimmedLicenseKey ? "" : trimmedPassword,
-        remember: true
-      }));
-    } else {
-      window.localStorage.removeItem(adminLoginStorageKey);
-      setAdminPassword("");
-      setAdminLicenseKey("");
-    }
-  }
-
-  async function logoutAdmin() {
-    await fetch("/api/admin/session", { method: "DELETE" });
-    setAuthenticated(false);
-    setAdminInfo(null);
-    setState(null);
-  }
-
-  async function persist(nextState, options = {}) {
-    setState(nextState);
-    try {
-      const saved = await saveAppState(nextState, options);
-      setState(saved);
-    } catch (error) {
-      setLoadError(error.message);
-    }
-  }
-
-  function updateStudentForm(patch) {
-    setStudentForm((current) => {
-      const next = { ...current, ...patch };
-      if (Object.prototype.hasOwnProperty.call(patch, "name")) {
-        next.loginId = String(patch.name || "").trim();
-      }
-      if (Object.prototype.hasOwnProperty.call(patch, "phone")) {
-        next.password = passwordFromPhone(patch.phone);
-      }
-      return next;
-    });
-  }
-
-  function addStudent(event) {
-    event.preventDefault();
-    const nextStudent = {
-      id: `s${Date.now()}`,
-      ...studentForm,
-      phone: String(studentForm.phone || "").replace(/\D/g, ""),
-      loginId: (studentForm.loginId || studentForm.name).trim(),
-      password: (studentForm.password || passwordFromPhone(studentForm.phone)).trim(),
-      name: studentForm.name.trim(),
-      grade: normalizeGradeLabel(studentForm.grade),
-      day: 1,
-      parentToken: makeParentToken()
-    };
-    if (!nextStudent.name || !nextStudent.loginId || !nextStudent.password) return;
-    if (state.students.some((student) => student.loginId === nextStudent.loginId)) {
-      alert("이미 같은 아이디를 사용하는 학생이 있습니다. 동명이인은 아이디에 반/번호를 붙여 주세요.");
-      return;
-    }
-    const nextState = structuredClone(state);
-    nextState.students.push(nextStudent);
-    nextState.progress[nextStudent.id] = { completed: {}, quiz: {} };
-    persist(nextState, { dataPatch: { students: nextState.students, progressByStudent: { [nextStudent.id]: nextState.progress[nextStudent.id] } } });
-    setStudentForm(defaultStudentForm);
-  }
-
-  async function importStudentsCsv(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    let rows;
-    try {
-      rows = parseCsv(await file.text());
-    } catch {
-      alert("학생 CSV 파일 형식을 확인해 주세요.");
-      return;
-    }
-    if (rows.length < 2) {
-      alert("제목줄과 학생 정보가 포함된 CSV 파일이 필요합니다.");
-      return;
-    }
-
-    const headers = rows[0].map(normalizeHeader);
-    const loginIds = new Set(state.students.map((student) => student.loginId));
-    const nextStudents = [];
-    const errors = [];
-
-    rows.slice(1).forEach((row, index) => {
-      if (!row.some((cell) => String(cell || "").trim())) return;
-      const entry = Object.fromEntries(headers.map((header, headerIndex) => [header, row[headerIndex] || ""]));
-      const name = String(entry.name || "").trim();
-      const phone = String(entry.phone || "").replace(/\D/g, "");
-      const loginId = String(entry.loginId || name).trim();
-      const password = String(entry.password || passwordFromPhone(phone)).trim();
-      const grade = normalizeGradeLabel(entry.grade || "초1");
-      const level = String(entry.level || "초급").trim();
-      const day = Number(entry.day || 1);
-
-      if (!name || !loginId || !password) {
-        errors.push(`${index + 2}행: 이름과 전화번호 또는 비밀번호가 필요합니다.`);
-        return;
-      }
-      if (loginIds.has(loginId)) {
-        errors.push(`${index + 2}행: 이미 사용 중인 아이디입니다. (${loginId})`);
-        return;
-      }
-
-      loginIds.add(loginId);
-      nextStudents.push({ id: `s${Date.now()}-${index}`, name, phone, loginId, password, grade, level, day: day || 1, parentToken: makeParentToken() });
-    });
-
-    if (errors.length) {
-      alert(errors.slice(0, 10).join("\n"));
-      return;
-    }
-    if (!nextStudents.length) {
-      alert("가져올 학생 정보가 없습니다.");
-      return;
-    }
-
-    const nextState = structuredClone(state);
-    nextStudents.forEach((student) => {
-      nextState.students.push(student);
-      nextState.progress[student.id] = { completed: {}, quiz: {} };
-    });
-    await persist(nextState, {
-      dataPatch: {
-        students: nextState.students,
-        progressByStudent: Object.fromEntries(nextStudents.map((student) => [student.id, nextState.progress[student.id]]))
-      }
-    });
-    alert(`${nextStudents.length}명의 학생 계정을 가져왔습니다.`);
-  }
-
-  function updateStudentDay(studentId, day) {
-    const nextState = structuredClone(state);
-    const student = nextState.students.find((item) => item.id === studentId);
-    if (!student) return;
-    student.day = Number(day);
-    persist(nextState, { dataPatch: { students: nextState.students } });
-  }
-
-  function unlockStudentDay(studentId, targetDay) {
-    const student = state.students.find((item) => item.id === studentId);
-    if (!student) return;
-    const day = Number(targetDay || student.day || 1);
-    const nextState = structuredClone(state);
-    const nextStudent = nextState.students.find((item) => item.id === studentId);
-    if (nextStudent && Number(nextStudent.day || 1) < day) {
-      nextStudent.day = day;
-    }
-    nextState.progress[studentId] ||= { completed: {}, quiz: {} };
-    nextState.progress[studentId].unlocks ||= {};
-    nextState.progress[studentId].unlocks[day] = "open";
-    persist(nextState, { dataPatch: { students: nextState.students, progressByStudent: { [studentId]: nextState.progress[studentId] } } });
-  }
-
-  function assignFilteredStudentsDay() {
-    if (!baseFilteredStudents.length) return;
-    const targetDay = Number(bulkDay);
-    const label = studentSearch.trim() ? "검색된 학생" : "전체 학생";
-    if (!window.confirm(`${label} ${baseFilteredStudents.length}명을 ${targetDay}일차로 배정할까요?`)) return;
-    const targetIds = new Set(baseFilteredStudents.map((student) => student.id));
-    const nextState = structuredClone(state);
-    nextState.students.forEach((student) => {
-      if (targetIds.has(student.id)) student.day = targetDay;
-    });
-    persist(nextState, { dataPatch: { students: nextState.students } });
-  }
-
-  async function copyParentLink(student) {
-    let targetStudent = student;
-    if (!targetStudent.parentToken) {
-      const nextState = structuredClone(state);
-      const nextStudent = nextState.students.find((item) => item.id === student.id);
-      if (!nextStudent) return;
-      nextStudent.parentToken = makeParentToken();
-      targetStudent = nextStudent;
-      await persist(nextState, { dataPatch: { students: nextState.students } });
-    }
-    const link = parentLinkForStudent(targetStudent, adminInfo);
-    try {
-      await navigator.clipboard.writeText(link);
-      alert(`${student.name} 학생의 학부모 확인 링크를 복사했습니다.`);
-    } catch {
-      window.prompt("학부모님께 보낼 링크입니다.", link);
-    }
-  }
-
-  function resetStudentProgress(studentId) {
-    const student = state.students.find((item) => item.id === studentId);
-    if (!student || !window.confirm(`${student.name} 학생의 학습 기록을 초기화할까요?`)) return;
-    const nextState = structuredClone(state);
-    nextState.progress[studentId] = { completed: {}, quiz: {} };
-    persist(nextState, { dataPatch: { progressByStudent: { [studentId]: nextState.progress[studentId] } } });
-  }
-
-  function deleteStudent(studentId) {
-    const student = state.students.find((item) => item.id === studentId);
-    if (!student || !window.confirm(`${student.name} 학생 계정을 삭제할까요?`)) return;
-    const nextState = structuredClone(state);
-    nextState.students = nextState.students.filter((item) => item.id !== studentId);
-    delete nextState.progress[studentId];
-    persist(nextState, { dataPatch: { students: nextState.students, removeProgressStudentIds: [studentId] } });
-  }
-
-  async function saveLesson(event) {
-    event.preventDefault();
-    setLessonSaveStatus("저장 중...");
-    setLessonSaving(true);
-    let hanjaSet;
-    try {
-      hanjaSet = JSON.parse(hanjaJson);
-    } catch {
-      setLessonSaveStatus("저장 실패: 한자 묶음 JSON 형식을 확인해 주세요.");
-      setLessonSaving(false);
-      alert("한자 묶음 JSON 형식을 확인해 주세요.");
-      return;
-    }
-    const nextLesson = { ...lesson, day: Number(selectedDay), level: selectedLevel, dailyCount: Number(dailyCount), hanjaSet };
-    const errors = validateLesson(nextLesson);
-    const blockingErrors = errors.filter((error) => !isSaveableContentWarning(error));
-    if (blockingErrors.length) {
-      setLessonSaveStatus("저장 실패: 필수 내용을 확인해 주세요.");
-      setLessonSaving(false);
-      alert(blockingErrors.slice(0, 8).join("\n"));
-      return;
-    }
-    try {
-      await persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { curriculumPatch: { type: "upsertLessons", lessons: [nextLesson] } });
-      const savedAt = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-      setLessonSaveStatus(selectedLevel + " " + selectedDay + "일차 저장 완료 · " + savedAt);
-    } catch (error) {
-      setLessonSaveStatus(error.message || "저장 실패: 다시 시도해 주세요.");
-    } finally {
-      setLessonSaving(false);
-    }
-  }
-
-  function addLesson() {
-    const sameLevelLessons = state.curriculum.filter((item) => String(item.level || "").trim() === plan.level);
-    const nextDay = Math.max(0, ...sameLevelLessons.map((item) => Number(item.day) || 0)) + 1;
-    const nextLesson = {
-      day: nextDay,
-      grade: plan.grade,
-      level: plan.level,
-      dailyCount: 4,
-      hanjaSet: [
-        {
-          character: "新",
-          sound: "신",
-          meaning: "새롭다",
-          radical: "斤",
-          relation: "새 일차 편집용 기본 한자입니다.",
-          origin: "나무를 베어 새롭게 다듬는 모습과 관련된 한자입니다.",
-          vocab: [
-            {
-              hanja: "新入",
-              word: "신입",
-              meaning: "새로 들어옴",
-              examples: ["신입 회원이 동아리에 들어왔다.", "신입 학생들이 강당에 모였다.", "신입 선수는 열심히 연습했다."]
-            }
-          ]
-        }
-      ]
-    };
-    persist({ ...state, curriculum: upsertLesson(state.curriculum, nextLesson) }, { curriculumPatch: { type: "upsertLessons", lessons: [nextLesson] } });
-    setSelectedDay(nextDay);
-    setSelectedLevel(plan.level);
-  }
-
-  function deleteLesson() {
-    if (state.curriculum.length <= 1) {
-      alert("최소 1개의 일차는 남아 있어야 합니다.");
-      return;
-    }
-    if (!window.confirm(`${selectedLevel} ${selectedDay}일차 한자 구성을 삭제할까요?`)) return;
-    const remaining = state.curriculum.filter((item) => !(Number(item.day) === Number(selectedDay) && String(item.level || "").trim() === selectedLevel));
-    const sameLevelRemaining = remaining.filter((item) => String(item.level || "").trim() === selectedLevel);
-    const fallbackDay = sameLevelRemaining[0]?.day || remaining[0]?.day || 1;
-    const nextState = structuredClone(state);
-    nextState.curriculum = remaining;
-    nextState.students.forEach((student) => {
-      if (Number(student.day) === Number(selectedDay)) student.day = fallbackDay;
-    });
-    Object.values(nextState.progress).forEach((record) => {
-      delete record.completed?.[selectedDay];
-      delete record.quiz?.[selectedDay];
-    });
-    persist(nextState, { curriculumPatch: { type: "deleteLesson", day: selectedDay, level: selectedLevel }, dataPatch: { clearProgressDay: selectedDay } });
-    setSelectedDay(fallbackDay);
-  }
-
-  function updateHanjaJson(mutator) {
-    let hanjaSet;
-    try {
-      hanjaSet = JSON.parse(hanjaJson || "[]");
-    } catch {
-      hanjaSet = contentPreview.hanjaSet || [];
-    }
-    const nextHanjaSet = structuredClone(Array.isArray(hanjaSet) ? hanjaSet : []);
-    mutator(nextHanjaSet);
-    setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
-  }
-
-  function updateHanjaField(hanjaIndex, field, value) {
-    updateHanjaJson((hanjaSet) => {
-      if (!hanjaSet[hanjaIndex]) return;
-      hanjaSet[hanjaIndex][field] = value;
-      if (field === "character") hanjaSet[hanjaIndex].radical = value;
-    });
-  }
-
-  function updateVocabField(hanjaIndex, vocabIndex, field, value) {
-    updateHanjaJson((hanjaSet) => {
-      const hanja = hanjaSet[hanjaIndex];
-      if (!hanja) return;
-      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
-      if (!hanja.vocab[vocabIndex]) return;
-      hanja.vocab[vocabIndex][field] = value;
-    });
-  }
-
-  function updateVocabExample(hanjaIndex, vocabIndex, exampleIndex, value) {
-    updateHanjaJson((hanjaSet) => {
-      const hanja = hanjaSet[hanjaIndex];
-      if (!hanja) return;
-      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
-      if (!hanja.vocab[vocabIndex]) return;
-      if (!Array.isArray(hanja.vocab[vocabIndex].examples)) hanja.vocab[vocabIndex].examples = ["", "", ""];
-      hanja.vocab[vocabIndex].examples[exampleIndex] = value;
-    });
-  }
-
-  function addVocab(hanjaIndex) {
-    updateHanjaJson((hanjaSet) => {
-      const hanja = hanjaSet[hanjaIndex];
-      if (!hanja) return;
-      if (!Array.isArray(hanja.vocab)) hanja.vocab = [];
-      hanja.vocab.push({
-        hanja: "",
-        word: "",
-        meaning: "",
-        examples: ["", "", ""]
-      });
-    });
-  }
-
-  function removeVocab(hanjaIndex, vocabIndex) {
-    updateHanjaJson((hanjaSet) => {
-      const hanja = hanjaSet[hanjaIndex];
-      if (!hanja || !Array.isArray(hanja.vocab)) return;
-      hanja.vocab.splice(vocabIndex, 1);
-    });
-  }
-
-  async function importCurrentLessonFromDictionary() {
-    let hanjaSet;
-    try {
-      hanjaSet = JSON.parse(hanjaJson || "[]");
-    } catch {
-      alert("한자 묶음 JSON 형식을 먼저 확인해 주세요.");
-      return;
-    }
-    const activeHanjaSet = (Array.isArray(hanjaSet) ? hanjaSet : []).slice(0, Number(dailyCount) || 4);
-    if (!activeHanjaSet.length) {
-      alert("어휘를 구성할 한자가 없습니다.");
-      return;
-    }
-    if (!window.confirm(`${selectedLevel} ${selectedDay}일차의 어휘를 국어원 등재 어휘 기준으로 다시 가져올까요? 현재 어휘는 교체됩니다.`)) return;
-    setDictionaryBulkRunning(true);
-    setDictionaryStatus(`${selectedLevel} ${selectedDay}일차 국어원 어휘·뜻·용례를 가져오는 중...`);
-    try {
-      const response = await fetch("/api/admin/dictionary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "hanja-vocab", hanjaSet: activeHanjaSet })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.message || "국어원 어휘 후보를 가져오지 못했습니다.");
-      const results = payload.results || {};
-      const nextHanjaSet = structuredClone(hanjaSet);
-      let replaced = 0;
-      let missing = 0;
-      nextHanjaSet.slice(0, Number(dailyCount) || 4).forEach((hanja) => {
-        const candidates = results[hanja.character] || [];
-        if (candidates.length) {
-          hanja.vocab = candidates.slice(0, 8);
-          replaced += candidates.length;
-        } else {
-          hanja.vocab = [];
-          missing += 1;
-        }
-      });
-      setHanjaJson(JSON.stringify(nextHanjaSet, null, 2));
-      setDictionaryStatus(`${selectedLevel} ${selectedDay}일차 반영 완료: 어휘 ${replaced}개, 후보 부족 한자 ${missing}개. 확인 후 저장을 눌러 주세요.`);
-    } catch (error) {
-      setDictionaryStatus(error.message || "국어원 API 연결을 확인해 주세요.");
-    } finally {
-      setDictionaryBulkRunning(false);
-    }
-  }
-
-  function makePrompt() {
-    setAiPrompt(buildAiPrompt(plan));
-  }
-
-  function previewAi() {
-    try {
-      const lessons = parseAiLessons(aiResult);
-      setAiPreview(lessons.map((item) => `${item.day}일차: ${item.hanjaSet.map((hanja) => `${hanja.character}(${hanja.sound})`).join(" · ")}`).join("\n"));
-    } catch (error) {
-      setAiPreview(error.message || "AI 결과 형식을 확인해 주세요.");
-    }
-  }
-
-  function applyAi() {
-    let lessons;
-    try {
-      lessons = parseAiLessons(aiResult);
-    } catch (error) {
-      alert(error.message || "AI 결과 형식을 확인해 주세요.");
-      return;
-    }
-    const nextState = structuredClone(state);
-    lessons.forEach((item) => {
-      nextState.curriculum = upsertLesson(nextState.curriculum, item);
-    });
-    persist(nextState, { curriculumPatch: { type: "upsertLessons", lessons } });
-    setSelectedDay(lessons[0].day);
-    setSelectedLevel(lessons[0].level || plan.level);
-    setAiPreview(lessons.map((item) => `${item.day}일차 적용 완료`).join("\n"));
-  }
-
-  function applySeedCurriculum() {
-    if (!window.confirm("초급/중급/고급 100일차 기본 한자 구성을 적용할까요? 기존 학생 계정과 학습 기록은 유지하고 커리큘럼만 교체합니다.")) return;
-    const nextState = structuredClone(state);
-    nextState.curriculum = buildSeedCurriculum();
-    persist(nextState, { curriculumPatch: { type: "replaceSeed" } });
-    setSelectedLevel("초급");
-    setSelectedDay(1);
-  }
-
-  async function resetDemo() {
-    try {
-      const nextState = await resetAppState();
-      setState(nextState);
-      setSelectedDay(nextState.curriculum[0]?.day || 1);
-    } catch (error) {
-      setLoadError(error.message);
-    }
-  }
-
-  function exportState() {
-    const snapshot = {
-      exportedAt: new Date().toISOString(),
-      app: "hanja-vocab-next",
-      version: 1,
-      data: state
-    };
-    downloadFile(
-      `hanja-vocab-backup-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(snapshot, null, 2),
-      "application/json"
-    );
-  }
-
-  async function exportFullDatabaseSql() {
-    try {
-      const response = await fetch("/api/admin/full-backup?format=sql", { cache: "no-store" });
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}));
-        alert(result.message || "전체 DB 백업을 만들지 못했습니다.");
-        return;
-      }
-      const blob = await response.blob();
-      const filename = filenameFromDisposition(response.headers.get("content-disposition")) || `hanja-app-state-restore-${new Date().toISOString().slice(0, 10)}.sql`;
-      downloadBlob(filename, blob);
-    } catch (error) {
-      alert(error.message || "전체 DB 백업을 만들지 못했습니다.");
-    }
-  }
-
-  function exportProgressCsv() {
-    const headers = ["학생", "아이디", "비밀번호", "학년", "난이도", "현재 일차", "진도", "정답률", "정답 수", "응시 문항 수", "응시 횟수", "오답", "복습 이력"];
-    const rows = state.students.map((student) => {
-      const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
-      const completed = state.progress[student.id]?.completed?.[student.day] && !record.wrong?.length;
-      const rate = record.total ? `${Math.round((record.correct / record.total) * 100)}%` : "";
-      const attempts = record.attempts || (record.total ? 1 : 0);
-      return [
-        student.name,
-        student.loginId,
-        student.password,
-        student.grade,
-        student.level,
-        `${student.day}일차`,
-        completed ? "학습 완성" : "진행 중",
-        rate,
-        record.correct || 0,
-        record.total || 0,
-        attempts,
-        (record.wrong || []).join(", "),
-        (record.wrongHistory || []).join(", ")
-      ];
-    });
-    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-    downloadFile(`hanja-progress-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
-  }
-
-  function exportProgressHistoryCsv() {
-    const headers = ["학생", "아이디", "학년", "난이도", "일차", "배정 여부", "진도", "정답률", "정답 수", "응시 문항 수", "응시 횟수", "오답", "복습 이력", "완료 시각"];
-    const days = state.curriculum.map((lesson) => Number(lesson.day)).sort((a, b) => a - b);
-    const rows = state.students.flatMap((student) =>
-      days.map((day) => {
-        const record = state.progress[student.id]?.quiz?.[day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
-        const completed = state.progress[student.id]?.completed?.[day] && !record.wrong?.length;
-        const assigned = Number(student.day) === Number(day);
-        const status = completed ? "학습 완성" : record.wrong?.length ? "복습 필요" : record.total ? "진행 중" : "시작 전";
-        const rate = record.total ? `${Math.round((record.correct / record.total) * 100)}%` : "";
-        const attempts = record.attempts || (record.total ? 1 : 0);
-        return [
-          student.name,
-          student.loginId,
-          student.grade,
-          student.level,
-          `${day}일차`,
-          assigned ? "현재 배정" : "",
-          status,
-          rate,
-          record.correct || 0,
-          record.total || 0,
-          attempts,
-          (record.wrong || []).join(", "),
-          (record.wrongHistory || []).join(", "),
-          record.finishedAt || ""
-        ];
-      })
-    );
-    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-    downloadFile(`hanja-progress-history-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
-  }
-
-  function exportStudentCsv() {
-    const headers = ["이름", "전화번호", "아이디", "비밀번호", "학년", "난이도", "일차"];
-    const rows = state.students.map((student) => [
-      student.name,
-      student.phone || "",
-      student.loginId,
-      student.password,
-      student.grade,
-      student.level,
-      student.day
-    ]);
-    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-    downloadFile(`hanja-students-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
-  }
-
-  function makeWorksheetHtml() {
-    const worksheet = buildWorksheet(state.curriculum, {
-      level: worksheetLevel,
-      endDay: worksheetEndDay,
-      questionCount: worksheetQuestionCount
-    });
-    if (!worksheet.questions.length) {
-      alert("학습지를 만들 어휘가 부족합니다. 해당 5일 묶음의 어휘를 확인해 주세요.");
-      return "";
-    }
-    return createWorksheetHtml(worksheet);
-  }
-
-  function openWorksheetPrint() {
-    const html = makeWorksheetHtml();
-    if (!html) return;
-    const printWindow = window.open("", "_blank", "width=980,height=900");
-    if (!printWindow) {
-      alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
-      return;
-    }
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-  }
-
-  function downloadWorksheetHtml() {
-    const html = makeWorksheetHtml();
-    if (!html) return;
-    downloadFile(
-      `hanja-worksheet-${worksheetLevel}-${worksheetEndDay - 4}-${worksheetEndDay}days.html`,
-      html,
-      "text/html;charset=utf-8"
-    );
-  }
-
-  function downloadStudentTemplate() {
-    const rows = [
-      ["이름", "전화번호", "아이디", "비밀번호", "학년", "난이도", "일차"],
-      ["김민준", "010-1234-5678", "", "", "초3", "초급", "1"],
-      ["박하린", "010-2345-6789", "", "", "초4", "초급", "1"]
-    ];
-    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
-    downloadFile("hanja-student-template.csv", `\uFEFF${csv}`, "text/csv;charset=utf-8");
-  }
-
-  function downloadFile(filename, content, type) {
-    const blob = new Blob([content], { type });
-    downloadBlob(filename, blob);
-  }
-
-  function downloadBlob(filename, blob) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function filenameFromDisposition(disposition) {
-    const match = String(disposition || "").match(/filename="([^"]+)"/i);
-    return match?.[1] || "";
-  }
-
-  async function importState(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    let imported;
-    try {
-      imported = JSON.parse(await file.text());
-    } catch {
-      alert("가져올 JSON 파일 형식을 확인해 주세요.");
-      return;
-    }
-    const nextState = imported.data || imported;
-    if (!Array.isArray(nextState.students) || !Array.isArray(nextState.curriculum) || !nextState.progress) {
-      alert("학생, 커리큘럼, 진도 데이터가 포함된 백업 파일만 가져올 수 있습니다.");
-      return;
-    }
-    const errors = validateAppStateShape(nextState);
-    if (errors.length) {
-      alert(errors.slice(0, 10).join("\n"));
-      return;
-    }
-    if (!window.confirm("현재 데이터를 백업 파일 내용으로 교체할까요?")) return;
-    await persist(nextState, { includeFullState: true });
-    setSelectedDay(nextState.curriculum[0]?.day || 1);
-  }
-
-  if (checkingAuth) return <main className="centerPage">확인하는 중...</main>;
-
-  if (!authenticated) {
-    return (
-      <main className="centerPage">
-        <form className="loginCard" onSubmit={loginAdmin}>
-          <Mascot />
-          <h1>관리자 로그인</h1>
-          <p>발급받은 라이선스 키로 로그인하세요. 소유자만 비상용 관리자 비밀번호를 사용할 수 있습니다.</p>
-          <label>라이선스 키<input value={adminLicenseKey} onChange={(event) => setAdminLicenseKey(event.target.value)} placeholder="HANJA-... 키 입력" /></label>
-          <details className="ownerLogin">
-            <summary>소유자 비밀번호로 로그인</summary>
-            <label>내 관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} placeholder="ADMIN_PASSWORD" /></label>
-          </details>
-          <label className="rememberLogin"><input type="checkbox" checked={rememberAdminLogin} onChange={(event) => setRememberAdminLogin(event.target.checked)} />라이선스 키와 비밀번호 저장</label>
-          <button className="btn primary" type="submit">관리 화면 열기</button>
-          {adminError && <strong className="errorText">{adminError}</strong>}
-          <Link className="textLink" href="/student">학생 화면으로</Link>
-        </form>
-      </main>
-    );
-  }
-
-  if (loadError) return (
-    <main className="centerPage">
-      <section className="loginCard">
-        <Mascot mood="sad" />
-        <h1>학습 데이터 오류</h1>
-        <strong className="errorText">{loadError}</strong>
-        <button className="btn primary" type="button" onClick={() => window.location.reload()}>다시 불러오기</button>
-        <button className="btn ghost" type="button" onClick={() => {
-          setAuthenticated(false);
-          setAdminInfo(null);
-          setLoadError("");
-        }}>관리자 로그인으로</button>
-      </section>
-    </main>
-  );
-  if (!state) return <main className="centerPage">불러오는 중...</main>;
-
-  return (
-    <main className="adminFrame">
-      <header className="topBar">
-        <div><strong>학습 관리</strong><span>학생 계정 · 한자 구성 · 학습도{adminInfo?.role === "license" ? ` · 강사 코드 ${adminInfo.teacherCode}` : ""}</span></div>
-        <div className="topActions">
-          <Link className="btn ghost" href="/student">학생 화면</Link>
-          <button className="btn" type="button" onClick={exportState}>백업</button>
-          {adminInfo?.role === "master" && <button className="btn" type="button" onClick={exportFullDatabaseSql}>전체 DB SQL</button>}
-          <button className="btn" type="button" onClick={exportProgressCsv}>학습도 CSV</button>
-          <button className="btn" type="button" onClick={exportProgressHistoryCsv}>전체 이력 CSV</button>
-          <label className="btn fileBtn">가져오기<input type="file" accept="application/json,.json" onChange={importState} /></label>
-          <button className="btn" onClick={resetDemo}>초기화</button>
-          <button className="btn" onClick={logoutAdmin}>로그아웃</button>
-        </div>
-      </header>
-
-      <nav className="adminTabs" aria-label="관리 메뉴">
-        {[
-          ["students", "학생 관리"],
-          ["progress", "학생별 학습도"],
-          ["matrix", "일차별 진행도"],
-          ["worksheet", "학습지"],
-          ["ai", "AI 생성"],
-          ["curriculum", "한자 관리"]
-        ].map(([key, label]) => (
-          <button className={adminView === key ? "active" : ""} type="button" key={key} onClick={() => setAdminView(key)}>
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      <section className="adminGrid">
-        {adminView === "students" && (
-          <>
-        <form className="panel form studentAccountForm" onSubmit={addStudent}>
-          <h2>학생 계정</h2>
-          <label>이름<input value={studentForm.name} onChange={(event) => updateStudentForm({ name: event.target.value })} placeholder="예: 이서연" /></label>
-          <label>전화번호<input value={studentForm.phone} onChange={(event) => updateStudentForm({ phone: event.target.value })} placeholder="예: 010-1234-5678" /></label>
-          <label>아이디<input value={studentForm.loginId} onChange={(event) => updateStudentForm({ loginId: event.target.value })} placeholder="이름으로 자동 입력" /></label>
-          <label>비밀번호<input value={studentForm.password} onChange={(event) => updateStudentForm({ password: event.target.value })} placeholder="010을 제외한 전화번호로 자동 입력" /></label>
-          <Select label="학년" value={studentForm.grade} onChange={(grade) => updateStudentForm({ grade })} options={gradeOptions} />
-          <Select label="난이도" value={studentForm.level} onChange={(level) => setStudentForm({ ...studentForm, level })} options={["초급", "중급", "고급"]} />
-          <button className="btn primary" type="submit">계정 생성</button>
-          <div className="buttonRow compact">
-            <button className="miniBtn" type="button" onClick={downloadStudentTemplate}>CSV 양식</button>
-            <label className="miniBtn fileBtn">CSV 가져오기<input type="file" accept=".csv,text/csv" onChange={importStudentsCsv} /></label>
-            <button className="miniBtn" type="button" onClick={exportStudentCsv}>계정 CSV</button>
-          </div>
-        </form>
-
-        <section className="panel">
-          <div className="studentPanelHead">
-            <h2>학생 목록</h2>
-            <span>{baseFilteredStudents.length}명 표시</span>
-          </div>
-          <label className="searchBox">학생 검색
-            <input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="이름, 아이디, 학년, 난이도" />
-          </label>
-          <StudentFilters
-            gradeFilter={studentGradeFilter}
-            dayFilter={studentDayFilter}
-            onGradeChange={setStudentGradeFilter}
-            onDayChange={setStudentDayFilter}
-            dayOptions={progressDays}
-          />
-          <div className="bulkAssign">
-            <label>검색 결과 일괄 배정
-              <select value={bulkDay} onChange={(event) => setBulkDay(Number(event.target.value))}>
-                {dayOptions.map((day) => <option key={day} value={day}>{day}일차</option>)}
-              </select>
-            </label>
-            <button className="miniBtn" type="button" onClick={assignFilteredStudentsDay} disabled={!baseFilteredStudents.length}>배정</button>
-          </div>
-          <div className="studentList">
-            {baseFilteredStudents.map((student) => (
-              <div className="studentRow" key={student.id}>
-                <div>
-                  <strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong>
-                  <span>{student.loginId} / {student.password} · {student.phone ? `${student.phone} · ` : ""}{student.grade} · {student.level}</span>
-                </div>
-                <label className="dayPicker">현재 일차
-                  <select value={student.day} onChange={(event) => updateStudentDay(student.id, event.target.value)}>
-                    {dayOptions.map((day) => <option key={day} value={day}>{day}일차</option>)}
-                  </select>
-                </label>
-                <div className="studentActions">
-                  <button className="miniBtn" type="button" onClick={() => copyParentLink(student)}>학부모 링크</button>
-                  <button className="miniBtn" type="button" onClick={() => resetStudentProgress(student.id)}>진도 초기화</button>
-                  <button className="miniBtn danger" type="button" onClick={() => deleteStudent(student.id)}>삭제</button>
-                </div>
-              </div>
-            ))}
-            {!baseFilteredStudents.length && <p className="emptyText">검색 결과가 없습니다.</p>}
-          </div>
-        </section>
-          </>
-        )}
-
-        {adminView === "progress" && (
-        <section className="panel wide">
-          <h2>학생별 학습도</h2>
-          <StudentFilters
-            gradeFilter={studentGradeFilter}
-            dayFilter={studentDayFilter}
-            onGradeChange={setStudentGradeFilter}
-            onDayChange={setStudentDayFilter}
-            dayOptions={progressDays}
-          />
-          <div className="summaryStrip">
-            <span><b>{baseFilteredStudents.length}</b>전체</span>
-            <span className="complete"><b>{progressSummary.completed}</b>완성</span>
-            <span className="retry"><b>{progressSummary.retry}</b>복습 필요</span>
-            <span className="active"><b>{progressSummary.active}</b>진행 중</span>
-            <span><b>{progressSummary.locked}</b>대기 중</span>
-            <span><b>{progressSummary.idle}</b>시작 전</span>
-          </div>
-          <div className="statusFilters">
-            {[
-              ["all", "전체", baseFilteredStudents.length],
-              ["completed", "완성", progressSummary.completed],
-              ["retry", "복습 필요", progressSummary.retry],
-              ["active", "진행 중", progressSummary.active],
-              ["locked", "대기 중", progressSummary.locked],
-              ["idle", "시작 전", progressSummary.idle]
-            ].map(([key, label, count]) => (
-              <button className={progressFilter === key ? "active" : ""} type="button" key={key} onClick={() => setProgressFilter(key)}>
-                {label}<b>{count}</b>
-              </button>
-            ))}
-          </div>
-          {(studentSearch.trim() || studentGradeFilter !== "all" || studentDayFilter !== "all" || progressFilter !== "all") && <p className="filterNote">현재 조건에 맞는 학생 {filteredStudents.length}명만 표시 중입니다.</p>}
-          <div className="tableScroller">
-          <table className="progressTable">
-            <thead><tr><th>학생</th><th>배정</th><th>상태</th><th>퀴즈 기록</th><th>오답/복습</th></tr></thead>
-            <tbody>{filteredStudents.map((student) => <ProgressRow key={student.id} state={state} student={student} onOpenReview={() => setReviewModalStudent(student)} />)}</tbody>
-          </table>
-          </div>
-          {reviewModalStudent && (
-            <ReviewDetailModal
-              state={state}
-              student={reviewModalStudent}
-              onClose={() => setReviewModalStudent(null)}
-            />
-          )}
-        </section>
-        )}
-
-        {adminView === "matrix" && (
-        <section className="panel wide">
-          <h2>일차별 학습 진행도</h2>
-          <p className="filterNote">학생별로 각 일차의 완료, 복습 필요, 진행 중, 잠금 상태를 한눈에 확인합니다.</p>
-          <StudentFilters
-            gradeFilter={studentGradeFilter}
-            dayFilter={studentDayFilter}
-            onGradeChange={setStudentGradeFilter}
-            onDayChange={setStudentDayFilter}
-            dayOptions={progressDays}
-          />
-          <ProgressMatrix state={state} students={filteredStudents} days={matrixDays} onUnlock={unlockStudentDay} />
-        </section>
-        )}
-
-        {adminView === "worksheet" && (
-        <section className="panel wide worksheetPanel">
-          <div className="panelTitle">
-            <div>
-              <h2>누적 어휘 종이 학습지</h2>
-              <p className="filterNote">5일차, 10일차처럼 5일 단위로 쌓인 어휘를 랜덤 시험지로 만들어 출력합니다.</p>
-            </div>
-            <Mascot small />
-          </div>
-          <div className="worksheetControls">
-            <Select label="난이도" value={worksheetLevel} onChange={(level) => {
-              setWorksheetLevel(level);
-              setWorksheetEndDay(5);
-            }} options={["초급", "중급", "고급"]} />
-            <label>학습 범위
-              <select value={worksheetEndDay} onChange={(event) => setWorksheetEndDay(Number(event.target.value))}>
-                {worksheetBlocks.map((block) => <option key={`${worksheetLevel}-${block.endDay}`} value={block.endDay}>{block.label}</option>)}
-              </select>
-            </label>
-            <label>문항 수
-              <input type="number" min="10" max="60" value={worksheetQuestionCount} onChange={(event) => setWorksheetQuestionCount(Number(event.target.value))} />
-            </label>
-          </div>
-          <WorksheetPreview state={state} level={worksheetLevel} endDay={worksheetEndDay} questionCount={worksheetQuestionCount} />
-          <div className="buttonRow">
-            <button className="btn primary" type="button" onClick={openWorksheetPrint}>인쇄/PDF 저장</button>
-            <button className="btn blue" type="button" onClick={downloadWorksheetHtml}>HTML 다운로드</button>
-          </div>
-        </section>
-        )}
-
-        {adminView === "ai" && (
-        <section className="panel form">
-          <div className="panelTitle"><h2>AI 생성 준비</h2><Mascot small /></div>
-          <Select label="학년" value={plan.grade} onChange={(grade) => setPlan({ ...plan, grade })} options={gradeOptions} />
-          <Select label="난이도" value={plan.level} onChange={(level) => setPlan({ ...plan, level })} options={["초급", "중급", "고급"]} />
-          <label>시작 일차<input type="number" min="1" value={plan.startDay} onChange={(event) => setPlan({ ...plan, startDay: Number(event.target.value) })} /></label>
-          <label>생성 일수<input type="number" min="1" max="30" value={plan.days} onChange={(event) => setPlan({ ...plan, days: Number(event.target.value) })} /></label>
-          <button className="btn blue" type="button" onClick={makePrompt}>AI 프롬프트 만들기</button>
-          <label>AI 요청 프롬프트<textarea readOnly value={aiPrompt} /></label>
-          <label>AI 생성 JSON 붙여넣기<textarea value={aiResult} onChange={(event) => setAiResult(event.target.value)} placeholder="AI가 만든 curriculum JSON을 붙여넣으세요." /></label>
-          <div className="buttonRow">
-            <button className="btn" type="button" onClick={previewAi}>미리보기</button>
-            <button className="btn primary" type="button" onClick={applyAi}>적용</button>
-          </div>
-          {aiPreview && <pre className="previewBox">{aiPreview}</pre>}
-        </section>
-        )}
-
-        {adminView === "curriculum" && (
-        <form className="panel form contentForm" onSubmit={saveLesson}>
-          <div className="contentTitle">
-            <h2>일차별 한자 관리</h2>
-            <div className="contentActions">
-              <button className="miniBtn" type="button" onClick={applySeedCurriculum}>기본 100일차 적용</button>
-              <button className="miniBtn" type="button" onClick={addLesson}>새 일차</button>
-              <button className="miniBtn danger" type="button" onClick={deleteLesson}>일차 삭제</button>
-            </div>
-          </div>
-          <div className="curriculumWorkspace">
-            <div className="curriculumSidebar">
-              <Select label="난이도" value={selectedLevel} onChange={setSelectedLevel} options={["초급", "중급", "고급"]} />
-              {selectedCriteria && (
-                <div className="criteriaBox">
-                  <strong>{selectedLevel} 기준 · {selectedCriteria.target}</strong>
-                  <span>{selectedCriteria.focus}</span>
-                  <small>{selectedCriteria.textRange}</small>
-                </div>
-              )}
-              <LevelDayOverview lessons={levelLessonSummary} selectedDay={selectedDay} onSelect={setSelectedDay} />
-            </div>
-            <div className="curriculumEditor">
-              <div className="editorControls">
-                <label>일차<select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>{dayOptions.map((day) => <option key={`${selectedLevel}-${day}`} value={day}>{day}일차</option>)}</select></label>
-                <label>일일 한자 수<input type="number" min="1" max="8" value={dailyCount} onChange={(event) => setDailyCount(event.target.value)} /></label>
-              </div>
-              <div className="dictionaryTools">
-                <button className="miniBtn blue" type="button" onClick={importCurrentLessonFromDictionary} disabled={dictionaryBulkRunning}>
-                  {dictionaryBulkRunning ? "가져오는 중..." : "현재 일차 국어원 어휘·뜻·용례 가져오기"}
-                </button>
-                <span>{dictionaryStatus || "선택한 일차의 한자에 맞는 국어원 등재 어휘와 실제 용례만 가져옵니다."}</span>
-              </div>
-              <HanjaQuickEditor
-                hanjaSet={contentPreview.hanjaSet}
-                dailyCount={dailyCount}
-                onHanjaChange={updateHanjaField}
-                onVocabChange={updateVocabField}
-                onExampleChange={updateVocabExample}
-                onAddVocab={addVocab}
-                onRemoveVocab={removeVocab}
-              />
-              <label>한자 묶음 JSON<textarea value={hanjaJson} onChange={(event) => setHanjaJson(event.target.value)} /></label>
-              <ContentPreview preview={contentPreview} dailyCount={dailyCount} />
-              <div className="saveActionRow">
-                <button className="btn primary" type="submit" disabled={lessonSaving}>{lessonSaving ? "저장 중..." : "저장"}</button>
-                <span className={lessonSaveStatus.includes("실패") ? "saveStatus error" : "saveStatus"}>{lessonSaveStatus || "저장 버튼을 누르면 현재 일차 구성이 반영됩니다."}</span>
-              </div>
-            </div>
-          </div>
-        </form>
-        )}
-      </section>
-    </main>
-  );
-}
-
-function WorksheetPreview({ state, level, endDay, questionCount }) {
-  const worksheet = useMemo(() => buildWorksheet(state.curriculum, { level, endDay, questionCount, preview: true }), [state, level, endDay, questionCount]);
-  return (
-    <div className="worksheetPreview">
-      <div>
-        <span>범위</span>
-        <strong>{worksheet.rangeStart}-{worksheet.rangeEnd}일차</strong>
-      </div>
-      <div>
-        <span>누적 어휘</span>
-        <strong>{worksheet.words.length}개</strong>
-      </div>
-      <div>
-        <span>생성 문항</span>
-        <strong>{worksheet.questions.length}문항</strong>
-      </div>
-      <div>
-        <span>구성</span>
-        <strong>쓰기 · 객관식 · 빈칸</strong>
-      </div>
-      <p>{worksheet.words.length ? `${worksheet.words.slice(0, 10).map((item) => item.word).join(", ")}${worksheet.words.length > 10 ? " ..." : ""}` : "해당 범위에 어휘가 없습니다."}</p>
-    </div>
-  );
-}
-
-function ProgressRow({ state, student, onOpenReview }) {
-  const lesson = findLesson(state.curriculum, student.day, student.level);
-  const record = state.progress[student.id]?.quiz?.[student.day] || { correct: 0, total: 0, wrong: [], wrongHistory: [] };
-  const status = getProgressStatus(state, student);
-  const nextLearning = getNextLearningInfo(state, student);
-  const reviewCounts = getReviewCounts(state, student);
-  const totalWords = lessonVocab(lesson).length;
-  const rate = record.total ? Math.round((record.correct / record.total) * 100) : 0;
-  const progress = status.key === "completed" ? 100 : record.total ? Math.min(92, Math.round((record.correct / Math.max(1, totalWords)) * 100)) : 0;
-  const finishedAt = record.finishedAt ? new Date(record.finishedAt).toLocaleDateString("ko-KR") : "";
-  const attempts = record.attempts || (record.total ? 1 : 0);
-  const quizMeta = record.total ? [`${record.correct}/${record.total}문항`, `${attempts}회 응시`, finishedAt].filter(Boolean).join(" · ") : `예정 어휘 ${totalWords}개`;
-  const reviewMeta = reviewCounts.total ? `오답 ${reviewCounts.currentWrong} · 복습 ${reviewCounts.quizReview} · 게임 ${reviewCounts.gameReview}` : "기록 없음";
-
-  return (
-    <tr>
-      <td data-label="학생"><strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong><br /><span>{student.loginId} / {student.password}</span></td>
-      <td data-label="배정">
-        <b>{student.day}일차</b><br />
-        <span>{student.grade} · {student.level}</span>
-        {nextLearning && <small className="nextLearning">{nextLearning}</small>}
-      </td>
-      <td data-label="상태">
-        <span className={`statusPill ${status.key}`}>{status.label}</span>
-        <div className="miniProgress"><i style={{ width: `${progress}%` }} /></div>
-      </td>
-      <td data-label="퀴즈 기록"><b>{record.total ? `${rate}%` : "-"}</b><br /><span>{quizMeta}</span></td>
-      <td data-label="오답/복습">
-        <button className="miniBtn" type="button" onClick={onOpenReview}>자세히 보기</button>
-        <small className="reviewSummary">{reviewMeta}</small>
-      </td>
-    </tr>
-  );
-}
-
-function StudentLevelBadge({ state, student }) {
-  const level = getStudentLevel(state, student);
-  return <span className="studentLevelBadge">Lv. {level}</span>;
-}
-
-function getStudentLevel(state, student) {
-  const completedDays = Object.values(state.progress[student.id]?.completed || {}).filter(Boolean).length;
-  return Math.max(1, Math.floor(completedDays / 5) + 1);
-}
-
-function ReviewDetailModal({ state, student, onClose }) {
-  const details = getReviewDetails(state, student);
-  const hasAnyReview = details.currentWrong.length || details.currentReviewDone.length || details.quizReviews.length || details.gameReviews.length;
-  return (
-    <div className="modalOverlay" role="presentation">
-      <section className="reviewModal" role="dialog" aria-modal="true" aria-label={`${student.name} 오답 복습 기록`}>
-        <div className="modalHead">
-          <div>
-            <p className="eyebrow">{student.grade} · {student.level} · {student.day}일차</p>
-            <h2>{student.name} 오답/복습 기록</h2>
-          </div>
-          <button className="miniBtn" type="button" onClick={onClose}>닫기</button>
-        </div>
-
-        {!hasAnyReview && <p className="emptyText">아직 오답이나 복습 기록이 없습니다.</p>}
-
-        <div className="reviewModalGrid">
-          <article className="reviewDetailBlock">
-            <h3>현재 일차</h3>
-            <ReviewWordList title="남은 오답" words={details.currentWrong} empty="남은 오답 없음" />
-            <ReviewWordList title="다시 풀어 맞힌 어휘" words={details.currentReviewDone} empty="복습 완료 어휘 없음" />
-          </article>
-
-          <article className="reviewDetailBlock">
-            <h3>일차별 퀴즈 복습</h3>
-            {details.quizReviews.length ? details.quizReviews.map((item) => (
-              <div className="reviewHistoryItem" key={`quiz-${item.day}`}>
-                <strong>{item.day}일차</strong>
-                {item.finishedAt && <span>{formatShortDate(item.finishedAt)}</span>}
-                <ReviewWordList title="오답" words={item.wrong} empty="남은 오답 없음" />
-                <ReviewWordList title="복습한 어휘" words={item.words} empty="복습 어휘 없음" />
-              </div>
-            )) : <p className="emptyText">퀴즈 복습 기록이 없습니다.</p>}
-          </article>
-
-          <article className="reviewDetailBlock full">
-            <h3>활쏘기 복습 게임</h3>
-            {details.gameReviews.length ? details.gameReviews.map((game, index) => (
-              <div className="reviewHistoryItem" key={`game-${game.rangeStart}-${game.rangeEnd}-${index}`}>
-                <strong>{game.rangeStart}-{game.rangeEnd}일차 활쏘기</strong>
-                <span>{game.accuracy}% · {game.score}점{game.finishedAt ? ` · ${formatShortDate(game.finishedAt)}` : ""}</span>
-                <ReviewWordList title="출제 어휘" words={game.reviewedWords} empty="출제 기록 없음" />
-                <ReviewWordList title="맞힌 어휘" words={game.hitWords} empty="맞힌 어휘 없음" />
-                <ReviewWordList title="놓친 어휘" words={game.missedWords} empty="놓친 어휘 없음" />
-              </div>
-            )) : <p className="emptyText">활쏘기 복습 기록이 없습니다.</p>}
-          </article>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ReviewWordList({ title, words, empty }) {
-  const cleanWords = [...new Set((words || []).filter(Boolean))];
-  return (
-    <div className="reviewWordList">
-      <span>{title}</span>
-      {cleanWords.length ? (
-        <div>{cleanWords.map((word) => <b key={word}>{word}</b>)}</div>
-      ) : (
-        <small>{empty}</small>
-      )}
-    </div>
-  );
-}
-
-function formatShortDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("ko-KR");
-}
-
-function isStudentDayLocked(state, student) {
-  const unlockAt = state.progress[student.id]?.unlocks?.[student.day];
-  return Boolean(unlockAt && Date.now() < new Date(unlockAt).getTime());
-}
-
-function getNextLearningInfo(state, student) {
-  const progress = state.progress[student.id] || {};
-  const currentDay = Number(student.day || 1);
-  const currentUnlock = progress.unlocks?.[currentDay];
-  if (currentUnlock && Date.now() < new Date(currentUnlock).getTime()) {
-    return `${currentDay}일차 대기 · ${formatKoreanUnlockTime(currentUnlock)}부터`;
-  }
-
-  const currentRecord = progress.quiz?.[currentDay];
-  const currentCompleted = progress.completed?.[currentDay] && !currentRecord?.wrong?.length;
-  if (!currentCompleted) return "";
-
-  const nextDay = currentDay + 1;
-  const hasNextLesson = state.curriculum.some((lesson) => Number(lesson.day) === nextDay && String(lesson.level || "").trim() === String(student.level || "").trim());
-  if (!hasNextLesson) return "마지막 일차 완료";
-
-  const unlockAt = progress.unlocks?.[nextDay] || inferNextUnlockFromRecord(currentRecord);
-  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
-    return `${nextDay}일차 대기 · ${formatKoreanUnlockTime(unlockAt)}부터`;
-  }
-  return `${nextDay}일차 학습 가능`;
-}
-
-function getReviewCounts(state, student) {
-  const details = getReviewDetails(state, student);
-  const currentWrong = details.currentWrong.length;
-  const quizReview = details.quizReviews.reduce((sum, item) => sum + item.words.length, 0);
-  const gameReview = details.gameReviews.reduce((sum, item) => sum + item.reviewedWords.length, 0);
-  return {
-    currentWrong,
-    quizReview,
-    gameReview,
-    total: currentWrong + quizReview + gameReview
-  };
-}
-
-function getReviewDetails(state, student) {
-  const progress = state.progress[student.id] || {};
-  const currentRecord = progress.quiz?.[student.day] || {};
-  const quizReviews = Object.entries(progress.quiz || {})
-    .map(([day, record]) => ({
-      day: Number(day),
-      wrong: record.wrong || [],
-      words: record.wrongHistory || [],
-      finishedAt: record.finishedAt || ""
-    }))
-    .filter((item) => item.wrong.length || item.words.length)
-    .sort((a, b) => a.day - b.day);
-  const gameReviews = Object.values(progress.games || {})
-    .map((game) => ({
-      type: game.type || "archery",
-      rangeStart: game.rangeStart,
-      rangeEnd: game.rangeEnd,
-      score: game.score || 0,
-      accuracy: game.accuracy || 0,
-      reviewedWords: game.reviewedWords || [],
-      hitWords: game.hitWords || [],
-      missedWords: game.missedWords || [],
-      finishedAt: game.finishedAt || ""
-    }))
-    .sort((a, b) => Number(a.rangeStart || 0) - Number(b.rangeStart || 0));
-  return {
-    currentWrong: currentRecord.wrong || [],
-    currentReviewDone: currentRecord.wrongHistory || [],
-    quizReviews,
-    gameReviews
-  };
-}
-
-function inferNextUnlockFromRecord(record) {
-  if (!record?.finishedAt) return "";
-  const finished = new Date(record.finishedAt);
-  if (Number.isNaN(finished.getTime())) return "";
-  const koreanFinished = new Date(finished.getTime() + 9 * 60 * 60 * 1000);
-  const nextMidnightUtcMs = Date.UTC(koreanFinished.getUTCFullYear(), koreanFinished.getUTCMonth(), koreanFinished.getUTCDate() + 1, -9, 0, 0, 0);
-  return new Date(nextMidnightUtcMs).toISOString();
-}
-
-function StudentFilters({ gradeFilter, dayFilter, onGradeChange, onDayChange, dayOptions }) {
-  return (
-    <div className="advancedFilters">
-      <label>학년
-        <select value={gradeFilter} onChange={(event) => onGradeChange(event.target.value)}>
-          <option value="all">전체 학년</option>
-          {gradeOptions.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-        </select>
-      </label>
-      <label>일차
-        <select value={dayFilter} onChange={(event) => onDayChange(event.target.value)}>
-          <option value="all">전체 일차</option>
-          {dayOptions.map((day) => <option key={day} value={day}>{day}일차</option>)}
-        </select>
-      </label>
-    </div>
-  );
-}
-
-function ProgressMatrix({ state, students, days, onUnlock }) {
-  return (
-    <div className="progressMatrixWrap">
-      <table className="progressMatrix">
-        <thead>
-          <tr>
-            <th className="stickyStudent">학생</th>
-            {days.map((day) => <th key={day}>{day}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <tr key={student.id}>
-              <td className="stickyStudent">
-                <strong>{student.name} <StudentLevelBadge state={state} student={student} /></strong>
-                <span>{student.grade} · {student.level}</span>
-              </td>
-              {days.map((day) => {
-                const status = getDayProgressStatus(state, student, day);
-                return (
-                  <td key={`${student.id}-${day}`}>
-                    <span className={`matrixCellWrap ${status.key}`}>
-                      <span className={`matrixCell ${status.key}`} title={status.title}>{status.label}</span>
-                      {status.key === "locked" && (
-                        <button
-                          className="matrixUnlock"
-                          type="button"
-                          title={`${student.name} ${day}일차 잠금 해제`}
-                          aria-label={`${student.name} ${day}일차 잠금 해제`}
-                          onClick={() => onUnlock(student.id, day)}
-                        >
-                          열
-                        </button>
-                      )}
-                    </span>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!students.length && <p className="emptyText">표시할 학생이 없습니다.</p>}
-    </div>
-  );
-}
-
-function getDayProgressStatus(state, student, day) {
-  const record = state.progress[student.id]?.quiz?.[day];
-  const completed = state.progress[student.id]?.completed?.[day] && !record?.wrong?.length;
-  const explicitUnlock = state.progress[student.id]?.unlocks?.[day];
-  const unlockAt = explicitUnlock || getInferredUnlockForDay(state, student, day);
-  const finishedText = formatLearningDateTime(record?.finishedAt);
-  if (completed) return { key: "completed", label: "완", title: `${day}일차 학습 완성${finishedText ? ` · ${finishedText}` : ""}` };
-  if (record?.wrong?.length) return { key: "retry", label: "복", title: `${day}일차 복습 필요${finishedText ? ` · 최근 학습 ${finishedText}` : ""}: ${record.wrong.join(", ")}` };
-  if (record?.total) return { key: "active", label: "진", title: `${day}일차 진행 중 ${record.correct || 0}/${record.total || 0}${finishedText ? ` · 최근 학습 ${finishedText}` : ""}` };
-  if (explicitUnlock === "open") return { key: "ready", label: "대", title: `${day}일차 관리자 잠금 해제` };
-  if (!explicitUnlock && Number(student.day) === Number(day)) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
-  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) {
-    const unlockText = formatKoreanUnlockTime(unlockAt);
-    return { key: "locked", label: "잠", title: `${day}일차 ${unlockText}부터 학습 가능` };
-  }
-  if (Number(student.day) === Number(day) || unlockAt) return { key: "ready", label: "대", title: `${day}일차 학습 가능` };
-  return { key: "idle", label: "-", title: `${day}일차 시작 전` };
-}
-
-function formatLearningDateTime(value) {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Seoul"
-  });
-}
-
-function getInferredUnlockForDay(state, student, day) {
-  const targetDay = Number(day);
-  const previousDay = targetDay - 1;
-  if (previousDay < 1) return "";
-  const previousRecord = state.progress[student.id]?.quiz?.[previousDay];
-  const previousCompleted = state.progress[student.id]?.completed?.[previousDay] && !previousRecord?.wrong?.length;
-  if (!previousCompleted) return "";
-  const hasTargetLesson = state.curriculum.some(
-    (lesson) => Number(lesson.day) === targetDay && String(lesson.level || "").trim() === String(student.level || "").trim()
-  );
-  if (!hasTargetLesson) return "";
-  return inferNextUnlockFromRecord(previousRecord) || "";
-}
-
-function formatKoreanUnlockTime(value) {
-  const date = new Date(value);
-  const koreanDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  const month = koreanDate.getUTCMonth() + 1;
-  const day = koreanDate.getUTCDate();
-  const hour = koreanDate.getUTCHours();
-  const minute = String(koreanDate.getUTCMinutes()).padStart(2, "0");
-  const period = hour < 12 ? "오전" : "오후";
-  const displayHour = hour < 12 ? hour : hour - 12;
-  return `${month}. ${day}일 ${period} ${String(displayHour).padStart(2, "0")}:${minute}`;
-}
-
-function getProgressStatus(state, student) {
-  const unlockAt = state.progress[student.id]?.unlocks?.[student.day];
-  if (unlockAt && Date.now() < new Date(unlockAt).getTime()) return { key: "locked", label: "대기 중" };
-  const record = state.progress[student.id]?.quiz?.[student.day];
-  const completed = state.progress[student.id]?.completed?.[student.day] && !record?.wrong?.length;
-  if (completed) return { key: "completed", label: "학습 완성" };
-  if (record?.wrong?.length) return { key: "retry", label: "복습 필요" };
-  if (record?.total) return { key: "active", label: "진행 중" };
-  return { key: "idle", label: "시작 전" };
-}
-
-function LevelDayOverview({ lessons, selectedDay, onSelect }) {
-  return (
-    <section className="levelDayOverview">
-      <div className="quickEditorHead">
-        <strong>난이도별 일차 구성</strong>
-        <span>일차를 누르면 아래 편집 카드가 바뀝니다.</span>
-      </div>
-      <div className="levelDayList">
-        {lessons.map((lesson) => (
-          <button
-            className={Number(selectedDay) === Number(lesson.day) ? "active" : ""}
-            type="button"
-            key={lesson.day}
-            onClick={() => onSelect(lesson.day)}
-          >
-            <b>{lesson.day}일차</b>
-            <span>{lesson.label}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HanjaQuickEditor({ hanjaSet, dailyCount, onHanjaChange, onVocabChange, onExampleChange, onAddVocab, onRemoveVocab }) {
-  const visibleHanja = hanjaSet.slice(0, Number(dailyCount) || hanjaSet.length);
-
-  if (!visibleHanja.length) {
-    return (
-      <section className="quickEditor">
-        <div className="quickEditorHead">
-          <strong>일차별 한자 구성</strong>
-          <span>JSON을 확인해 주세요.</span>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="quickEditor">
-      <div className="quickEditorHead">
-        <strong>일차별 한자 구성</strong>
-        <span>카드에서 수정하면 아래 JSON에 바로 반영됩니다.</span>
-      </div>
-      <div className="quickHanjaGrid">
-        {visibleHanja.map((hanja, hanjaIndex) => (
-          <article className="quickHanjaCard" key={`${hanja.character}-${hanjaIndex}`}>
-            <div className="quickHanjaTop">
-              <b>{hanjaIndex + 1}번</b>
-              <span>{hanjaIndex < 2 ? "관계 한자" : `${hanjaIndex === 2 ? "1번" : "2번"}과 동음`}</span>
-            </div>
-            <div className="quickHanjaFields">
-              <label>한자<input value={hanja.character || ""} onChange={(event) => onHanjaChange(hanjaIndex, "character", event.target.value)} /></label>
-              <label>음<input value={hanja.sound || ""} onChange={(event) => onHanjaChange(hanjaIndex, "sound", event.target.value)} /></label>
-              <label>뜻<input value={hanja.meaning || ""} onChange={(event) => onHanjaChange(hanjaIndex, "meaning", event.target.value)} /></label>
-            </div>
-            <div className="quickHanjaMetaFields">
-              <label>형성 원리<input value={hanja.origin || ""} onChange={(event) => onHanjaChange(hanjaIndex, "origin", event.target.value)} /></label>
-              <label>관계 설명<input value={hanja.relation || ""} onChange={(event) => onHanjaChange(hanjaIndex, "relation", event.target.value)} /></label>
-            </div>
-            <div className="quickVocabHead">
-              <strong>어휘 {hanja.vocab?.length || 0}개</strong>
-              <button className="miniBtn" type="button" onClick={() => onAddVocab(hanjaIndex)}>어휘 추가</button>
-            </div>
-            <div className="quickVocabList">
-              {(hanja.vocab || []).map((vocab, vocabIndex) => (
-                <div className="quickVocabItem" key={`${vocab.word}-${vocabIndex}`}>
-                  <div className="quickVocabRow">
-                    <input aria-label="한자어" value={vocab.hanja || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "hanja", event.target.value)} />
-                    <input aria-label="단어" value={vocab.word || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "word", event.target.value)} />
-                    <input aria-label="뜻" value={vocab.meaning || ""} onChange={(event) => onVocabChange(hanjaIndex, vocabIndex, "meaning", event.target.value)} />
-                    <button className="miniBtn danger" type="button" onClick={() => onRemoveVocab(hanjaIndex, vocabIndex)}>삭제</button>
-                  </div>
-                  <div className="quickExampleGrid">
-                    {[0, 1, 2].map((exampleIndex) => (
-                      <input
-                        key={`${vocab.word}-${vocabIndex}-example-${exampleIndex}`}
-                        aria-label={`용례 ${exampleIndex + 1}`}
-                        placeholder={`용례 ${exampleIndex + 1}`}
-                        value={(Array.isArray(vocab.examples) ? vocab.examples : [])[exampleIndex] || ""}
-                        onChange={(event) => onExampleChange(hanjaIndex, vocabIndex, exampleIndex, event.target.value)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ContentPreview({ preview, dailyCount }) {
-  const visibleHanja = preview.hanjaSet.slice(0, Number(dailyCount) || preview.hanjaSet.length);
-  const blockingErrors = preview.errors.filter((error) => !isSaveableContentWarning(error));
-  const warnings = preview.errors.filter(isSaveableContentWarning);
-  return (
-    <section className={`contentPreview ${blockingErrors.length ? "hasError" : warnings.length ? "hasWarning" : ""}`}>
-      <div className="previewSummary">
-        <span><b>{visibleHanja.length}</b>학습 한자</span>
-        <span><b>{preview.vocabCount}</b>전체 어휘</span>
-        <span><b>{blockingErrors.length ? "확인 필요" : warnings.length ? "저장 가능" : "저장 가능"}</b>상태</span>
-      </div>
-      {blockingErrors.length || warnings.length ? (
-        <ul className="previewErrors">
-          {[...blockingErrors, ...warnings].slice(0, 5).map((error) => <li key={error}>{isSaveableContentWarning(error) ? formatSaveableWarning(error) : error}</li>)}
-        </ul>
-      ) : (
-        <div className="hanjaPreviewList">
-          {visibleHanja.map((hanja, index) => (
-            <article key={`${hanja.character}-${index}`}>
-              <strong>{hanja.character}</strong>
-              <span>음 {hanja.sound} · 뜻 {hanja.meaning}</span>
-              <small>{hanja.vocab?.length || 0}개 어휘</small>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function isSaveableContentWarning(error) {
-  const text = String(error || "");
-  return text.includes("어휘가 8개 이상 필요합니다.") || text.includes("실제 용례를 확인해 주세요.");
-}
-
-function formatSaveableWarning(error) {
-  const text = String(error || "");
-  if (text.includes("어휘가 8개 이상 필요합니다.")) return text.replace("필요합니다.", "권장됩니다.");
-  if (text.includes("실제 용례를 확인해 주세요.")) return text.replace("확인해 주세요.", "나중에 보완할 수 있습니다.");
-  return text;
-}
-
-function csvCell(value) {
-  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
-}
-
-function makeNeedsReviewExamples(word) {
-  const cleanWord = String(word || "").trim() || "어휘";
-  return [
-    `${cleanWord} 용례 확인 필요.`,
-    `${cleanWord} 용례 확인 필요.`,
-    `${cleanWord} 용례 확인 필요.`
-  ];
-}
-
-function buildWorksheet(curriculum, { level, endDay, questionCount }) {
-  const rangeEnd = Number(endDay || 5);
-  const rangeStart = Math.max(1, rangeEnd - 4);
-  const lessons = [];
-  for (let day = rangeStart; day <= rangeEnd; day += 1) {
-    const lesson = findLesson(curriculum, day, level);
-    if (lesson) lessons.push(lesson);
-  }
-  const seen = new Set();
-  const words = lessons
-    .flatMap((lesson) => lessonVocab(lesson).map((item) => ({ ...item, day: Number(lesson.day) })))
-    .filter((item) => {
-      const key = item.word || item.hanja;
-      if (!key || !item.meaning || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  const questions = buildWorksheetQuestions(words, Number(questionCount || 30));
-  return { level, rangeStart, rangeEnd, lessons, words, questions };
-}
-
-function buildWorksheetQuestions(words, questionCount) {
-  const pool = shuffleItems(words);
-  const count = Math.min(Math.max(1, questionCount), pool.length || 0);
-  const writingCount = Math.ceil(count * 0.4);
-  const choiceCount = Math.ceil(count * 0.35);
-  const blankCount = Math.max(0, count - writingCount - choiceCount);
-  const questions = [];
-  let cursor = 0;
-
-  pool.slice(cursor, cursor + writingCount).forEach((item) => {
-    questions.push({ type: "write", prompt: item.meaning, answer: item.word, meta: item });
-  });
-  cursor += writingCount;
-
-  pool.slice(cursor, cursor + choiceCount).forEach((item) => {
-    const distractors = shuffleItems(words.filter((word) => word.word !== item.word)).slice(0, 3);
-    questions.push({
-      type: "choice",
-      prompt: item.word,
-      answer: item.meaning,
-      choices: shuffleItems([item, ...distractors]).map((choice) => choice.meaning),
-      meta: item
-    });
-  });
-  cursor += choiceCount;
-
-  pool.slice(cursor, cursor + blankCount).forEach((item) => {
-    const example = (item.examples || []).find((sentence) => String(sentence || "").includes(item.word)) || `${item.word}의 의미를 생각하며 문장을 완성해 보세요.`;
-    questions.push({
-      type: "blank",
-      prompt: String(example).replaceAll(item.word, "(          )"),
-      answer: item.word,
-      meta: item
-    });
-  });
-
-  return shuffleItems(questions).map((question, index) => ({ ...question, number: index + 1 }));
-}
-
-function createWorksheetHtml(worksheet) {
-  const title = `${worksheet.level} ${worksheet.rangeStart}-${worksheet.rangeEnd}일차 누적 어휘 학습지`;
-  const issuedAt = new Date().toLocaleDateString("ko-KR");
-  const writeQuestions = worksheet.questions.filter((item) => item.type === "write");
-  const choiceQuestions = worksheet.questions.filter((item) => item.type === "choice");
-  const blankQuestions = worksheet.questions.filter((item) => item.type === "blank");
-  return `<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeWorksheetHtml(title)}</title>
-  <style>
-    @page { size: A4; margin: 16mm; }
-    * { box-sizing: border-box; }
-    body { margin: 0; color: #14213d; font-family: Arial, "Malgun Gothic", sans-serif; }
-    header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #14213d; padding-bottom: 12px; margin-bottom: 18px; }
-    h1 { margin: 0 0 8px; font-size: 25px; }
-    h2 { margin: 24px 0 10px; padding: 8px 12px; border-radius: 12px; background: #eaf8ff; font-size: 17px; }
-    .meta { color: #65708a; font-weight: 700; }
-    .nameBox { min-width: 210px; border: 2px solid #d9e6f7; border-radius: 12px; padding: 10px; font-weight: 800; }
-    ol { margin: 0; padding-left: 24px; }
-    li { margin: 0 0 12px; break-inside: avoid; line-height: 1.55; }
-    .answerLine { display: inline-block; min-width: 150px; border-bottom: 1.8px solid #14213d; margin-left: 8px; }
-    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px; margin-top: 5px; color: #34415f; }
-    .wordBank { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 16px; }
-    .wordBank span { border: 1px solid #d9e6f7; border-radius: 999px; padding: 4px 8px; background: #f8fbff; font-weight: 800; }
-    .answers { break-before: page; }
-    .answerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
-    .answerGrid div { border-bottom: 1px solid #d9e6f7; padding-bottom: 4px; }
-    .toolbar { position: fixed; right: 18px; top: 18px; display: flex; gap: 8px; }
-    .toolbar button { border: 0; border-radius: 999px; padding: 10px 14px; background: #58cc02; color: white; font-weight: 900; cursor: pointer; }
-    @media print { .toolbar { display: none; } }
-  </style>
-</head>
-<body>
-  <div class="toolbar"><button onclick="window.print()">인쇄/PDF 저장</button></div>
-  <header>
-    <div>
-      <h1>${escapeWorksheetHtml(title)}</h1>
-      <div class="meta">발행일 ${escapeWorksheetHtml(issuedAt)} · 총 ${worksheet.questions.length}문항 · 누적 어휘 ${worksheet.words.length}개</div>
-    </div>
-    <div class="nameBox">이름: __________________</div>
-  </header>
-  <section>
-    <h2>1. 뜻을 보고 알맞은 어휘를 쓰세요.</h2>
-    <ol>${writeQuestions.map((item) => `<li>${escapeWorksheetHtml(item.prompt)} <span class="answerLine"></span></li>`).join("")}</ol>
-  </section>
-  <section>
-    <h2>2. 어휘의 뜻으로 알맞은 것을 고르세요.</h2>
-    <ol>${choiceQuestions.map((item) => `<li><b>${escapeWorksheetHtml(item.prompt)}</b><div class="choices">${item.choices.map((choice, index) => `<span>${index + 1}. ${escapeWorksheetHtml(choice)}</span>`).join("")}</div></li>`).join("")}</ol>
-  </section>
-  <section>
-    <h2>3. 문맥에 알맞은 어휘를 쓰세요.</h2>
-    <div class="wordBank">${shuffleItems(blankQuestions).map((item) => `<span>${escapeWorksheetHtml(item.answer)}</span>`).join("")}</div>
-    <ol>${blankQuestions.map((item) => `<li>${escapeWorksheetHtml(item.prompt)}</li>`).join("")}</ol>
-  </section>
-  <section class="answers">
-    <h1>정답</h1>
-    <div class="answerGrid">${worksheet.questions.map((item) => `<div>${item.number}. ${escapeWorksheetHtml(item.answer)}</div>`).join("")}</div>
-  </section>
-</body>
-</html>`;
-}
-
-function escapeWorksheetHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function shuffleItems(items) {
-  return [...items].sort(() => Math.random() - 0.5);
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let quoted = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-    if (quoted) {
-      if (char === "\"" && next === "\"") {
-        cell += "\"";
-        index += 1;
-      } else if (char === "\"") {
-        quoted = false;
-      } else {
-        cell += char;
-      }
-    } else if (char === "\"") {
-      quoted = true;
-    } else if (char === ",") {
-      row.push(cell.trim());
-      cell = "";
-    } else if (char === "\n") {
-      row.push(cell.trim());
-      rows.push(row);
-      row = [];
-      cell = "";
-    } else if (char !== "\r") {
-      cell += char;
-    }
-  }
-
-  if (cell || row.length) {
-    row.push(cell.trim());
-    rows.push(row);
-  }
-  return rows;
-}
-
-function normalizeHeader(header) {
-  const value = String(header || "").replace(/^\uFEFF/, "").trim().toLowerCase();
-  const map = {
-    "이름": "name",
-    name: "name",
-    "학생": "name",
-    "아이디": "loginId",
-    id: "loginId",
-    loginid: "loginId",
-    "전화번호": "phone",
-    "휴대폰": "phone",
-    phone: "phone",
-    tel: "phone",
-    "비밀번호": "password",
-    password: "password",
-    "학년": "grade",
-    grade: "grade",
-    "난이도": "level",
-    level: "level",
-    "일차": "day",
-    day: "day",
-    "현재 일차": "day"
-  };
-  return map[value] || value;
-}
-
-function Select({ label, value, onChange, options }) {
-  return (
-    <label>{label}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
-  );
-}
-
-

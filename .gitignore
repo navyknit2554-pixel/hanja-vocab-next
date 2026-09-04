@@ -1,8 +1,8 @@
-.next
 node_modules
-out
-.data
+.next
 .npm-cache
+.data
 .vercel
 .env*
 !.env.example
+*.log

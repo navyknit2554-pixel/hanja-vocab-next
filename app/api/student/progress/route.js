@@ -1,89 +1,116 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getState, setState } from "../../../../src/lib/serverStore";
-import { readStudentSession, studentCookieName } from "../../../../src/lib/studentAuth";
-import { studentPayload, withoutPassword } from "../../../../src/lib/studentPayload";
+import { readStudentSession, studentCookieName } from "../../../../src/lib/auth";
+import { sql } from "../../../../src/lib/db";
+import { getStudentToday } from "../../../../src/lib/learning";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 export async function PUT(request) {
-  const cookieStore = await cookies();
-  const session = readStudentSession(cookieStore.get(studentCookieName)?.value);
-  if (!session?.studentId) return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  try {
+    const cookieStore = await cookies();
+    const session = readStudentSession(cookieStore.get(studentCookieName())?.value);
+    if (!session?.studentId) return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
 
-  const body = await request.json().catch(() => ({}));
-  const lessonDay = Number(body.lessonDay);
-  if (!lessonDay || (!body.stats && !body.game)) return NextResponse.json({ ok: false, message: "학습 결과 형식이 올바르지 않습니다." }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const lessonDay = Number(body.lessonDay || 0);
+    const stats = body.stats || {};
+    if (!lessonDay) return NextResponse.json({ ok: false, message: "학습 일차를 확인해 주세요." }, { status: 400 });
 
-  const state = await getState(session.scopeKey);
-  const student = state.students.find((item) => item.id === session.studentId);
-  if (!student) return NextResponse.json({ ok: false, message: "학생 계정을 찾을 수 없습니다." }, { status: 404 });
+    const db = await sql();
+    const studentRows = await db`
+      select id, level, current_day
+      from students
+      where id = ${session.studentId}
+      limit 1
+    `;
+    const student = studentRows[0];
+    if (!student) return NextResponse.json({ ok: false, message: "학생 계정을 찾지 못했습니다." }, { status: 404 });
 
-  state.progress[student.id] ||= { completed: {}, quiz: {} };
-  state.progress[student.id].games ||= {};
-  if (body.game) {
-    const game = body.game || {};
-    const key = String(game.key || `${game.type || "game"}:${lessonDay}`);
-    state.progress[student.id].games[key] = {
-      type: String(game.type || "archery"),
-      rangeStart: Number(game.rangeStart || lessonDay),
-      rangeEnd: Number(game.rangeEnd || lessonDay),
-      level: String(game.level || student.level || ""),
-      score: Number(game.score || 0),
-      hits: Number(game.hits || 0),
-      total: Number(game.total || 0),
-      missed: Number(game.missed || 0),
-      accuracy: Number(game.accuracy || 0),
-      reviewedWords: Array.isArray(game.reviewedWords) ? game.reviewedWords : [],
-      hitWords: Array.isArray(game.hitWords) ? game.hitWords : [],
-      missedWords: Array.isArray(game.missedWords) ? game.missedWords : [],
-      answers: Array.isArray(game.answers) ? game.answers : [],
-      cleared: Boolean(game.cleared),
-      finishedAt: new Date().toISOString()
-    };
-    await setState(state, session.scopeKey);
-    return NextResponse.json(studentPayload(state, student));
-  }
+    const lessonRows = await db`
+      select id
+      from curriculum_days
+      where level = ${student.level}
+        and day = ${lessonDay}
+      limit 1
+    `;
+    const lesson = lessonRows[0];
+    if (!lesson) return NextResponse.json({ ok: false, message: "학습 일차를 찾지 못했습니다." }, { status: 404 });
 
-  const mastered = Array.isArray(body.stats.wrong) ? body.stats.wrong.length === 0 : Boolean(body.stats.mastered);
-  const previousRecord = state.progress[student.id].quiz?.[lessonDay] || {};
-  const currentDay = Number(student.day || 1);
-  const alreadyMastered = Boolean(state.progress[student.id].completed?.[lessonDay]) && !previousRecord?.wrong?.length;
-  if (lessonDay < currentDay && alreadyMastered) {
-    return NextResponse.json({
-      ok: true,
-      stale: true,
-      message: "이미 완료한 이전 일차입니다. 현재 일차로 이동합니다.",
-      ...studentPayload(state, student)
-    });
-  }
-  state.progress[student.id].completed[lessonDay] = mastered;
-  state.progress[student.id].unlocks ||= {};
-  state.progress[student.id].quiz[lessonDay] = {
-    correct: Number(body.stats.correct || 0),
-    total: Number(body.stats.total || 0),
-    wrong: Array.isArray(body.stats.wrong) ? body.stats.wrong : [],
-    wrongHistory: Array.isArray(body.stats.wrongHistory) ? body.stats.wrongHistory : [],
-    attempts: Number(previousRecord.attempts || 0) + 1,
-    mastered,
-    finishedAt: new Date().toISOString()
-  };
-  if (mastered) {
-    const nextDay = lessonDay + 1;
-    const hasNextLesson = state.curriculum.some((lesson) => Number(lesson.day) === nextDay && String(lesson.level || "").trim() === String(student.level || "").trim());
-    if (hasNextLesson) {
-      state.progress[student.id].unlocks[nextDay] ||= nextKoreanMidnightIso();
-      if (Number(student.day || 1) <= lessonDay) student.day = nextDay;
+    const wrong = Array.isArray(stats.wrong) ? stats.wrong : [];
+    const total = Math.max(0, Number(stats.total || 0));
+    const correct = Math.max(0, Number(stats.correct || 0));
+    const completed = total > 0 && wrong.length === 0;
+    const status = completed ? "completed" : wrong.length ? "needs_review" : total ? "in_progress" : "not_started";
+
+    const previous = await db`
+      select attempts
+      from student_progress
+      where student_id = ${student.id}
+        and curriculum_day_id = ${lesson.id}
+      limit 1
+    `;
+    const attempts = Math.max(1, Number(previous[0]?.attempts || 0) + 1);
+
+    await db`
+      insert into student_progress (
+        student_id,
+        curriculum_day_id,
+        status,
+        unlocked_at,
+        started_at,
+        completed_at,
+        correct_count,
+        total_count,
+        attempts
+      )
+      values (
+        ${student.id},
+        ${lesson.id},
+        ${status},
+        coalesce((select unlocked_at from student_progress where student_id = ${student.id} and curriculum_day_id = ${lesson.id}), now()),
+        coalesce((select started_at from student_progress where student_id = ${student.id} and curriculum_day_id = ${lesson.id}), now()),
+        ${completed ? new Date().toISOString() : null},
+        ${correct},
+        ${total},
+        ${attempts}
+      )
+      on conflict (student_id, curriculum_day_id)
+      do update set
+        status = excluded.status,
+        started_at = coalesce(student_progress.started_at, excluded.started_at),
+        completed_at = excluded.completed_at,
+        correct_count = excluded.correct_count,
+        total_count = excluded.total_count,
+        attempts = excluded.attempts
+    `;
+
+    if (completed && Number(student.current_day) <= lessonDay) {
+      const nextRows = await db`
+        select id
+        from curriculum_days
+        where level = ${student.level}
+          and day = ${lessonDay + 1}
+        limit 1
+      `;
+      if (nextRows[0]) {
+        await db`
+          update students
+          set current_day = ${lessonDay + 1},
+              updated_at = now()
+          where id = ${student.id}
+        `;
+      }
     }
+
+    const payload = await getStudentToday(student.id);
+    return NextResponse.json({ ok: true, ...payload });
+  } catch (error) {
+    console.error("student progress save failed", error);
+    return NextResponse.json(
+      { ok: false, message: error?.message || "학습 결과를 저장하지 못했습니다." },
+      { status: 500 }
+    );
   }
-
-  await setState(state, session.scopeKey);
-  return NextResponse.json(studentPayload(state, student));
-}
-
-function nextKoreanMidnightIso() {
-  const now = new Date();
-  const koreanNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const nextMidnightUtcMs = Date.UTC(koreanNow.getUTCFullYear(), koreanNow.getUTCMonth(), koreanNow.getUTCDate() + 1, -9, 0, 0, 0);
-  return new Date(nextMidnightUtcMs).toISOString();
 }
