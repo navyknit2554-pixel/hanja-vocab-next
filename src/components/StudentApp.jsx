@@ -131,6 +131,11 @@ export function StudentApp() {
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setPayload(null);
+    resetLearningState();
+    setStatus("");
+  }
+
+  function resetLearningState() {
     setStage("home");
     setCardIndex(0);
     setQuizQueue([]);
@@ -138,7 +143,27 @@ export function StudentApp() {
     setRetryQueue([]);
     setFeedback(null);
     setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+  }
+
+  function goHome() {
+    resetLearningState();
     setStatus("");
+  }
+
+  function goPreviousStage() {
+    setFeedback(null);
+    if (stage === "cards") {
+      setStage("home");
+      return;
+    }
+    if (stage === "quiz") {
+      setStage("cards");
+      setCardIndex(Math.max(0, lessonItems.length - 1));
+      return;
+    }
+    if (stage === "done") {
+      startQuiz();
+    }
   }
 
   if (payload?.student) {
@@ -155,6 +180,9 @@ export function StudentApp() {
             <>
               <LessonStats hanja={payload.hanja} />
               {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
+              {stage !== "home" && stage !== "saving" ? (
+                <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
+              ) : null}
               {stage === "cards" && currentCard ? (
                 <StudyCard
                   item={currentCard}
@@ -225,6 +253,17 @@ function HomeLesson({ hanja, onCards, onQuiz }) {
   );
 }
 
+function StageNavigation({ stage, onPrev, onHome }) {
+  const label = stage === "quiz" ? "한자 학습으로" : stage === "done" ? "문제 다시 보기" : "처음 화면으로";
+
+  return (
+    <div className="stageNavigation">
+      <button className="btn secondary" type="button" onClick={onPrev}>◀ {label}</button>
+      <button className="btn textBtn" type="button" onClick={onHome}>홈</button>
+    </div>
+  );
+}
+
 function StudyCard({ item, index, total, onPrev, onNext }) {
   const touchStartX = useRef(null);
   const isFirst = index === 0;
@@ -259,7 +298,7 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
         type="button"
         onClick={goPrev}
         disabled={isFirst}
-        aria-label="앞 페이지"
+        aria-label="이전 카드"
       >
         ‹
       </button>
@@ -267,7 +306,7 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
         className="cardPageButton next"
         type="button"
         onClick={goNext}
-        aria-label={isLast ? "문제 풀기" : "뒤 페이지"}
+        aria-label={isLast ? "문제 풀기" : "다음 카드"}
       >
         ›
       </button>
@@ -290,8 +329,8 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
         </>
       )}
       <div className="navRow">
-        <button className="btn secondary" type="button" onClick={goPrev} disabled={isFirst}>앞 페이지</button>
-        <button className="btn primary" type="button" onClick={goNext}>{isLast ? "문제 풀기" : "뒤 페이지"}</button>
+        <button className="btn secondary" type="button" onClick={goPrev} disabled={isFirst}>이전 카드</button>
+        <button className="btn primary" type="button" onClick={goNext}>{isLast ? "문제 풀기" : "다음 카드"}</button>
       </div>
     </article>
   );
