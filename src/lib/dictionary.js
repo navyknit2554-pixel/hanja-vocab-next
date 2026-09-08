@@ -1,11 +1,17 @@
 const searchUrl = "https://krdict.korean.go.kr/api/search";
 const viewUrl = "https://krdict.korean.go.kr/api/view";
+const characterAliases = new Map([
+  ["强", "強"]
+]);
+const blockedWords = new Set(["강간"]);
+const blockedDefinitionPatterns = [/성관계/, /폭행/, /도둑/, /습격/];
 
 export async function lookupHanjaVocabulary(character, limit = 8) {
   const apiKey = process.env.KOREAN_DICT_API_KEY || process.env.KRDICT_API_KEY;
   if (!apiKey) throw new Error("KOREAN_DICT_API_KEY 환경변수가 필요합니다.");
+  const searchCharacter = normalizeSearchCharacter(character);
 
-  const candidates = await fetchDictionaryPart(apiKey, character, "word", {
+  const candidates = await fetchDictionaryPart(apiKey, searchCharacter, "word", {
     method: "include",
     type2: "chinese",
     target: "4",
@@ -13,11 +19,12 @@ export async function lookupHanjaVocabulary(character, limit = 8) {
     num: "100"
   });
   const filtered = candidates
-    .filter((item) => isValidCandidate(item, character))
-    .sort((left, right) => scoreCandidate(right, character) - scoreCandidate(left, character));
+    .filter((item) => isValidCandidate(item, searchCharacter))
+    .sort((left, right) => scoreCandidate(right, searchCharacter) - scoreCandidate(left, searchCharacter));
+  const unique = uniqueByWord(filtered);
 
   const enriched = await Promise.all(
-    filtered.slice(0, limit).map((item) => enrichCandidate(apiKey, item, character))
+    unique.slice(0, limit).map((item) => enrichCandidate(apiKey, item, searchCharacter))
   );
   return enriched.filter(Boolean).slice(0, limit);
 }
@@ -128,9 +135,12 @@ function parseExamplesFromView(xml, word) {
 function isValidCandidate(item, character) {
   const word = String(item.word || "").trim();
   const hanjaWord = extractHanjaWord(item.origin, character);
+  const definition = String(item.definition || "").trim();
   if (!word || word.length < 2 || word.length > 3 || /\s/.test(word)) return false;
-  if (!String(item.definition || "").trim()) return false;
+  if (!definition) return false;
   if (!hanjaWord || hanjaWord.length < 2 || hanjaWord.length > 3) return false;
+  if (blockedWords.has(word)) return false;
+  if (blockedDefinitionPatterns.some((pattern) => pattern.test(definition))) return false;
   return hanjaWord.includes(character);
 }
 
@@ -148,6 +158,21 @@ function scoreCandidate(item, character) {
   if (word.length === 3) score += 1;
   if (!/[·ㆍ,;()]/.test(String(item.origin || ""))) score += 1;
   return score;
+}
+
+function uniqueByWord(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = String(item.word || "").trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeSearchCharacter(character) {
+  const value = String(character || "").trim();
+  return characterAliases.get(value) || value;
 }
 
 function tag(xml, name) {
