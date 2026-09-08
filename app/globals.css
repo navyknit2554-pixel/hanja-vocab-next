@@ -522,53 +522,84 @@ textarea {
 }
 
 .curriculumIndexPanel {
-  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  border-top: 2px solid var(--line);
+  padding-top: 16px;
+}
+
+.miniSectionHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.miniSectionHeader h2,
+.miniSectionHeader p {
+  margin: 0;
+}
+
+.miniSectionHeader h2 {
+  font-size: 1.15rem;
+}
+
+.miniSectionHeader p {
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 900;
 }
 
 .curriculumScroller {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  max-height: 420px;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  max-height: 290px;
   overflow: auto;
   padding: 2px 4px 6px 2px;
 }
 
 .curriculumDayCard {
   display: grid;
-  gap: 6px;
-  min-height: 112px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
   border: 2px solid var(--line);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 8px 10px;
   background: #fff;
   color: var(--ink);
   text-align: left;
-  box-shadow: 0 4px 0 #e2f0ff;
+  box-shadow: none;
   cursor: pointer;
 }
 
 .curriculumDayCard.active {
   border-color: var(--green);
   background: #f2ffe9;
-  box-shadow: 0 4px 0 #a9df7b;
+  box-shadow: inset 4px 0 0 var(--green);
 }
 
 .curriculumDayCard span {
   color: var(--green-dark);
+  font-size: .92rem;
   font-weight: 1000;
 }
 
 .curriculumDayCard strong {
   min-width: 0;
   color: var(--ink);
-  font-size: 1.7rem;
+  font-size: 1.35rem;
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
 .curriculumDayCard small {
   color: var(--muted);
+  white-space: nowrap;
+  font-size: .82rem;
   font-weight: 900;
 }
 
@@ -981,11 +1012,6 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .curriculumScroller {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 360px;
-  }
-
   .lessonOverviewHeader {
     display: grid;
   }
@@ -996,7 +1022,11 @@ textarea {
 }
 
 @media (max-width: 420px) {
-  .curriculumScroller {
-    grid-template-columns: 1fr;
+  .curriculumDayCard {
+    grid-template-columns: 50px minmax(0, 1fr);
+  }
+
+  .curriculumDayCard small {
+    grid-column: 2;
   }
 }

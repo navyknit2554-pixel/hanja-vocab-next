@@ -400,6 +400,14 @@ export function AdminApp() {
                 <li>국어원 API는 현재 일차 단위로만 실행</li>
                 <li>용례 없는 어휘는 자동 저장하지 않음</li>
               </ul>
+              <CurriculumIndexPanel
+                level={level}
+                currentDay={day}
+                days={curriculumIndex}
+                status={curriculumStatus}
+                onSelectDay={setDay}
+                onRefresh={loadCurriculumIndex}
+              />
             </article>
             <article className="panel">
               <Mascot variant="discover" small label="자료 찾기" />
@@ -415,14 +423,6 @@ export function AdminApp() {
               <p className="statusText">{status}</p>
             </article>
           </section>
-          <CurriculumIndexPanel
-            level={level}
-            currentDay={day}
-            days={curriculumIndex}
-            status={curriculumStatus}
-            onSelectDay={setDay}
-            onRefresh={loadCurriculumIndex}
-          />
           <section className="panel reviewPanel">
         <div className="sectionHeader">
           <div>
@@ -510,13 +510,13 @@ function LessonHanjaOverview({ lessonData, level, day }) {
 
 function CurriculumIndexPanel({ level, currentDay, days, status, onSelectDay, onRefresh }) {
   return (
-    <section className="panel curriculumIndexPanel">
-      <div className="sectionHeader">
+    <section className="curriculumIndexPanel">
+      <div className="miniSectionHeader">
         <div>
           <h2>일차별 한자 구성</h2>
           <p>{status || `${level} 한자 구성을 한눈에 확인합니다.`}</p>
         </div>
-        <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+        <button className="btn textBtn" type="button" onClick={onRefresh}>새로고침</button>
       </div>
       <div className="curriculumScroller">
         {days.map((item) => (
