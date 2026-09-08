@@ -566,6 +566,7 @@ textarea {
 
 .curriculumDayCard {
   display: grid;
+  grid-template-areas: "day hanja meta";
   grid-template-columns: 58px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
@@ -601,12 +602,14 @@ textarea {
 }
 
 .curriculumDayCard span {
+  grid-area: day;
   color: var(--green-dark);
   font-size: .92rem;
   font-weight: 1000;
 }
 
 .curriculumDayCard strong {
+  grid-area: hanja;
   min-width: 0;
   color: var(--ink);
   font-size: 1.35rem;
@@ -615,6 +618,7 @@ textarea {
 }
 
 .curriculumDayCard small {
+  grid-area: meta;
   color: var(--muted);
   white-space: nowrap;
   font-size: .82rem;
@@ -1040,11 +1044,35 @@ textarea {
 }
 
 @media (max-width: 420px) {
+  .curriculumScroller {
+    gap: 10px;
+    max-height: min(360px, 48dvh);
+    padding: 2px 2px 10px;
+  }
+
   .curriculumDayCard {
-    grid-template-columns: 50px minmax(0, 1fr);
+    grid-template-areas:
+      "day hanja"
+      "day meta";
+    grid-template-columns: 60px minmax(0, 1fr);
+    row-gap: 4px;
+    min-height: 72px;
+    padding: 9px 12px;
+  }
+
+  .curriculumDayCard span {
+    align-self: center;
+    font-size: .95rem;
+  }
+
+  .curriculumDayCard strong {
+    font-size: 1.25rem;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   .curriculumDayCard small {
-    grid-column: 2;
+    white-space: normal;
+    line-height: 1.25;
   }
 }
