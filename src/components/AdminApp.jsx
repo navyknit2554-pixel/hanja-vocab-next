@@ -22,6 +22,8 @@ export function AdminApp() {
   const [status, setStatus] = useState("v2는 현재 새 구조를 세우는 단계입니다.");
   const [loading, setLoading] = useState(false);
   const [lessonData, setLessonData] = useState(null);
+  const [curriculumIndex, setCurriculumIndex] = useState([]);
+  const [curriculumStatus, setCurriculumStatus] = useState("");
   const [savingId, setSavingId] = useState("");
 
   useEffect(() => {
@@ -45,6 +47,10 @@ export function AdminApp() {
   useEffect(() => {
     if (admin?.role === "master" && view === "content") loadLesson();
   }, [admin, view, level, day]);
+
+  useEffect(() => {
+    if (admin?.role === "master" && view === "content") loadCurriculumIndex();
+  }, [admin, view, level]);
 
   async function loadAdminSession() {
     try {
@@ -182,6 +188,22 @@ export function AdminApp() {
     } catch (error) {
       setLessonData(null);
       setStatus(error.message || "일차 데이터를 불러오지 못했습니다.");
+    }
+  }
+
+  async function loadCurriculumIndex() {
+    setCurriculumStatus(`${level} 일차별 한자 구성을 불러오는 중...`);
+    try {
+      const response = await fetch(`/api/admin/curriculum?level=${encodeURIComponent(level)}`, { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "일차별 한자 구성을 불러오지 못했습니다.");
+      setCurriculumIndex(data.days || []);
+      setCurriculumStatus(`${level} ${data.days?.length || 0}개 일차`);
+    } catch (error) {
+      setCurriculumIndex([]);
+      setCurriculumStatus(error.message || "일차별 한자 구성을 불러오지 못했습니다.");
     }
   }
 
@@ -393,6 +415,14 @@ export function AdminApp() {
               <p className="statusText">{status}</p>
             </article>
           </section>
+          <CurriculumIndexPanel
+            level={level}
+            currentDay={day}
+            days={curriculumIndex}
+            status={curriculumStatus}
+            onSelectDay={setDay}
+            onRefresh={loadCurriculumIndex}
+          />
           <section className="panel reviewPanel">
         <div className="sectionHeader">
           <div>
@@ -475,6 +505,35 @@ function LessonHanjaOverview({ lessonData, level, day }) {
         <p className="mutedText">이 일차의 한자 구성을 확인하려면 난이도와 일차를 선택해 주세요.</p>
       )}
     </div>
+  );
+}
+
+function CurriculumIndexPanel({ level, currentDay, days, status, onSelectDay, onRefresh }) {
+  return (
+    <section className="panel curriculumIndexPanel">
+      <div className="sectionHeader">
+        <div>
+          <h2>일차별 한자 구성</h2>
+          <p>{status || `${level} 한자 구성을 한눈에 확인합니다.`}</p>
+        </div>
+        <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+      </div>
+      <div className="curriculumScroller">
+        {days.map((item) => (
+          <button
+            className={`curriculumDayCard ${Number(item.day) === Number(currentDay) ? "active" : ""}`}
+            key={item.id}
+            type="button"
+            onClick={() => onSelectDay(Number(item.day))}
+          >
+            <span>{item.day}일차</span>
+            <strong>{item.hanja.map((hanja) => hanja.character).join(" ") || "한자 없음"}</strong>
+            <small>{item.hanja.length}개 한자 · {item.vocabCount}개 어휘</small>
+          </button>
+        ))}
+        {!days.length ? <p className="statusText">표시할 일차별 한자 구성이 없습니다.</p> : null}
+      </div>
+    </section>
   );
 }
 

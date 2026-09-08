@@ -521,6 +521,57 @@ textarea {
   margin-top: 18px;
 }
 
+.curriculumIndexPanel {
+  margin-top: 18px;
+}
+
+.curriculumScroller {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 2px 4px 6px 2px;
+}
+
+.curriculumDayCard {
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 0 4px 0 #e2f0ff;
+  cursor: pointer;
+}
+
+.curriculumDayCard.active {
+  border-color: var(--green);
+  background: #f2ffe9;
+  box-shadow: 0 4px 0 #a9df7b;
+}
+
+.curriculumDayCard span {
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.curriculumDayCard strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 1.7rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.curriculumDayCard small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
 .lessonOverview {
   display: grid;
   gap: 12px;
@@ -930,11 +981,22 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .curriculumScroller {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 360px;
+  }
+
   .lessonOverviewHeader {
     display: grid;
   }
 
   .swipeCard {
     min-height: 390px;
+  }
+}
+
+@media (max-width: 420px) {
+  .curriculumScroller {
+    grid-template-columns: 1fr;
   }
 }
