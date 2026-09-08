@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Mascot } from "./Mascot";
 
 export function StudentApp() {
@@ -218,6 +219,7 @@ export function StudentApp() {
         <label>아이디<input value={login.loginId} onChange={(event) => setLogin({ ...login, loginId: event.target.value })} /></label>
         <label>비밀번호<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
         <button className="btn primary" disabled={loading}>{loading ? "로그인 중..." : "로그인"}</button>
+        <Link className="btn secondary loginSwitch" href="/admin">강사/원장 로그인</Link>
         {status ? <p className="errorText">{status}</p> : null}
       </form>
     </main>

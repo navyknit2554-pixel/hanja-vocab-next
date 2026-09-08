@@ -176,6 +176,10 @@ textarea {
   box-shadow: 0 5px 0 #cfe5f9;
 }
 
+.loginSwitch {
+  width: 100%;
+}
+
 .btn.textBtn {
   min-height: 36px;
   padding: 8px 12px;

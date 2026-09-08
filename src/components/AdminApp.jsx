@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Mascot } from "./Mascot";
 
 const emptyStudent = { name: "", loginId: "", password: "", phone: "", grade: "초1", level: "초급", currentDay: 1 };
@@ -346,6 +347,7 @@ export function AdminApp() {
           <label>마스터 비밀번호<input type="password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} placeholder="마스터만 입력" /></label>
           <label>라이선스 키<textarea value={loginForm.licenseKey} onChange={(event) => setLoginForm({ ...loginForm, licenseKey: event.target.value })} placeholder="원장님·강사님은 HANJA-... 키 입력" /></label>
           <button className="btn primary">로그인</button>
+          <Link className="btn secondary loginSwitch" href="/student">학생 로그인</Link>
           <button className="btn textBtn" type="button" onClick={logout}>세션 초기화</button>
           {loginStatus ? <p className="errorText">{loginStatus}</p> : null}
         </form>
