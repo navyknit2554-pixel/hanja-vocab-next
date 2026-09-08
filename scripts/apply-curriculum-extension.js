@@ -104,25 +104,28 @@ function parseLessonLine(line, day) {
 function validatePlan(plan) {
   if (plan.length !== 80) throw new Error(`구성안은 80일차여야 합니다. 현재 ${plan.length}일차입니다.`);
   const seenDay = new Set();
-  const seenCharacter = new Map();
+  const seenLesson = new Map();
   const invalid = [];
 
   for (const lesson of plan) {
     if (seenDay.has(lesson.day)) invalid.push(`${lesson.day}일차가 중복되었습니다.`);
     seenDay.add(lesson.day);
     if (lesson.hanja.length !== 4) invalid.push(`${lesson.day}일차 한자가 4개가 아닙니다.`);
+    if (lesson.hanja.length === 4) {
+      const [a, b, c, d] = lesson.hanja;
+      if (a.sound !== c.sound) invalid.push(`${lesson.day}일차 3번째 ${c.character}(${c.sound})는 1번째 ${a.character}(${a.sound})와 음이 같아야 합니다.`);
+      if (b.sound !== d.sound) invalid.push(`${lesson.day}일차 4번째 ${d.character}(${d.sound})는 2번째 ${b.character}(${b.sound})와 음이 같아야 합니다.`);
+      const lessonKey = lesson.hanja.map((item) => item.character).join("");
+      const existingLesson = seenLesson.get(lessonKey);
+      if (existingLesson) invalid.push(`${lesson.day}일차 한자 구성은 ${existingLesson}일차와 동일합니다.`);
+      else seenLesson.set(lessonKey, lesson.day);
+    }
     lesson.hanja.forEach((item, index) => {
       if (!/^[\u3400-\u9fff]$/.test(item.character)) {
         invalid.push(`${lesson.day}일차 ${index + 1}번째 '${item.character}'는 한 글자 한자가 아닙니다.`);
       }
       if (!item.sound || !item.meaning) {
         invalid.push(`${lesson.day}일차 ${item.character}의 음/뜻이 비었습니다.`);
-      }
-      const existing = seenCharacter.get(item.character);
-      if (existing) {
-        invalid.push(`${item.character} 중복: ${existing}일차와 ${lesson.day}일차`);
-      } else {
-        seenCharacter.set(item.character, lesson.day);
       }
     });
   }
@@ -165,7 +168,7 @@ async function upsertHanjaItems(lessonId, hanjaItems) {
     }
     await db`
       insert into hanja_items (curriculum_day_id, position, character, sound, meaning, radical, origin_note, relation_note, relation_role)
-      values (${lessonId}, ${position}, ${item.character}, ${item.sound}, ${item.meaning}, ${item.radical}, '', '', '')
+      values (${lessonId}, ${position}, ${item.character}, ${item.sound}, ${item.meaning}, ${item.radical}, '', ${relationNote(hanjaItems, position)}, ${relationRole(position)})
       on conflict (curriculum_day_id, position)
       do update set
         character = excluded.character,
@@ -173,8 +176,8 @@ async function upsertHanjaItems(lessonId, hanjaItems) {
         meaning = excluded.meaning,
         radical = excluded.radical,
         origin_note = '',
-        relation_note = '',
-        relation_role = '',
+        relation_note = excluded.relation_note,
+        relation_role = excluded.relation_role,
         updated_at = now()
     `;
     saved += 1;
@@ -236,4 +239,18 @@ function loadLocalEnv() {
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function relationRole(position) {
+  return ["관계-기준", "관계-짝", "동음-기준", "동음-짝"][position - 1] || "";
+}
+
+function relationNote(items, position) {
+  const [a, b, c, d] = items;
+  if (!a || !b || !c || !d) return "";
+  if (position === 1) return `${a.character}와 ${b.character}는 뜻이나 쓰임이 서로 이어지는 관계 한자입니다.`;
+  if (position === 2) return `${a.character}와 ${b.character}는 뜻이나 쓰임이 서로 이어지는 관계 한자입니다.`;
+  if (position === 3) return `${c.character}는 ${a.character}와 음이 같은 한자입니다.`;
+  if (position === 4) return `${d.character}는 ${b.character}와 음이 같은 한자입니다.`;
+  return "";
 }
