@@ -64,7 +64,21 @@ export async function GET(request) {
       }
     }
 
-    return NextResponse.json({ ok: true, level, days });
+    const firstSeenByHanja = new Map();
+    const duplicateDays = [];
+    for (const lesson of days) {
+      const hanjaKey = lesson.hanja.map((item) => item.character).join("");
+      if (!hanjaKey) continue;
+      const firstDay = firstSeenByHanja.get(hanjaKey);
+      if (firstDay) {
+        lesson.duplicateOf = firstDay;
+        duplicateDays.push({ day: lesson.day, duplicateOf: firstDay, hanja: hanjaKey });
+      } else {
+        firstSeenByHanja.set(hanjaKey, lesson.day);
+      }
+    }
+
+    return NextResponse.json({ ok: true, level, days, duplicateDays });
   } catch (error) {
     console.error("admin curriculum load failed", error);
     return adminErrorResponse(error, NextResponse);

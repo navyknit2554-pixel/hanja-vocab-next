@@ -200,7 +200,7 @@ export function AdminApp() {
       if (handleExpiredAdmin(response, data)) return;
       if (!response.ok) throw new Error(data.message || "일차별 한자 구성을 불러오지 못했습니다.");
       setCurriculumIndex(data.days || []);
-      setCurriculumStatus(`${level} ${data.days?.length || 0}개 일차`);
+      setCurriculumStatus(`${level} ${data.days?.length || 0}개 일차 · 중복 ${data.duplicateDays?.length || 0}개`);
     } catch (error) {
       setCurriculumIndex([]);
       setCurriculumStatus(error.message || "일차별 한자 구성을 불러오지 못했습니다.");
@@ -521,14 +521,14 @@ function CurriculumIndexPanel({ level, currentDay, days, status, onSelectDay, on
       <div className="curriculumScroller">
         {days.map((item) => (
           <button
-            className={`curriculumDayCard ${Number(item.day) === Number(currentDay) ? "active" : ""}`}
+            className={`curriculumDayCard ${Number(item.day) === Number(currentDay) ? "active" : ""} ${item.duplicateOf ? "duplicate" : ""}`}
             key={item.id}
             type="button"
             onClick={() => onSelectDay(Number(item.day))}
           >
             <span>{item.day}일차</span>
             <strong>{item.hanja.map((hanja) => hanja.character).join(" ") || "한자 없음"}</strong>
-            <small>{item.hanja.length}개 한자 · {item.vocabCount}개 어휘</small>
+            <small>{item.duplicateOf ? `${item.duplicateOf}일차와 동일` : `${item.hanja.length}개 한자 · ${item.vocabCount}개 어휘`}</small>
           </button>
         ))}
         {!days.length ? <p className="statusText">표시할 일차별 한자 구성이 없습니다.</p> : null}

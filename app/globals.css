@@ -582,6 +582,20 @@ textarea {
   box-shadow: inset 4px 0 0 var(--green);
 }
 
+.curriculumDayCard.duplicate {
+  border-color: #ffd0de;
+  background: #fff8fb;
+}
+
+.curriculumDayCard.duplicate small {
+  color: var(--pink);
+}
+
+.curriculumDayCard.active.duplicate {
+  border-color: var(--green);
+  background: #f2ffe9;
+}
+
 .curriculumDayCard span {
   color: var(--green-dark);
   font-size: .92rem;
