@@ -4,6 +4,7 @@ const sourceUrl = process.env.SOURCE_DATABASE_URL || process.env.OLD_DATABASE_UR
 const targetUrl = process.env.TARGET_DATABASE_URL || process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
 const sourceScopeKey = process.env.SOURCE_SCOPE_KEY || "main";
 const write = process.argv.includes("--write");
+const allowDuplicateCurriculum = process.argv.includes("--allow-duplicate-curriculum");
 
 if (!sourceUrl || !targetUrl) {
   console.error("기존 앱 DB 주소와 새 v2 DB 주소가 모두 필요합니다.");
@@ -51,10 +52,15 @@ async function main() {
 
   const data = normalizeJsonData(rows[0].data);
   const lessons = normalizeLessons(data?.curriculum);
+  const duplicateLessons = findDuplicateLessons(lessons);
   const hanjaCount = lessons.reduce((total, lesson) => total + lesson.hanja.length, 0);
 
   console.log(`${sourceScopeKey} 커리큘럼에서 ${lessons.length}개 일차, 한자 ${hanjaCount}개를 찾았습니다.`);
   console.table(summaryByLevel(lessons));
+  if (duplicateLessons.length) {
+    console.log(`\n주의: 같은 한자 구성으로 반복되는 일차 ${duplicateLessons.length}개를 찾았습니다.`);
+    console.table(duplicateLessons.slice(0, 20));
+  }
   console.log("\n미리보기 12개 일차:");
   console.table(lessons.slice(0, 12).map((lesson) => ({
     level: lesson.level,
@@ -67,6 +73,10 @@ async function main() {
     console.log("\n아직 DB에 반영하지 않았습니다. 실제 반영하려면:");
     console.log("npm.cmd run import:legacy-curriculum -- --write");
     return;
+  }
+
+  if (duplicateLessons.length && !allowDuplicateCurriculum) {
+    throw new Error("기존 커리큘럼에 반복 일차가 있어 반영을 멈췄습니다. 정말 그대로 넣어야 하면 --allow-duplicate-curriculum 옵션을 함께 사용하세요.");
   }
 
   let savedLessons = 0;
@@ -258,6 +268,26 @@ function summaryByLevel(lessons) {
     map.set(lesson.level, current);
   });
   return [...map.values()];
+}
+
+function findDuplicateLessons(lessons) {
+  const seen = new Map();
+  const duplicates = [];
+  for (const lesson of lessons) {
+    const key = `${lesson.level}:${lesson.hanja.map((item) => item.character).join("")}`;
+    const first = seen.get(key);
+    if (first) {
+      duplicates.push({
+        level: lesson.level,
+        day: lesson.day,
+        duplicateOf: first.day,
+        hanja: lesson.hanja.map((item) => item.character).join("")
+      });
+    } else {
+      seen.set(key, lesson);
+    }
+  }
+  return duplicates;
 }
 
 function normalizeJsonData(data) {

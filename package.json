@@ -12,6 +12,7 @@
     "check:data": "node scripts/check-data.js",
     "import:legacy-students": "node scripts/import-legacy-students.js",
     "import:legacy-curriculum": "node scripts/import-legacy-curriculum.js",
+    "curriculum:extend": "node scripts/apply-curriculum-extension.js",
     "import:legacy-licenses": "node scripts/import-legacy-licenses.js"
   },
   "dependencies": {

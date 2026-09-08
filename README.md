@@ -18,14 +18,14 @@
 처음 한 번만 환경변수를 저장합니다.
 
 ```powershell
-cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-v2"
+cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-next"
 powershell -ExecutionPolicy Bypass -File scripts\setup-local-env.ps1
 ```
 
 평소 실행은 아래 명령을 사용합니다. 3000 포트가 꼬였을 때도 이 명령을 먼저 씁니다.
 
 ```powershell
-cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-v2"
+cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-next"
 npm.cmd run dev:clean
 ```
 
@@ -52,7 +52,7 @@ http://localhost:3000/api/health
 학생이나 한자 구성이 사라진 것처럼 보일 때 먼저 확인합니다.
 
 ```powershell
-cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-v2"
+cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-next"
 npm.cmd run check:data
 ```
 
@@ -61,7 +61,7 @@ npm.cmd run check:data
 한자 구성이 이미 들어가 있다면 학생과 학습도만 가져옵니다.
 
 ```powershell
-cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-v2"
+cd "C:\Users\demps\Documents\Codex\2026-07-01\zmff\outputs\hanja-vocab-next"
 $env:SOURCE_DATABASE_URL="기존 데이터가 들어 있는 Supabase 연결 문자열"
 $env:SUPABASE_DATABASE_URL="새 v2 앱이 사용하는 Supabase 연결 문자열"
 npm.cmd run import:legacy-students -- --write
@@ -72,6 +72,15 @@ npm.cmd run import:legacy-students -- --write
 ```powershell
 npm.cmd run import:legacy-curriculum -- --write
 ```
+
+기존 앱의 자동 구성은 20일차 단위로 반복될 수 있으므로, 초급 21~100일차를 새 구성안으로 바꿀 때는 아래 명령을 사용합니다.
+
+```powershell
+npm.cmd run curriculum:extend
+npm.cmd run curriculum:extend -- --write
+```
+
+첫 번째 명령은 미리보기만 보여 주고, 두 번째 명령이 실제 Supabase DB에 반영합니다. 한자가 바뀐 자리의 기존 어휘는 삭제되며, 새 어휘는 관리자 화면에서 국어원 가져오기 버튼으로 다시 채웁니다.
 
 ## 배포 환경변수
 
