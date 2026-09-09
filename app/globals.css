@@ -580,10 +580,16 @@ textarea {
   display: block;
   width: max-content;
   max-width: 92vw;
+  min-height: 56px;
+  padding: 8px 20px;
+  border: 3px solid currentColor;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .94);
   white-space: nowrap;
-  font-size: clamp(2.1rem, 8vw, 3.3rem);
-  line-height: 1.08;
-  text-shadow: 0 5px 0 #dff4c8;
+  font-size: clamp(1.85rem, 7vw, 2.9rem);
+  line-height: 1.15;
+  box-shadow: none;
+  text-shadow: none;
 }
 
 .feedbackOverlay.correct {
@@ -596,10 +602,6 @@ textarea {
 
 .feedbackOverlay.wrong .feedbackCard {
   --feedback-x: -10px;
-}
-
-.feedbackOverlay.wrong strong {
-  text-shadow: 0 5px 0 #ffe1ea;
 }
 
 .preloadAssets {
@@ -1291,6 +1293,10 @@ textarea {
 
   .swipeCard {
     min-height: 390px;
+  }
+
+  .feedbackOverlay.wrong .feedbackCard {
+    --feedback-x: 0px;
   }
 }
 
