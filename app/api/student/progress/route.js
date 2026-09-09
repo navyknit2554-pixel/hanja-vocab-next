@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { readStudentSession, studentCookieName } from "../../../../src/lib/auth";
 import { sql } from "../../../../src/lib/db";
-import { getStudentToday } from "../../../../src/lib/learning";
+import { getStudentToday, nextKoreaMidnight } from "../../../../src/lib/learning";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
@@ -27,6 +27,9 @@ export async function PUT(request) {
     `;
     const student = studentRows[0];
     if (!student) return NextResponse.json({ ok: false, message: "학생 계정을 찾지 못했습니다." }, { status: 404 });
+    if (lessonDay !== Number(student.current_day)) {
+      return NextResponse.json({ ok: false, message: "오늘 배정된 일차만 학습할 수 있습니다." }, { status: 403 });
+    }
 
     const lessonRows = await db`
       select id
@@ -37,6 +40,21 @@ export async function PUT(request) {
     `;
     const lesson = lessonRows[0];
     if (!lesson) return NextResponse.json({ ok: false, message: "학습 일차를 찾지 못했습니다." }, { status: 404 });
+
+    const lockRows = await db`
+      select unlocked_at
+      from student_progress
+      where student_id = ${student.id}
+        and curriculum_day_id = ${lesson.id}
+      limit 1
+    `;
+    const unlockedAt = lockRows[0]?.unlocked_at ? new Date(lockRows[0].unlocked_at) : null;
+    if (unlockedAt && unlockedAt.getTime() > Date.now()) {
+      return NextResponse.json(
+        { ok: false, message: "아직 열리지 않은 일차입니다. 다음 학습 시간에 다시 열려요." },
+        { status: 403 }
+      );
+    }
 
     const wrong = Array.isArray(stats.wrong) ? stats.wrong : [];
     const total = Math.max(0, Number(stats.total || 0));
@@ -95,11 +113,33 @@ export async function PUT(request) {
         limit 1
       `;
       if (nextRows[0]) {
+        const nextUnlockAt = nextKoreaMidnight();
         await db`
           update students
           set current_day = ${lessonDay + 1},
               updated_at = now()
           where id = ${student.id}
+        `;
+        await db`
+          insert into student_progress (
+            student_id,
+            curriculum_day_id,
+            status,
+            unlocked_at
+          )
+          values (
+            ${student.id},
+            ${nextRows[0].id},
+            'not_started',
+            ${nextUnlockAt.toISOString()}
+          )
+          on conflict (student_id, curriculum_day_id)
+          do update set
+            unlocked_at = case
+              when student_progress.unlocked_at is null then excluded.unlocked_at
+              when student_progress.unlocked_at <= now() then student_progress.unlocked_at
+              else least(student_progress.unlocked_at, excluded.unlocked_at)
+            end
         `;
       }
     }

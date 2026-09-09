@@ -305,6 +305,10 @@ textarea {
   margin-top: 16px;
 }
 
+.singleAction {
+  grid-template-columns: 1fr;
+}
+
 .stageNavigation {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -327,6 +331,11 @@ textarea {
   padding: 22px;
   text-align: center;
   box-shadow: 0 6px 0 #e2f0ff;
+}
+
+.lockedCard {
+  display: grid;
+  gap: 12px;
 }
 
 .swipeCard {

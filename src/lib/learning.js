@@ -32,6 +32,38 @@ export async function getStudentToday(studentId) {
   const student = studentRows[0];
   if (!student) return null;
 
+  const currentLessonRows = await db`
+    select id
+    from curriculum_days
+    where level = ${student.level}
+      and day = ${student.current_day}
+    limit 1
+  `;
+  const currentLesson = currentLessonRows[0];
+  if (currentLesson) {
+    const progressRows = await db`
+      select status, unlocked_at, completed_at
+      from student_progress
+      where student_id = ${student.id}
+        and curriculum_day_id = ${currentLesson.id}
+      limit 1
+    `;
+    const progress = progressRows[0];
+    const unlockedAt = progress?.unlocked_at ? new Date(progress.unlocked_at) : null;
+    if (unlockedAt && unlockedAt.getTime() > Date.now()) {
+      return {
+        student,
+        lesson: null,
+        hanja: [],
+        lock: {
+          day: Number(student.current_day),
+          availableAt: unlockedAt.toISOString(),
+          previousDay: Math.max(1, Number(student.current_day) - 1)
+        }
+      };
+    }
+  }
+
   const lessonDetail = await getLessonDetail({ level: student.level, day: student.current_day }, db);
   if (!lessonDetail) return { student, lesson: null, hanja: [] };
 
@@ -40,6 +72,17 @@ export async function getStudentToday(studentId) {
     lesson: lessonDetail.lesson,
     hanja: lessonDetail.hanja
   };
+}
+
+export function nextKoreaMidnight(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day) + 1, -9, 0, 0));
 }
 
 export async function getLessonDetail({ level, day }, existingDb) {

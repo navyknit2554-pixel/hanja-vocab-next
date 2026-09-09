@@ -122,7 +122,7 @@ export function StudentApp() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "학습 결과를 저장하지 못했습니다.");
       setPayload(data);
-      setStage("done");
+      setStage(data.lock ? "home" : "done");
     } catch (error) {
       setStatus(error.message || "학습 결과를 저장하지 못했습니다.");
       setStage("done");
@@ -176,8 +176,10 @@ export function StudentApp() {
           </div>
           <Mascot variant="wink" level={Math.floor((Number(payload.student.current_day || 1) - 1) / 5) + 1} />
           <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
-          <h1>{payload.student.current_day}일차 학습</h1>
-          {payload.lesson ? (
+          <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
+          {payload.lock ? (
+            <LockedLesson lock={payload.lock} onRefresh={loadToday} />
+          ) : payload.lesson ? (
             <>
               <LessonStats hanja={payload.hanja} />
               {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
@@ -223,6 +225,20 @@ export function StudentApp() {
         {status ? <p className="errorText">{status}</p> : null}
       </form>
     </main>
+  );
+}
+
+function LockedLesson({ lock, onRefresh }) {
+  return (
+    <article className="doneCard lockedCard">
+      <Mascot variant="book" label="휴식" />
+      <h2>오늘 학습 완료</h2>
+      <p>{lock.previousDay}일차를 끝냈어요.</p>
+      <p className="mutedText">{lock.day}일차는 {formatKoreaDateTime(lock.availableAt)}부터 열려요.</p>
+      <div className="studyActions singleAction">
+        <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+      </div>
+    </article>
   );
 }
 
@@ -350,7 +366,7 @@ function DoneCard({ stats, status, onCards, onQuiz }) {
   return (
     <article className="doneCard">
       <Mascot variant={rate >= 80 ? "levelup" : "streak"} label={rate >= 80 ? "레벨업" : "연속 학습"} />
-      <h2>{stats.wrong.length ? "복습 완료" : "학습 완료"}</h2>
+      <h2>{stats.wrong.length ? "복습 완료" : "오늘 학습 완료"}</h2>
       <p>정답률 {rate}% · {stats.correct}/{stats.total}</p>
       {stats.wrongHistory.length ? <p className="mutedText">다시 만난 어휘: {stats.wrongHistory.join(", ")}</p> : null}
       {status ? <p className="errorText">{status}</p> : null}
@@ -360,6 +376,21 @@ function DoneCard({ stats, status, onCards, onQuiz }) {
       </div>
     </article>
   );
+}
+
+function formatKoreaDateTime(value) {
+  if (!value) return "다음날 00:00";
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const hour = values.hour === "24" ? "00" : values.hour;
+  return `${values.month}.${values.day}. ${hour}:${values.minute}`;
 }
 
 function LoadingLesson() {
