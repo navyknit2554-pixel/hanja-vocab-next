@@ -452,7 +452,7 @@ export function AdminApp() {
                       <label>
                         용례
                         <textarea
-                          value={[0, 1, 2].map((index) => vocab.examples[index]?.text || "").join("\n")}
+                          value={[0, 1, 2].map((index) => cleanExampleLabel(vocab.examples[index]?.text || "")).join("\n")}
                           onChange={(event) => updateVocab(hanja.id, vocab.id, {
                             examples: event.target.value.split("\n").slice(0, 3).map((line, index) => ({
                               id: `${vocab.id}-${index}`,
@@ -703,4 +703,11 @@ function progressCellState(student, day, record) {
     return { key: "current", label: "현", title: `${day}일차 현재 배정` };
   }
   return { key: "empty", label: "", title: `${day}일차 기록 없음` };
+}
+
+function cleanExampleLabel(value) {
+  return String(value || "")
+    .replace(/^\s*[\[(<【]?\s*(문장|대화|예문|구)\s*(\d+|[一二三])?\s*[\])>】]?\s*[:：.\-–—]*\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }

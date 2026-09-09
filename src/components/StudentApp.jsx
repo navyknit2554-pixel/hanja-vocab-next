@@ -499,7 +499,8 @@ function makeChoices(answer, pool, offset = 0) {
 
 function cleanExample(value) {
   return String(value || "")
-    .replace(/^\s*(문장|대화|예문)\s*\d*\s*[:：.\-–—]?\s*/i, "")
+    .replace(/^\s*[\[(<【]?\s*(문장|대화|예문|구)\s*(\d+|[一二三])?\s*[\])>】]?\s*[:：.\-–—]*\s*/i, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 

@@ -10,6 +10,7 @@
     "deploy:check": "node scripts/deploy-check.js",
     "secrets:make": "node scripts/make-secrets.js",
     "check:data": "node scripts/check-data.js",
+    "clean:example-labels": "node scripts/clean-example-labels.js",
     "import:legacy-students": "node scripts/import-legacy-students.js",
     "import:legacy-curriculum": "node scripts/import-legacy-curriculum.js",
     "curriculum:extend": "node scripts/apply-curriculum-extension.js",
