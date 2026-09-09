@@ -16,6 +16,7 @@ export function StudentApp() {
   const [retryQueue, setRetryQueue] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+  const [levelUpNotice, setLevelUpNotice] = useState(null);
 
   useEffect(() => {
     loadToday();
@@ -96,7 +97,7 @@ export function StudentApp() {
     window.setTimeout(() => {
       setFeedback(null);
       setQuizIndex((previous) => previous + 1);
-    }, 650);
+    }, 1300);
   }
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export function StudentApp() {
   async function saveProgress() {
     setStage("saving");
     try {
+      const completedDay = Number(payload.lesson.day);
       const response = await fetch("/api/student/progress", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -122,6 +124,11 @@ export function StudentApp() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "학습 결과를 저장하지 못했습니다.");
       setPayload(data);
+      if (data.lock && completedDay > 0 && completedDay % 5 === 0) {
+        const nextLevel = Math.floor(completedDay / 5) + 1;
+        setLevelUpNotice({ level: nextLevel });
+        window.setTimeout(() => setLevelUpNotice(null), 2600);
+      }
       setStage(data.lock ? "home" : "done");
     } catch (error) {
       setStatus(error.message || "학습 결과를 저장하지 못했습니다.");
@@ -144,6 +151,7 @@ export function StudentApp() {
     setRetryQueue([]);
     setFeedback(null);
     setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+    setLevelUpNotice(null);
   }
 
   function goHome() {
@@ -174,9 +182,10 @@ export function StudentApp() {
           <div className="studentTopActions">
             <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
           </div>
-          <Mascot variant="wink" level={Math.floor((Number(payload.student.current_day || 1) - 1) / 5) + 1} />
+          {!payload.lock ? <Mascot variant="wink" level={Math.floor((Number(payload.student.current_day || 1) - 1) / 5) + 1} /> : null}
           <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
           <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
+          {levelUpNotice ? <LevelUpOverlay level={levelUpNotice.level} /> : null}
           {payload.lock ? (
             <LockedLesson lock={payload.lock} onRefresh={loadToday} />
           ) : payload.lesson ? (
@@ -225,6 +234,18 @@ export function StudentApp() {
         {status ? <p className="errorText">{status}</p> : null}
       </form>
     </main>
+  );
+}
+
+function LevelUpOverlay({ level }) {
+  return (
+    <div className="levelUpOverlay" role="status" aria-live="polite">
+      <article className="levelUpCard">
+        <Mascot variant="levelup" label="레벨업" />
+        <span>Lv. {level}</span>
+        <h2>레벨업!</h2>
+      </article>
+    </div>
   );
 }
 
