@@ -956,10 +956,16 @@ textarea {
   user-select: none;
 }
 
+.mascot-hero .mascotImage,
 .mascot-book .mascotImage,
 .mascot-search .mascotImage {
   width: clamp(132px, 24vw, 230px);
   height: clamp(132px, 24vw, 230px);
+}
+
+.mascot-hero .mascotImage {
+  width: clamp(170px, 34vw, 320px);
+  height: clamp(170px, 34vw, 320px);
 }
 
 .smallMascot .mascotImage {
