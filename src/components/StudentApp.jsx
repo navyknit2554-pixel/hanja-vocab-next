@@ -385,7 +385,7 @@ function QuizCard({ quiz, feedback, index, total, onAnswer }) {
       {feedback ? (
         <div className={`feedbackOverlay ${feedback}`}>
           <article className="feedbackCard">
-            <Mascot variant={feedback === "correct" ? "correct" : "wrong"} label={feedback === "correct" ? "정답" : "오답"} />
+            <Mascot variant={feedback === "correct" ? "correct" : "wrong"} label="" />
             <strong>{feedback === "correct" ? "정답!" : "다시 풀어볼게요"}</strong>
           </article>
         </div>
