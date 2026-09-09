@@ -24,7 +24,7 @@ export function StudentApp() {
   }, []);
 
   const lessonItems = useMemo(() => buildLessonItems(payload?.hanja || []), [payload]);
-  const quizItems = useMemo(() => buildQuizItems(payload?.hanja || []), [payload]);
+  const quizItems = useMemo(() => buildQuizItems(lessonItems), [lessonItems]);
   const currentCard = lessonItems[cardIndex];
   const currentQuiz = quizQueue[quizIndex];
 
@@ -449,6 +449,7 @@ function buildLessonItems(hanja) {
     ...item.vocab.slice(0, 3).map((vocab) => ({
       type: "vocab",
       id: `v-${vocab.id}`,
+      character: item.character,
       hanjaWord: vocab.hanja_word,
       word: vocab.word,
       meaning: vocab.meaning,
@@ -457,15 +458,17 @@ function buildLessonItems(hanja) {
   ]);
 }
 
-function buildQuizItems(hanja) {
-  const words = hanja.flatMap((item) => item.vocab.map((vocab) => ({
-    id: vocab.id,
-    character: item.character,
-    hanjaWord: vocab.hanja_word,
-    word: vocab.word,
-    meaning: vocab.meaning,
-    example: cleanExample(vocab.examples?.[0]?.text || "")
-  }))).filter((item) => item.word && item.meaning);
+function buildQuizItems(lessonItems) {
+  const words = lessonItems
+    .filter((item) => item.type === "vocab" && item.word && item.meaning)
+    .map((item) => ({
+      id: item.id,
+      character: item.character,
+      hanjaWord: item.hanjaWord,
+      word: item.word,
+      meaning: item.meaning,
+      example: item.example
+    }));
   return words.flatMap((item, index) => {
     const prompt = item.example && item.example.includes(item.word)
       ? item.example.replaceAll(item.word, "____")
