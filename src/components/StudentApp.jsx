@@ -179,6 +179,7 @@ export function StudentApp() {
   if (payload?.student) {
     return (
       <main className="phonePage">
+        <PreloadedFeedbackImages />
         <section className="panel studentHome">
           <div className="studentTopActions">
             <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
@@ -382,12 +383,24 @@ function QuizCard({ quiz, feedback, index, total, onAnswer }) {
         ))}
       </div>
       {feedback ? (
-        <div className={`feedback ${feedback}`}>
-          <Mascot variant={feedback === "correct" ? "correct" : "wrong"} label={feedback === "correct" ? "정답" : "오답"} />
-          <strong>{feedback === "correct" ? "정답!" : "다시 풀어볼게요"}</strong>
+        <div className={`feedbackOverlay ${feedback}`}>
+          <article className="feedbackCard">
+            <Mascot variant={feedback === "correct" ? "correct" : "wrong"} label={feedback === "correct" ? "정답" : "오답"} />
+            <strong>{feedback === "correct" ? "정답!" : "다시 풀어볼게요"}</strong>
+          </article>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PreloadedFeedbackImages() {
+  return (
+    <div className="preloadAssets" aria-hidden="true">
+      <img src="/characters/correct.png" alt="" />
+      <img src="/characters/wrong.png" alt="" />
+      <img src="/characters/levelup.png" alt="" />
+    </div>
   );
 }
 

@@ -539,59 +539,76 @@ textarea {
   box-shadow: 0 2px 0 #d8edf8;
 }
 
-.feedback {
+.feedbackOverlay {
   position: fixed;
   inset: 0;
   z-index: 18;
-  display: grid;
-  place-items: center;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
   background: rgba(255, 255, 255, .36);
   text-align: center;
   animation: feedbackFade 1.3s ease both;
 }
 
-.feedback::before {
-  content: "";
-  position: absolute;
+.feedbackCard {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  gap: 8px;
   width: min(330px, 82vw);
-  height: min(330px, 82vw);
+  min-height: min(330px, 82vw);
+  padding: 22px;
   border-radius: 999px;
   background: rgba(255, 255, 255, .95);
   box-shadow: 0 12px 0 #d8edf8, 0 24px 48px rgba(20, 33, 61, .18);
   animation: feedbackPop 1.3s cubic-bezier(.18, 1.15, .3, 1) both;
 }
 
-.feedback .mascotImage {
-  position: relative;
-  z-index: 1;
-  width: clamp(170px, 48vw, 260px);
+.feedbackCard .mascotImage {
+  width: clamp(176px, 48vw, 258px);
+  height: clamp(176px, 48vw, 258px);
 }
 
-.feedback .mascotName {
-  position: relative;
-  z-index: 1;
+.feedbackCard .mascotName {
+  font-size: 1.1rem;
 }
 
-.feedback strong {
-  position: relative;
-  z-index: 1;
+.feedbackCard strong {
   font-size: clamp(2.2rem, 9vw, 4rem);
   line-height: 1;
   text-shadow: 0 5px 0 #dff4c8;
 }
 
-.feedback.correct {
+.feedbackOverlay.correct {
   color: var(--green-dark);
 }
 
-.feedback.wrong {
+.feedbackOverlay.wrong {
   color: var(--pink);
 }
 
-.feedback.wrong strong {
+.feedbackOverlay.wrong strong {
   text-shadow: 0 5px 0 #ffe1ea;
+}
+
+.preloadAssets {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloadAssets img {
+  width: 1px;
+  height: 1px;
 }
 
 @keyframes feedbackPop {
