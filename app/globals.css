@@ -563,6 +563,7 @@ textarea {
   padding: 0;
   background: transparent;
   box-shadow: none;
+  --feedback-x: 0px;
   animation: feedbackPop 1.3s cubic-bezier(.18, 1.15, .3, 1) both;
 }
 
@@ -593,6 +594,10 @@ textarea {
   color: var(--pink);
 }
 
+.feedbackOverlay.wrong .feedbackCard {
+  --feedback-x: -10px;
+}
+
 .feedbackOverlay.wrong strong {
   text-shadow: 0 5px 0 #ffe1ea;
 }
@@ -616,15 +621,15 @@ textarea {
 @keyframes feedbackPop {
   0% {
     opacity: 0;
-    transform: scale(.75);
+    transform: translateX(var(--feedback-x)) scale(.75);
   }
   18%, 82% {
     opacity: 1;
-    transform: scale(1);
+    transform: translateX(var(--feedback-x)) scale(1);
   }
   100% {
     opacity: 0;
-    transform: scale(.96);
+    transform: translateX(var(--feedback-x)) scale(.96);
   }
 }
 
