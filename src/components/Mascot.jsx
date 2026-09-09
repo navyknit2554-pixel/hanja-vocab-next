@@ -10,7 +10,7 @@ const mascotImages = {
   search: "/characters/discover.png",
   correct: "/characters/correct.png",
   wrong: "/characters/wrong.png",
-  levelup: "/characters/heart.png",
+  levelup: "/characters/levelup.png",
   streak: "/characters/streak.png",
   sleep: "/characters/sleep.png",
   loading: "/characters/loading.png"

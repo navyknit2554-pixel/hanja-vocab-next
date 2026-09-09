@@ -20,6 +20,7 @@ export function StudentApp() {
 
   useEffect(() => {
     loadToday();
+    preloadImages(["/characters/correct.png", "/characters/wrong.png", "/characters/levelup.png"]);
   }, []);
 
   const lessonItems = useMemo(() => buildLessonItems(payload?.hanja || []), [payload]);
@@ -382,7 +383,7 @@ function QuizCard({ quiz, feedback, index, total, onAnswer }) {
       </div>
       {feedback ? (
         <div className={`feedback ${feedback}`}>
-          <Mascot variant={feedback === "correct" ? "correct" : "wrong"} small label={feedback === "correct" ? "정답" : "오답"} />
+          <Mascot variant={feedback === "correct" ? "correct" : "wrong"} label={feedback === "correct" ? "정답" : "오답"} />
           <strong>{feedback === "correct" ? "정답!" : "다시 풀어볼게요"}</strong>
         </div>
       ) : null}
@@ -498,4 +499,12 @@ function highlightWord(sentence, word) {
 
 function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5);
+}
+
+function preloadImages(paths) {
+  paths.forEach((path) => {
+    const image = new Image();
+    image.src = path;
+    if (image.decode) image.decode().catch(() => {});
+  });
 }

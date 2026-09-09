@@ -541,22 +541,45 @@ textarea {
 
 .feedback {
   position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 10;
+  inset: 0;
+  z-index: 18;
   display: grid;
-  grid-template-columns: auto auto;
-  gap: 10px;
-  align-items: center;
+  place-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(255, 255, 255, .36);
+  text-align: center;
+  animation: feedbackFade 1.3s ease both;
+}
+
+.feedback::before {
+  content: "";
+  position: absolute;
+  width: min(330px, 82vw);
+  height: min(330px, 82vw);
   border-radius: 999px;
-  padding: 10px 16px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(20, 33, 61, .18);
-  transform: translateX(-50%);
+  background: rgba(255, 255, 255, .95);
+  box-shadow: 0 12px 0 #d8edf8, 0 24px 48px rgba(20, 33, 61, .18);
+  animation: feedbackPop 1.3s cubic-bezier(.18, 1.15, .3, 1) both;
 }
 
 .feedback .mascotImage {
-  width: 62px;
+  position: relative;
+  z-index: 1;
+  width: clamp(170px, 48vw, 260px);
+}
+
+.feedback .mascotName {
+  position: relative;
+  z-index: 1;
+}
+
+.feedback strong {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(2.2rem, 9vw, 4rem);
+  line-height: 1;
+  text-shadow: 0 5px 0 #dff4c8;
 }
 
 .feedback.correct {
@@ -565,6 +588,34 @@ textarea {
 
 .feedback.wrong {
   color: var(--pink);
+}
+
+.feedback.wrong strong {
+  text-shadow: 0 5px 0 #ffe1ea;
+}
+
+@keyframes feedbackPop {
+  0% {
+    opacity: 0;
+    transform: scale(.75);
+  }
+  18%, 82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(.96);
+  }
+}
+
+@keyframes feedbackFade {
+  0%, 100% {
+    opacity: 0;
+  }
+  12%, 86% {
+    opacity: 1;
+  }
 }
 
 .levelUpOverlay {
