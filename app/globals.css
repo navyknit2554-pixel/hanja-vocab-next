@@ -335,7 +335,94 @@ textarea {
 
 .lockedCard {
   display: grid;
+  justify-items: center;
   gap: 12px;
+  overflow: hidden;
+}
+
+.lockHero {
+  position: relative;
+  width: min(240px, 72vw);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 4px;
+}
+
+.lockHero .mascotImage {
+  width: clamp(118px, 32vw, 176px);
+}
+
+.lockBadge {
+  position: absolute;
+  right: 28px;
+  bottom: 18px;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #ffe9a8;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff6c9 0%, var(--yellow) 100%);
+  box-shadow: 0 7px 0 #e6b728, 0 14px 26px rgba(255, 200, 44, .28);
+  transform: rotate(-6deg);
+}
+
+.lockShackle {
+  position: absolute;
+  top: 9px;
+  width: 26px;
+  height: 23px;
+  border: 7px solid var(--ink);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+
+.lockBody {
+  position: absolute;
+  bottom: 12px;
+  width: 36px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--ink);
+}
+
+.lockBody::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 7px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  transform: translateX(-50%);
+}
+
+.lockEyebrow {
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: #efffe5;
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.lockedCard h2 {
+  color: var(--ink);
+  font-size: clamp(2rem, 8vw, 3.3rem);
+  text-shadow: 0 4px 0 #dff4c8;
+}
+
+.lockedCard .lockMessage {
+  color: var(--green-dark);
+  font-size: clamp(1.2rem, 4.8vw, 1.7rem);
+}
+
+.lockedCard .lockMessage b {
+  color: var(--pink);
+  font-size: 1.18em;
 }
 
 .swipeCard {

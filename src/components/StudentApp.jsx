@@ -229,12 +229,20 @@ export function StudentApp() {
 }
 
 function LockedLesson({ lock, onRefresh }) {
+  const openTime = formatKoreaTime(lock.availableAt);
   return (
     <article className="doneCard lockedCard">
-      <Mascot variant="book" label="휴식" />
-      <h2>오늘 학습 완료</h2>
-      <p>{lock.previousDay}일차를 끝냈어요.</p>
-      <p className="mutedText">{lock.day}일차는 {formatKoreaDateTime(lock.availableAt)}부터 열려요.</p>
+      <div className="lockHero" aria-hidden="true">
+        <Mascot variant="wink" label="초록이" />
+        <span className="lockBadge">
+          <span className="lockShackle" />
+          <span className="lockBody" />
+        </span>
+      </div>
+      <span className="lockEyebrow">오늘 학습 완료</span>
+      <h2>기다려주세요!</h2>
+      <p className="lockMessage"><b>{openTime}</b>에 다음 일차 학습이 시작됩니다!</p>
+      <p className="mutedText">{lock.previousDay}일차를 끝냈어요. 잠깐 쉬었다가 다음 한자로 만나요.</p>
       <div className="studyActions singleAction">
         <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
       </div>
@@ -378,19 +386,17 @@ function DoneCard({ stats, status, onCards, onQuiz }) {
   );
 }
 
-function formatKoreaDateTime(value) {
-  if (!value) return "다음날 00:00";
+function formatKoreaTime(value) {
+  if (!value) return "00:00";
   const parts = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
-    month: "numeric",
-    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false
   }).formatToParts(new Date(value));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   const hour = values.hour === "24" ? "00" : values.hour;
-  return `${values.month}.${values.day}. ${hour}:${values.minute}`;
+  return `${hour}:${values.minute}`;
 }
 
 function LoadingLesson() {

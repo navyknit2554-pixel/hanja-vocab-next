@@ -40,6 +40,7 @@ export async function getStudentToday(studentId) {
     limit 1
   `;
   const currentLesson = currentLessonRows[0];
+  const lockUntil = nextKoreaMidnight();
   if (currentLesson) {
     const progressRows = await db`
       select status, unlocked_at, completed_at
@@ -63,6 +64,33 @@ export async function getStudentToday(studentId) {
       };
     }
   }
+  if (!currentLesson && Number(student.current_day) > 1) {
+    const dayStart = koreaTodayStart();
+    const recentCompletionRows = await db`
+      select p.completed_at
+      from student_progress p
+      join curriculum_days c on c.id = p.curriculum_day_id
+      where p.student_id = ${student.id}
+        and c.level = ${student.level}
+        and c.day = ${Number(student.current_day) - 1}
+        and p.status = 'completed'
+        and p.completed_at >= ${dayStart.toISOString()}
+        and p.completed_at < ${lockUntil.toISOString()}
+      limit 1
+    `;
+    if (recentCompletionRows[0]) {
+      return {
+        student,
+        lesson: null,
+        hanja: [],
+        lock: {
+          day: Number(student.current_day),
+          availableAt: lockUntil.toISOString(),
+          previousDay: Number(student.current_day) - 1
+        }
+      };
+    }
+  }
 
   const lessonDetail = await getLessonDetail({ level: student.level, day: student.current_day }, db);
   if (!lessonDetail) return { student, lesson: null, hanja: [] };
@@ -75,14 +103,23 @@ export async function getStudentToday(studentId) {
 }
 
 export function nextKoreaMidnight(date = new Date()) {
+  const values = koreaDateParts(date);
+  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day) + 1, -9, 0, 0));
+}
+
+function koreaTodayStart(date = new Date()) {
+  const values = koreaDateParts(date);
+  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), -9, 0, 0));
+}
+
+function koreaDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
   }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day) + 1, -9, 0, 0));
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
 export async function getLessonDetail({ level, day }, existingDb) {
