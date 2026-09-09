@@ -446,7 +446,7 @@ function LoadingLesson() {
 function buildLessonItems(hanja) {
   return hanja.flatMap((item) => [
     { type: "hanja", id: `h-${item.id}`, character: item.character, sound: item.sound, meaning: item.meaning },
-    ...item.vocab.slice(0, 3).map((vocab) => ({
+    ...item.vocab.map((vocab) => ({
       type: "vocab",
       id: `v-${vocab.id}`,
       character: item.character,
