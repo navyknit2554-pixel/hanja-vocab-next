@@ -745,9 +745,12 @@ function TestPaperPreview({ paper }) {
     <article className="testPaperPreview">
       <section className="questionPaper">
         <header className="testPaperHeader">
-          <div>
-            <p>초록이한자 오프라인 확인</p>
-            <h1>{paper.title}</h1>
+          <div className="testPaperTitleWrap">
+            <img className="testPaperMascot" src="/characters/study.png" alt="" />
+            <div className="testPaperTitleBox">
+              <p>초록이한자 오프라인 확인</p>
+              <h1>{paper.title}</h1>
+            </div>
           </div>
           <dl>
             <div><dt>이름</dt><dd /></div>
@@ -773,9 +776,12 @@ function TestPaperPreview({ paper }) {
       </section>
       <section className="answerSheetPrint">
         <header className="testPaperHeader answerHeader">
-          <div>
-            <p>초록이한자 오프라인 확인</p>
-            <h1>{paper.title} 정답표</h1>
+          <div className="testPaperTitleWrap">
+            <img className="testPaperMascot" src="/characters/study.png" alt="" />
+            <div className="testPaperTitleBox">
+              <p>초록이한자 오프라인 확인</p>
+              <h1>{paper.title} 정답표</h1>
+            </div>
           </div>
         </header>
         <div className="answerKey">

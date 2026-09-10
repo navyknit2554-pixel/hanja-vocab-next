@@ -1124,9 +1124,33 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr);
   gap: 18px;
-  align-items: end;
+  align-items: center;
   border-bottom: 3px solid #111827;
   padding-bottom: 16px;
+}
+
+.testPaperTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.testPaperMascot {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.testPaperTitleBox {
+  display: inline-block;
+  min-width: min(100%, 360px);
+  max-width: 100%;
+  border: 2px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #fff;
 }
 
 .testPaperHeader p,
@@ -1477,6 +1501,21 @@ textarea {
 
   .testPaperPreview {
     padding: 20px;
+  }
+
+  .testPaperTitleWrap {
+    align-items: flex-start;
+  }
+
+  .testPaperMascot {
+    width: 58px;
+    height: 58px;
+  }
+
+  .testPaperTitleBox {
+    min-width: 0;
+    width: 100%;
+    padding: 9px 12px;
   }
 
   .lessonOverviewHeader,
