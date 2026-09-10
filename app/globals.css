@@ -1230,6 +1230,20 @@ textarea {
   font-weight: 800;
 }
 
+.answerKeyItem {
+  display: grid;
+  grid-template-columns: 2.4em 1.8em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.answerChoiceMark {
+  color: #111827;
+  font-size: 1.08em;
+  font-weight: 900;
+}
+
 .progressTools {
   display: grid;
   grid-template-columns: 140px auto;

@@ -780,8 +780,10 @@ function TestPaperPreview({ paper }) {
         </header>
         <div className="answerKey">
           {paper.questions.map((question) => (
-            <span key={`answer-${question.number}`}>
-              {question.number}. {choiceMarks[question.answerIndex] || ""} {question.answer}
+            <span className="answerKeyItem" key={`answer-${question.number}`}>
+              <span className="answerNumber">{question.number}.</span>
+              <span className="answerChoiceMark">{choiceMarks[question.answerIndex] || ""}</span>
+              <span>{question.answer}</span>
             </span>
           ))}
         </div>
