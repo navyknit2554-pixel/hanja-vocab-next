@@ -1074,6 +1074,163 @@ textarea {
   overflow: hidden;
 }
 
+.testBuilderPanel {
+  display: grid;
+  gap: 16px;
+}
+
+.testBuilderForm {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(3, minmax(100px, .8fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.checkLabel {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  color: var(--ink);
+}
+
+.checkLabel input {
+  width: 20px;
+  height: 20px;
+}
+
+.testActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.testPaperPreview {
+  display: grid;
+  gap: 18px;
+  width: min(880px, 100%);
+  margin: 8px auto 0;
+  border: 1px solid #d8deea;
+  border-radius: 6px;
+  padding: 34px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 16px 36px rgba(20, 33, 61, .12);
+}
+
+.testPaperHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr);
+  gap: 18px;
+  align-items: end;
+  border-bottom: 3px solid #111827;
+  padding-bottom: 16px;
+}
+
+.testPaperHeader p,
+.testPaperHeader h1 {
+  margin: 0;
+}
+
+.testPaperHeader p {
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.testPaperHeader h1 {
+  margin-top: 4px;
+  font-size: 1.75rem;
+  letter-spacing: 0;
+}
+
+.testPaperHeader dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.testPaperHeader dl div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.testPaperHeader dt {
+  font-weight: 900;
+}
+
+.testPaperHeader dd {
+  min-height: 26px;
+  margin: 0;
+  border-bottom: 1px solid #111827;
+}
+
+.testQuestions {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.testQuestions li {
+  break-inside: avoid;
+  border-bottom: 1px dashed #cbd5e1;
+  padding-bottom: 14px;
+}
+
+.testQuestionTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.testQuestionTop strong {
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+
+.testQuestionTop span {
+  color: #64748b;
+  font-size: .9rem;
+  font-weight: 800;
+}
+
+.testChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 10px;
+  color: #334155;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.answerKey {
+  break-inside: avoid;
+  border-top: 3px solid #111827;
+  padding-top: 14px;
+}
+
+.answerKey h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+
+.answerKey div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 12px;
+  color: #334155;
+  font-size: .92rem;
+  font-weight: 800;
+}
+
 .progressTools {
   display: grid;
   grid-template-columns: 140px auto;
@@ -1297,6 +1454,18 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .testBuilderForm,
+  .testActions,
+  .testPaperHeader,
+  .testChoices,
+  .answerKey div {
+    grid-template-columns: 1fr;
+  }
+
+  .testPaperPreview {
+    padding: 20px;
+  }
+
   .lessonOverviewHeader,
   .lessonHanjaList {
     grid-template-columns: 1fr;
@@ -1346,5 +1515,56 @@ textarea {
   .curriculumDayCard small {
     white-space: normal;
     line-height: 1.25;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    width: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .testPaperPreview,
+  .testPaperPreview * {
+    visibility: visible;
+  }
+
+  .testPaperPreview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .noPrint {
+    display: none !important;
+  }
+
+  .testQuestions {
+    gap: 12px;
+  }
+
+  .testChoices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .answerKey div {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

@@ -26,6 +26,9 @@ export function AdminApp() {
   const [curriculumIndex, setCurriculumIndex] = useState([]);
   const [curriculumStatus, setCurriculumStatus] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [testForm, setTestForm] = useState({ level: "초급", startDay: 1, endDay: 5, questionCount: 20, includeAnswers: true });
+  const [testPaper, setTestPaper] = useState(null);
+  const [testStatus, setTestStatus] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("reset") === "1") {
@@ -299,6 +302,32 @@ export function AdminApp() {
     }
   }
 
+  async function generateTestPaper(event) {
+    event.preventDefault();
+    setTestStatus("테스트지를 구성하는 중...");
+    setTestPaper(null);
+    try {
+      const response = await fetch("/api/admin/test-paper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testForm)
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "테스트지를 만들지 못했습니다.");
+      setTestPaper(data.test);
+      setTestStatus(`${data.test.title} · ${data.test.questions.length}문항`);
+    } catch (error) {
+      setTestStatus(error.message || "테스트지를 만들지 못했습니다.");
+    }
+  }
+
+  function printTestPaper() {
+    if (!testPaper) return;
+    window.print();
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setAdmin(null);
@@ -309,6 +338,8 @@ export function AdminApp() {
     setProgressData(null);
     setProgressStatus("");
     setLessonData(null);
+    setTestPaper(null);
+    setTestStatus("");
     setStatus("v2는 현재 새 구조를 세우는 단계입니다.");
   }
 
@@ -370,6 +401,7 @@ export function AdminApp() {
       <nav className="adminTabs">
         <button className={view === "students" ? "active" : ""} onClick={() => setView("students")} type="button">학생 관리</button>
         <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")} type="button">학습도</button>
+        <button className={view === "test" ? "active" : ""} onClick={() => setView("test")} type="button">테스트지</button>
         {admin.role === "master" ? <button className={view === "content" ? "active" : ""} onClick={() => setView("content")} type="button">한자·어휘 관리</button> : null}
       </nav>
       {view === "students" ? (
@@ -388,6 +420,16 @@ export function AdminApp() {
           status={progressStatus}
           data={progressData}
           onRefresh={loadProgress}
+        />
+      ) : null}
+      {view === "test" ? (
+        <TestPaperPanel
+          form={testForm}
+          setForm={setTestForm}
+          paper={testPaper}
+          status={testStatus}
+          onGenerate={generateTestPaper}
+          onPrint={printTestPaper}
         />
       ) : null}
       {view === "content" && admin.role === "master" ? (
@@ -655,6 +697,84 @@ function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
         {!(data?.students || []).length ? <p className="statusText">표시할 학생이 없습니다.</p> : null}
       </div>
     </section>
+  );
+}
+
+function TestPaperPanel({ form, setForm, paper, status, onGenerate, onPrint }) {
+  function updateNumber(key, value) {
+    const number = Math.min(100, Math.max(1, Number(value || 1)));
+    const next = { ...form, [key]: number };
+    if (key === "startDay" && number > next.endDay) next.endDay = number;
+    if (key === "endDay" && number < next.startDay) next.startDay = number;
+    setForm(next);
+  }
+
+  return (
+    <section className="panel testBuilderPanel">
+      <div className="sectionHeader noPrint">
+        <div>
+          <h2>테스트지 만들기</h2>
+          <p>일차 범위에서 어휘를 랜덤으로 뽑아 오프라인 확인용 시험지를 만듭니다.</p>
+        </div>
+        <Mascot variant="study" small label="출제" />
+      </div>
+      <form className="testBuilderForm noPrint" onSubmit={onGenerate}>
+        <label>난이도<select value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}><option>초급</option><option>중급</option><option>고급</option></select></label>
+        <label>시작 일차<input type="number" min="1" max="100" value={form.startDay} onChange={(event) => updateNumber("startDay", event.target.value)} /></label>
+        <label>끝 일차<input type="number" min="1" max="100" value={form.endDay} onChange={(event) => updateNumber("endDay", event.target.value)} /></label>
+        <label>문항 수<input type="number" min="1" max="100" value={form.questionCount} onChange={(event) => updateNumber("questionCount", event.target.value)} /></label>
+        <label className="checkLabel"><input type="checkbox" checked={form.includeAnswers} onChange={(event) => setForm({ ...form, includeAnswers: event.target.checked })} />정답표 포함</label>
+        <button className="btn primary" type="submit">랜덤 테스트지 만들기</button>
+      </form>
+      <div className="testActions noPrint">
+        <p className="statusText">{status || "범위와 문항 수를 정한 뒤 테스트지를 만들어 주세요."}</p>
+        <button className="btn secondary" type="button" onClick={onPrint} disabled={!paper}>PDF로 저장</button>
+      </div>
+      {paper ? <TestPaperPreview paper={paper} includeAnswers={form.includeAnswers} /> : null}
+    </section>
+  );
+}
+
+function TestPaperPreview({ paper, includeAnswers }) {
+  return (
+    <article className="testPaperPreview">
+      <header className="testPaperHeader">
+        <div>
+          <p>초록이한자 오프라인 확인</p>
+          <h1>{paper.title}</h1>
+        </div>
+        <dl>
+          <div><dt>이름</dt><dd /></div>
+          <div><dt>날짜</dt><dd /></div>
+          <div><dt>점수</dt><dd /></div>
+        </dl>
+      </header>
+      <ol className="testQuestions">
+        {paper.questions.map((question) => (
+          <li key={question.number}>
+            <div className="testQuestionTop">
+              <strong>{question.number}. {question.prompt}</strong>
+              <span>{question.day}일차 · {question.character}</span>
+            </div>
+            <div className="testChoices">
+              {question.choices.map((choice, index) => (
+                <span key={`${question.number}-${choice}`}>{index + 1}. {choice}</span>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ol>
+      {includeAnswers ? (
+        <section className="answerKey">
+          <h2>정답표</h2>
+          <div>
+            {paper.questions.map((question) => (
+              <span key={`answer-${question.number}`}>{question.number}. {question.answer}</span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </article>
   );
 }
 
