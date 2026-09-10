@@ -188,6 +188,7 @@ export function StudentApp() {
           <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
           <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
           {levelUpNotice ? <LevelUpOverlay level={levelUpNotice.level} /> : null}
+          <GradeLeaderboard leaderboard={payload.leaderboard} />
           {payload.lock ? (
             <LockedLesson lock={payload.lock} onRefresh={loadToday} />
           ) : payload.lesson ? (
@@ -236,6 +237,36 @@ export function StudentApp() {
         {status ? <p className="errorText">{status}</p> : null}
       </form>
     </main>
+  );
+}
+
+function GradeLeaderboard({ leaderboard }) {
+  const leaders = leaderboard?.top || [];
+  if (!leaders.length) return null;
+
+  return (
+    <section className="gradeLeaderboard" aria-label="같은 학년 랭킹">
+      <div className="leaderboardHeader">
+        <div>
+          <span>같은 학년 TOP 3</span>
+          <h2>{leaderboard.scope}</h2>
+        </div>
+        {leaderboard.mine && Number(leaderboard.mine.rank) > 3 ? (
+          <p>나는 {leaderboard.mine.rank}위</p>
+        ) : null}
+      </div>
+      <div className="leaderboardList">
+        {leaders.map((student) => (
+          <article className={`leaderboardItem ${student.id === leaderboard.currentStudentId ? "mine" : ""}`} key={student.id}>
+            <strong>{student.rank}위</strong>
+            <div>
+              <b>{student.name}</b>
+              <span>{student.level} · {student.completed_count}일차 완료 · 정답률 {student.accuracy}%</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 

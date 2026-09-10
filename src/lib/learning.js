@@ -31,6 +31,7 @@ export async function getStudentToday(studentId) {
   `;
   const student = studentRows[0];
   if (!student) return null;
+  const leaderboard = await getGradeLeaderboard(student, db);
 
   const currentLessonRows = await db`
     select id
@@ -56,6 +57,7 @@ export async function getStudentToday(studentId) {
         student,
         lesson: null,
         hanja: [],
+        leaderboard,
         lock: {
           day: Number(student.current_day),
           availableAt: unlockedAt.toISOString(),
@@ -83,6 +85,7 @@ export async function getStudentToday(studentId) {
         student,
         lesson: null,
         hanja: [],
+        leaderboard,
         lock: {
           day: Number(student.current_day),
           availableAt: lockUntil.toISOString(),
@@ -93,12 +96,57 @@ export async function getStudentToday(studentId) {
   }
 
   const lessonDetail = await getLessonDetail({ level: student.level, day: student.current_day }, db);
-  if (!lessonDetail) return { student, lesson: null, hanja: [] };
+  if (!lessonDetail) return { student, lesson: null, hanja: [], leaderboard };
 
   return {
     student,
     lesson: lessonDetail.lesson,
-    hanja: lessonDetail.hanja
+    hanja: lessonDetail.hanja,
+    leaderboard
+  };
+}
+
+async function getGradeLeaderboard(student, db) {
+  const rows = await db`
+    with progress_totals as (
+      select
+        s.id,
+        s.name,
+        s.grade,
+        s.level,
+        s.current_day,
+        count(p.id) filter (where p.status = 'completed')::int as completed_count,
+        coalesce(sum(p.correct_count), 0)::int as correct_count,
+        coalesce(sum(p.total_count), 0)::int as total_count,
+        max(p.completed_at) as last_completed_at
+      from students s
+      left join student_progress p on p.student_id = s.id
+      where s.teacher_id = ${student.teacher_id}
+        and s.grade = ${student.grade}
+      group by s.id
+    ),
+    ranked as (
+      select
+        *,
+        case
+          when total_count > 0 then round((correct_count::numeric / total_count::numeric) * 100)
+          else 0
+        end::int as accuracy,
+        row_number() over (
+          order by completed_count desc, current_day desc, total_count desc, last_completed_at asc nulls last, name asc
+        )::int as rank
+      from progress_totals
+    )
+    select id, name, grade, level, current_day, completed_count, correct_count, total_count, accuracy, rank
+    from ranked
+    where rank <= 3 or id = ${student.id}
+    order by rank asc
+  `;
+  return {
+    scope: `${student.grade} 랭킹`,
+    currentStudentId: student.id,
+    top: rows.filter((row) => Number(row.rank) <= 3),
+    mine: rows.find((row) => row.id === student.id) || null
   };
 }
 
