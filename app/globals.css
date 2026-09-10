@@ -1247,8 +1247,8 @@ textarea {
 
 .answerKey {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px 12px;
+  grid-template-columns: 1fr;
+  gap: 7px;
   color: #334155;
   font-size: .92rem;
   font-weight: 800;
@@ -1258,8 +1258,8 @@ textarea {
   display: grid;
   grid-template-columns: 2.4em 1.8em minmax(0, 1fr);
   align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
+  gap: 6px;
+  line-height: 1.45;
 }
 
 .answerChoiceMark {
@@ -1625,6 +1625,6 @@ textarea {
   }
 
   .answerKey {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
