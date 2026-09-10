@@ -1122,7 +1122,7 @@ textarea {
 
 .testPaperHeader {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr);
+  grid-template-columns: minmax(0, 1fr) 180px;
   gap: 18px;
   align-items: center;
   border-bottom: 3px solid #111827;
@@ -1145,12 +1145,14 @@ textarea {
 
 .testPaperTitleBox {
   display: inline-block;
-  min-width: min(100%, 360px);
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
   border: 2px solid #dbeafe;
   border-radius: 8px;
   padding: 10px 16px;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .testPaperHeader p,
@@ -1177,7 +1179,7 @@ textarea {
 
 .testPaperHeader dl div {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr);
   gap: 8px;
   align-items: end;
 }
@@ -1613,6 +1615,48 @@ textarea {
 
   .testQuestions {
     gap: 12px;
+  }
+
+  .testPaperHeader {
+    grid-template-columns: minmax(0, 1fr) 150px;
+    gap: 10px;
+    align-items: center;
+    padding-bottom: 12px;
+  }
+
+  .testPaperTitleWrap {
+    gap: 8px;
+  }
+
+  .testPaperMascot {
+    width: 56px;
+    height: 56px;
+  }
+
+  .testPaperTitleBox {
+    padding: 7px 12px;
+  }
+
+  .testPaperHeader p {
+    font-size: .88rem;
+  }
+
+  .testPaperHeader h1 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+  }
+
+  .testPaperHeader dl {
+    gap: 4px;
+  }
+
+  .testPaperHeader dl div {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .testPaperHeader dd {
+    min-height: 22px;
   }
 
   .testChoices {
