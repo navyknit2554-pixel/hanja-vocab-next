@@ -78,31 +78,36 @@ function buildQuestion(item, index, pool) {
     const prompt = item.example && item.example.includes(item.word)
       ? item.example.replaceAll(item.word, "____")
       : `${item.meaning}에 알맞은 어휘를 고르세요.`;
+    const choices = makeChoices(item.word, pool.map((entry) => entry.word), index + 5);
     return {
       number: index + 1,
       type,
       day: item.day,
       character: item.character,
       prompt,
-      choices: makeChoices(item.word, pool.map((entry) => entry.word), index + 5),
+      choices,
+      answerIndex: choices.indexOf(item.word),
       answer: item.word
     };
   }
+  const choices = makeChoices(item.meaning, pool.map((entry) => entry.meaning), index);
   return {
     number: index + 1,
     type,
     day: item.day,
     character: item.character,
     prompt: `${item.hanjaWord} · ${item.word}`,
-    choices: makeChoices(item.meaning, pool.map((entry) => entry.meaning), index),
+    choices,
+    answerIndex: choices.indexOf(item.meaning),
     answer: item.meaning
   };
 }
 
 function makeChoices(answer, pool, offset = 0) {
   const candidates = shuffle([...new Set(pool.filter((item) => item && item !== answer))]);
-  const choices = [answer, ...candidates.slice(offset % 4, offset % 4 + 3)];
-  return shuffle([...new Set(choices)].slice(0, 4));
+  const rotated = [...candidates.slice(offset), ...candidates.slice(0, offset)];
+  const choices = [answer, ...rotated.slice(0, 4)];
+  return shuffle([...new Set(choices)].slice(0, 5));
 }
 
 function cleanExample(value) {

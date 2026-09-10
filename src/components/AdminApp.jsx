@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mascot } from "./Mascot";
 
 const emptyStudent = { name: "", loginId: "", password: "", phone: "", grade: "초1", level: "초급", currentDay: 1 };
+const choiceMarks = ["①", "②", "③", "④", "⑤"];
 
 export function AdminApp() {
   const [admin, setAdmin] = useState(null);
@@ -26,7 +27,7 @@ export function AdminApp() {
   const [curriculumIndex, setCurriculumIndex] = useState([]);
   const [curriculumStatus, setCurriculumStatus] = useState("");
   const [savingId, setSavingId] = useState("");
-  const [testForm, setTestForm] = useState({ level: "초급", startDay: 1, endDay: 5, questionCount: 20, includeAnswers: true });
+  const [testForm, setTestForm] = useState({ level: "초급", startDay: 1, endDay: 5, questionCount: 20 });
   const [testPaper, setTestPaper] = useState(null);
   const [testStatus, setTestStatus] = useState("");
 
@@ -323,9 +324,13 @@ export function AdminApp() {
     }
   }
 
-  function printTestPaper() {
+  function printTestPaper(mode = "questions") {
     if (!testPaper) return;
+    document.body.dataset.testPrintMode = mode;
     window.print();
+    window.setTimeout(() => {
+      delete document.body.dataset.testPrintMode;
+    }, 500);
   }
 
   async function logout() {
@@ -723,57 +728,64 @@ function TestPaperPanel({ form, setForm, paper, status, onGenerate, onPrint }) {
         <label>시작 일차<input type="number" min="1" max="100" value={form.startDay} onChange={(event) => updateNumber("startDay", event.target.value)} /></label>
         <label>끝 일차<input type="number" min="1" max="100" value={form.endDay} onChange={(event) => updateNumber("endDay", event.target.value)} /></label>
         <label>문항 수<input type="number" min="1" max="100" value={form.questionCount} onChange={(event) => updateNumber("questionCount", event.target.value)} /></label>
-        <label className="checkLabel"><input type="checkbox" checked={form.includeAnswers} onChange={(event) => setForm({ ...form, includeAnswers: event.target.checked })} />정답표 포함</label>
         <button className="btn primary" type="submit">랜덤 테스트지 만들기</button>
       </form>
       <div className="testActions noPrint">
         <p className="statusText">{status || "범위와 문항 수를 정한 뒤 테스트지를 만들어 주세요."}</p>
-        <button className="btn secondary" type="button" onClick={onPrint} disabled={!paper}>PDF로 저장</button>
+        <button className="btn secondary" type="button" onClick={() => onPrint("questions")} disabled={!paper}>문제지 PDF로 저장</button>
+        <button className="btn secondary" type="button" onClick={() => onPrint("answers")} disabled={!paper}>정답표 PDF로 저장</button>
       </div>
-      {paper ? <TestPaperPreview paper={paper} includeAnswers={form.includeAnswers} /> : null}
+      {paper ? <TestPaperPreview paper={paper} /> : null}
     </section>
   );
 }
 
-function TestPaperPreview({ paper, includeAnswers }) {
+function TestPaperPreview({ paper }) {
   return (
     <article className="testPaperPreview">
-      <header className="testPaperHeader">
-        <div>
-          <p>초록이한자 오프라인 확인</p>
-          <h1>{paper.title}</h1>
-        </div>
-        <dl>
-          <div><dt>이름</dt><dd /></div>
-          <div><dt>날짜</dt><dd /></div>
-          <div><dt>점수</dt><dd /></div>
-        </dl>
-      </header>
-      <ol className="testQuestions">
-        {paper.questions.map((question) => (
-          <li key={question.number}>
-            <div className="testQuestionTop">
-              <strong>{question.number}. {question.prompt}</strong>
-              <span>{question.day}일차 · {question.character}</span>
-            </div>
-            <div className="testChoices">
-              {question.choices.map((choice, index) => (
-                <span key={`${question.number}-${choice}`}>{index + 1}. {choice}</span>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {includeAnswers ? (
-        <section className="answerKey">
-          <h2>정답표</h2>
+      <section className="questionPaper">
+        <header className="testPaperHeader">
           <div>
-            {paper.questions.map((question) => (
-              <span key={`answer-${question.number}`}>{question.number}. {question.answer}</span>
-            ))}
+            <p>초록이한자 오프라인 확인</p>
+            <h1>{paper.title}</h1>
           </div>
-        </section>
-      ) : null}
+          <dl>
+            <div><dt>이름</dt><dd /></div>
+            <div><dt>날짜</dt><dd /></div>
+            <div><dt>점수</dt><dd /></div>
+          </dl>
+        </header>
+        <ol className="testQuestions">
+          {paper.questions.map((question) => (
+            <li key={question.number}>
+              <div className="testQuestionTop">
+                <strong>{question.number}. {question.prompt}</strong>
+                <span>{question.day}일차 · {question.character}</span>
+              </div>
+              <div className="testChoices">
+                {question.choices.map((choice, index) => (
+                  <span key={`${question.number}-${choice}`}>{choiceMarks[index]} {choice}</span>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section className="answerSheetPrint">
+        <header className="testPaperHeader answerHeader">
+          <div>
+            <p>초록이한자 오프라인 확인</p>
+            <h1>{paper.title} 정답표</h1>
+          </div>
+        </header>
+        <div className="answerKey">
+          {paper.questions.map((question) => (
+            <span key={`answer-${question.number}`}>
+              {question.number}. {choiceMarks[question.answerIndex] || ""} {question.answer}
+            </span>
+          ))}
+        </div>
+      </section>
     </article>
   );
 }

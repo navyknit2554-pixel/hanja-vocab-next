@@ -1081,7 +1081,7 @@ textarea {
 
 .testBuilderForm {
   display: grid;
-  grid-template-columns: 1.1fr repeat(3, minmax(100px, .8fr)) auto;
+  grid-template-columns: 1.1fr repeat(3, minmax(100px, .8fr)) minmax(180px, auto);
   gap: 12px;
   align-items: end;
 }
@@ -1102,7 +1102,7 @@ textarea {
 
 .testActions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
 }
@@ -1211,18 +1211,17 @@ textarea {
   line-height: 1.5;
 }
 
-.answerKey {
+.answerSheetPrint {
   break-inside: avoid;
   border-top: 3px solid #111827;
   padding-top: 14px;
 }
 
-.answerKey h2 {
-  margin: 0 0 10px;
-  font-size: 1.15rem;
+.answerHeader {
+  margin-bottom: 14px;
 }
 
-.answerKey div {
+.answerKey {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px 12px;
@@ -1458,7 +1457,7 @@ textarea {
   .testActions,
   .testPaperHeader,
   .testChoices,
-  .answerKey div {
+  .answerKey {
     grid-template-columns: 1fr;
   }
 
@@ -1535,12 +1534,15 @@ textarea {
     visibility: hidden;
   }
 
-  .testPaperPreview,
-  .testPaperPreview * {
+  body[data-test-print-mode="questions"] .questionPaper,
+  body[data-test-print-mode="questions"] .questionPaper *,
+  body[data-test-print-mode="answers"] .answerSheetPrint,
+  body[data-test-print-mode="answers"] .answerSheetPrint * {
     visibility: visible;
   }
 
-  .testPaperPreview {
+  body[data-test-print-mode="questions"] .questionPaper,
+  body[data-test-print-mode="answers"] .answerSheetPrint {
     position: absolute;
     left: 0;
     top: 0;
@@ -1564,7 +1566,12 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .answerKey div {
+  .answerSheetPrint {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .answerKey {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
