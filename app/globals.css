@@ -19,6 +19,8 @@ html {
   max-width: 100%;
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  touch-action: pan-y;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -27,6 +29,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  touch-action: pan-y;
   color: var(--ink);
   font-family: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   background:
@@ -58,6 +61,7 @@ a {
   margin: 0 auto;
   padding: 18px 0;
   overflow-x: clip;
+  touch-action: pan-y;
 }
 
 .panel {
