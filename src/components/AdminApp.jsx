@@ -648,7 +648,20 @@ function StudentList({ students, status, onRefresh, onEdit, onDelete }) {
 }
 
 function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
+  const [filters, setFilters] = useState({ query: "", grade: "전체", state: "전체", day: 1, minDay: "", maxDay: "" });
   const progressMap = buildProgressMap(data?.progress || []);
+  const gradeOptions = uniqueValues((data?.students || []).map((student) => student.grade));
+  const selectedDay = clampDay(filters.day, data?.days || []);
+  const filteredStudents = filterProgressStudents(data?.students || [], progressMap, selectedDay, filters);
+
+  function updateFilter(key, value) {
+    setFilters((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function resetFilters() {
+    setFilters({ query: "", grade: "전체", state: "전체", day: selectedDay, minDay: "", maxDay: "" });
+  }
+
   return (
     <section className="panel progressPanel">
       <div className="sectionHeader">
@@ -665,6 +678,30 @@ function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
           <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
         </div>
       </div>
+      <div className="progressFilters">
+        <label>이름 검색<input value={filters.query} onChange={(event) => updateFilter("query", event.target.value)} placeholder="학생 이름" /></label>
+        <label>학년
+          <select value={filters.grade} onChange={(event) => updateFilter("grade", event.target.value)}>
+            <option>전체</option>
+            {gradeOptions.map((grade) => <option key={grade}>{grade}</option>)}
+          </select>
+        </label>
+        <label>상태
+          <select value={filters.state} onChange={(event) => updateFilter("state", event.target.value)}>
+            <option>전체</option>
+            <option value="done">완료</option>
+            <option value="review">복습</option>
+            <option value="active">진행</option>
+            <option value="current">현재</option>
+            <option value="empty">기록 없음</option>
+          </select>
+        </label>
+        <label>기준 일차<input type="number" min="1" max="100" value={filters.day} onChange={(event) => updateFilter("day", event.target.value)} /></label>
+        <label>현재 일차 시작<input type="number" min="1" max="100" value={filters.minDay} onChange={(event) => updateFilter("minDay", event.target.value)} placeholder="전체" /></label>
+        <label>현재 일차 끝<input type="number" min="1" max="100" value={filters.maxDay} onChange={(event) => updateFilter("maxDay", event.target.value)} placeholder="전체" /></label>
+        <button className="btn secondary" type="button" onClick={resetFilters}>필터 초기화</button>
+      </div>
+      <p className="filterSummary">표시 {filteredStudents.length}명 / 전체 {data?.students?.length || 0}명</p>
       <div className="legend">
         <span><i className="done" />완료</span>
         <span><i className="review" />복습</span>
@@ -680,7 +717,7 @@ function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
             </tr>
           </thead>
           <tbody>
-            {(data?.students || []).map((student) => (
+            {filteredStudents.map((student) => (
               <tr key={student.id}>
                 <th>
                   <strong>{student.name}</strong>
@@ -700,6 +737,7 @@ function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
           </tbody>
         </table>
         {!(data?.students || []).length ? <p className="statusText">표시할 학생이 없습니다.</p> : null}
+        {(data?.students || []).length && !filteredStudents.length ? <p className="statusText">필터 조건에 맞는 학생이 없습니다.</p> : null}
       </div>
     </section>
   );
@@ -827,6 +865,38 @@ function buildProgressMap(progress) {
     map.set(`${item.student_id}:${item.day}`, item);
     return map;
   }, new Map());
+}
+
+function filterProgressStudents(students, progressMap, selectedDay, filters) {
+  const query = String(filters.query || "").trim().toLowerCase();
+  const minDay = Number(filters.minDay || 0);
+  const maxDay = Number(filters.maxDay || 0);
+  return students.filter((student) => {
+    if (query && !String(student.name || "").toLowerCase().includes(query)) return false;
+    if (filters.grade !== "전체" && student.grade !== filters.grade) return false;
+    if (minDay && Number(student.current_day) < minDay) return false;
+    if (maxDay && Number(student.current_day) > maxDay) return false;
+    if (filters.state !== "전체") {
+      const record = progressMap.get(`${student.id}:${selectedDay}`);
+      const state = progressCellState(student, selectedDay, record);
+      if (state.key !== filters.state) return false;
+    }
+    return true;
+  });
+}
+
+function clampDay(value, days) {
+  const number = Math.min(100, Math.max(1, Number(value || 1)));
+  if (!days.length) return number;
+  const dayNumbers = days.map((day) => Number(day.day));
+  if (dayNumbers.includes(number)) return number;
+  return dayNumbers.reduce((closest, day) => (
+    Math.abs(day - number) < Math.abs(closest - number) ? day : closest
+  ), dayNumbers[0]);
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right, "ko"));
 }
 
 function progressCellState(student, day, record) {
