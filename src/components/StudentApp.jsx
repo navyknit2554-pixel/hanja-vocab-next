@@ -241,22 +241,39 @@ export function StudentApp() {
 }
 
 function GradeLeaderboard({ leaderboard }) {
-  const leaders = leaderboard?.top || [];
-  if (!leaders.length) return null;
+  const scopes = leaderboard?.scopes || [];
+  const [activeScopeKey, setActiveScopeKey] = useState("all");
+  const activeScope = scopes.find((scope) => scope.key === activeScopeKey) || scopes[0];
+  const leaders = activeScope?.top || [];
+  if (!scopes.length || !activeScope) return null;
 
   return (
-    <section className="gradeLeaderboard" aria-label="같은 학년 랭킹">
+    <section className="gradeLeaderboard" aria-label="랭킹">
       <div className="leaderboardHeader">
         <div>
-          <span>같은 학년 TOP 3</span>
-          <h2>{leaderboard.scope}</h2>
+          <span>랭킹 TOP 3</span>
+          <h2>{activeScope.title}</h2>
         </div>
-        {leaderboard.mine && Number(leaderboard.mine.rank) > 3 ? (
-          <p>나는 {leaderboard.mine.rank}위</p>
+        {activeScope.mine && Number(activeScope.mine.rank) > 3 ? (
+          <p>나는 {activeScope.mine.rank}위</p>
         ) : null}
       </div>
+      <div className="leaderboardTabs" role="tablist" aria-label="랭킹 범위">
+        {scopes.map((scope) => (
+          <button
+            className={scope.key === activeScope.key ? "active" : ""}
+            key={scope.key}
+            type="button"
+            role="tab"
+            aria-selected={scope.key === activeScope.key}
+            onClick={() => setActiveScopeKey(scope.key)}
+          >
+            {scope.label}
+          </button>
+        ))}
+      </div>
       <div className="leaderboardList">
-        {leaders.map((student) => (
+        {leaders.length ? leaders.map((student) => (
           <article className={`leaderboardItem ${student.id === leaderboard.currentStudentId ? "mine" : ""}`} key={student.id}>
             <strong>{student.rank}위</strong>
             <div>
@@ -264,7 +281,7 @@ function GradeLeaderboard({ leaderboard }) {
               <span>{student.level} · {student.completed_count}일차 완료 · 정답률 {student.accuracy}%</span>
             </div>
           </article>
-        ))}
+        )) : <p className="emptyLeaderboard">아직 랭킹에 표시할 학생이 없습니다.</p>}
       </div>
     </section>
   );

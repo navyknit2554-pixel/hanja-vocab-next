@@ -309,6 +309,30 @@ textarea {
   font-weight: 1000;
 }
 
+.leaderboardTabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.leaderboardTabs button {
+  min-height: 38px;
+  border: 2px solid #d9f7c8;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.leaderboardTabs button.active {
+  border-color: var(--green);
+  background: #ecffe1;
+  color: var(--green-dark);
+}
+
 .leaderboardList {
   display: grid;
   gap: 8px;
@@ -354,6 +378,12 @@ textarea {
 .leaderboardItem span {
   color: var(--muted);
   font-size: .9rem;
+  font-weight: 900;
+}
+
+.emptyLeaderboard {
+  margin: 0;
+  color: var(--muted);
   font-weight: 900;
 }
 

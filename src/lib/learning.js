@@ -31,7 +31,7 @@ export async function getStudentToday(studentId) {
   `;
   const student = studentRows[0];
   if (!student) return null;
-  const leaderboard = await getGradeLeaderboard(student, db);
+  const leaderboard = await getLeaderboards(student, db);
 
   const currentLessonRows = await db`
     select id
@@ -106,48 +106,67 @@ export async function getStudentToday(studentId) {
   };
 }
 
-async function getGradeLeaderboard(student, db) {
+async function getLeaderboards(student, db) {
   const rows = await db`
-    with progress_totals as (
-      select
-        s.id,
-        s.name,
-        s.grade,
-        s.level,
-        s.current_day,
-        count(p.id) filter (where p.status = 'completed')::int as completed_count,
-        coalesce(sum(p.correct_count), 0)::int as correct_count,
-        coalesce(sum(p.total_count), 0)::int as total_count,
-        max(p.completed_at) as last_completed_at
-      from students s
-      left join student_progress p on p.student_id = s.id
-      where s.teacher_id = ${student.teacher_id}
-        and s.grade = ${student.grade}
-      group by s.id
-    ),
-    ranked as (
-      select
-        *,
-        case
-          when total_count > 0 then round((correct_count::numeric / total_count::numeric) * 100)
-          else 0
-        end::int as accuracy,
-        row_number() over (
-          order by completed_count desc, current_day desc, total_count desc, last_completed_at asc nulls last, name asc
-        )::int as rank
-      from progress_totals
-    )
-    select id, name, grade, level, current_day, completed_count, correct_count, total_count, accuracy, rank
-    from ranked
-    where rank <= 3 or id = ${student.id}
-    order by rank asc
+    select
+      s.id,
+      s.name,
+      s.grade,
+      s.level,
+      s.current_day,
+      count(p.id) filter (where p.status = 'completed')::int as completed_count,
+      coalesce(sum(p.correct_count), 0)::int as correct_count,
+      coalesce(sum(p.total_count), 0)::int as total_count,
+      max(p.completed_at) as last_completed_at
+    from students s
+    left join student_progress p on p.student_id = s.id
+    where s.teacher_id = ${student.teacher_id}
+    group by s.id
   `;
+
+  const rankedRows = rows.map((row) => ({
+    ...row,
+    accuracy: Number(row.total_count) > 0 ? Math.round((Number(row.correct_count) / Number(row.total_count)) * 100) : 0
+  }));
+  const scopes = [
+    { key: "all", label: "전체", title: "전체 랭킹", rows: rankedRows },
+    { key: "elementary", label: "초등부", title: "초등부 랭킹", rows: rankedRows.filter((row) => /^초[1-6]$/.test(String(row.grade || ""))) },
+    { key: "middle", label: "중등부", title: "중등부 랭킹", rows: rankedRows.filter((row) => /^중[1-3]$/.test(String(row.grade || ""))) },
+    { key: "high", label: "고등부", title: "고등부 랭킹", rows: rankedRows.filter((row) => /^고[1-3]$/.test(String(row.grade || ""))) }
+  ];
+
   return {
-    scope: `${student.grade} 랭킹`,
     currentStudentId: student.id,
-    top: rows.filter((row) => Number(row.rank) <= 3),
-    mine: rows.find((row) => row.id === student.id) || null
+    scopes: scopes.map((scope) => rankLeaderboardScope(scope, student.id))
   };
+}
+
+function rankLeaderboardScope(scope, currentStudentId) {
+  const ranked = [...scope.rows]
+    .sort(compareLeaderboardRows)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+  return {
+    key: scope.key,
+    label: scope.label,
+    title: scope.title,
+    top: ranked.slice(0, 3),
+    mine: ranked.find((row) => row.id === currentStudentId) || null
+  };
+}
+
+function compareLeaderboardRows(left, right) {
+  return Number(right.completed_count) - Number(left.completed_count)
+    || Number(right.current_day) - Number(left.current_day)
+    || Number(right.total_count) - Number(left.total_count)
+    || compareNullableDates(left.last_completed_at, right.last_completed_at)
+    || String(left.name || "").localeCompare(String(right.name || ""), "ko");
+}
+
+function compareNullableDates(left, right) {
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  return new Date(left).getTime() - new Date(right).getTime();
 }
 
 export function nextKoreaMidnight(date = new Date()) {
