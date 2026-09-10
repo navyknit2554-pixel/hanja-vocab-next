@@ -278,7 +278,7 @@ function GradeLeaderboard({ leaderboard }) {
             <strong>{student.rank}위</strong>
             <div>
               <b>{student.name}</b>
-              <span>{student.level} · {student.completed_count}일차 완료 · 정답률 {student.accuracy}%</span>
+              <span>{student.level} · {student.completed_count}일차 완료</span>
             </div>
           </article>
         )) : <p className="emptyLeaderboard">아직 랭킹에 표시할 학생이 없습니다.</p>}
