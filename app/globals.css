@@ -14,8 +14,19 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
 body {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   color: var(--ink);
   font-family: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   background:
@@ -46,6 +57,7 @@ a {
   min-height: 100dvh;
   margin: 0 auto;
   padding: 18px 0;
+  overflow-x: clip;
 }
 
 .panel {
@@ -431,7 +443,10 @@ textarea {
   display: grid;
   align-content: center;
   gap: 14px;
-  touch-action: manipulation;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior-x: contain;
 }
 
 .studyHanja {

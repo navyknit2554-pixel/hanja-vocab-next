@@ -315,6 +315,8 @@ function StageNavigation({ stage, onPrev, onHome }) {
 
 function StudyCard({ item, index, total, onPrev, onNext }) {
   const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+  const swipingHorizontally = useRef(false);
   const isFirst = index === 0;
   const isLast = index + 1 >= total;
 
@@ -328,6 +330,22 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
 
   function handleTouchStart(event) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
+    touchStartY.current = event.touches[0]?.clientY ?? null;
+    swipingHorizontally.current = false;
+  }
+
+  function handleTouchMove(event) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - touchStartX.current;
+    const deltaY = touch.clientY - touchStartY.current;
+    if (!swipingHorizontally.current && Math.abs(deltaX) > 14 && Math.abs(deltaX) > Math.abs(deltaY) + 8) {
+      swipingHorizontally.current = true;
+    }
+    if (swipingHorizontally.current && event.cancelable) {
+      event.preventDefault();
+    }
   }
 
   function handleTouchEnd(event) {
@@ -335,13 +353,15 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
     const endX = event.changedTouches[0]?.clientX ?? touchStartX.current;
     const distance = endX - touchStartX.current;
     touchStartX.current = null;
+    touchStartY.current = null;
+    swipingHorizontally.current = false;
     if (Math.abs(distance) < 55) return;
     if (distance > 0) goPrev();
     else goNext();
   }
 
   return (
-    <article className="swipeCard" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <article className="swipeCard" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       <Mascot variant={item.type === "hanja" ? "study" : "discover"} small label={item.type === "hanja" ? "공부 중" : "어휘 발견"} />
       <p className="eyebrow">{index + 1} / {total}</p>
       {item.type === "hanja" ? (
