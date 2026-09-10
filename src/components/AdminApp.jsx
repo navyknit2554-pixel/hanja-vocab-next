@@ -6,6 +6,7 @@ import { Mascot } from "./Mascot";
 
 const emptyStudent = { name: "", loginId: "", password: "", phone: "", grade: "초1", level: "초급", currentDay: 1 };
 const choiceMarks = ["①", "②", "③", "④", "⑤"];
+const gradeFilterOptions = ["초등부", "중등부", "고등부", "초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
 
 export function AdminApp() {
   const [admin, setAdmin] = useState(null);
@@ -650,7 +651,7 @@ function StudentList({ students, status, onRefresh, onEdit, onDelete }) {
 function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
   const [filters, setFilters] = useState({ query: "", grade: "전체", state: "전체", day: 1, minDay: "", maxDay: "" });
   const progressMap = buildProgressMap(data?.progress || []);
-  const gradeOptions = uniqueValues((data?.students || []).map((student) => student.grade));
+  const extraGradeOptions = uniqueValues((data?.students || []).map((student) => student.grade)).filter((grade) => !gradeFilterOptions.includes(grade));
   const selectedDay = clampDay(filters.day, data?.days || []);
   const filteredStudents = filterProgressStudents(data?.students || [], progressMap, selectedDay, filters);
 
@@ -683,7 +684,8 @@ function ProgressPanel({ level, setLevel, status, data, onRefresh }) {
         <label>학년
           <select value={filters.grade} onChange={(event) => updateFilter("grade", event.target.value)}>
             <option>전체</option>
-            {gradeOptions.map((grade) => <option key={grade}>{grade}</option>)}
+            {gradeFilterOptions.map((grade) => <option key={grade}>{grade}</option>)}
+            {extraGradeOptions.map((grade) => <option key={grade}>{grade}</option>)}
           </select>
         </label>
         <label>상태
@@ -873,7 +875,7 @@ function filterProgressStudents(students, progressMap, selectedDay, filters) {
   const maxDay = Number(filters.maxDay || 0);
   return students.filter((student) => {
     if (query && !String(student.name || "").toLowerCase().includes(query)) return false;
-    if (filters.grade !== "전체" && student.grade !== filters.grade) return false;
+    if (!matchesGradeFilter(student.grade, filters.grade)) return false;
     if (minDay && Number(student.current_day) < minDay) return false;
     if (maxDay && Number(student.current_day) > maxDay) return false;
     if (filters.state !== "전체") {
@@ -883,6 +885,15 @@ function filterProgressStudents(students, progressMap, selectedDay, filters) {
     }
     return true;
   });
+}
+
+function matchesGradeFilter(studentGrade, filterGrade) {
+  if (!filterGrade || filterGrade === "전체") return true;
+  const grade = String(studentGrade || "").trim();
+  if (filterGrade === "초등부") return /^초[1-6]$/.test(grade);
+  if (filterGrade === "중등부") return /^중[1-3]$/.test(grade);
+  if (filterGrade === "고등부") return /^고[1-3]$/.test(grade);
+  return grade === filterGrade;
 }
 
 function clampDay(value, days) {
