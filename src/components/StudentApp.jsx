@@ -15,7 +15,7 @@ export function StudentApp() {
   const [quizIndex, setQuizIndex] = useState(0);
   const [retryQueue, setRetryQueue] = useState([]);
   const [feedback, setFeedback] = useState(null);
-  const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+  const [stats, setStats] = useState({ correct: 0, total: 0, wrong: [], wrongHistory: [], wrongDetails: [] });
   const [levelUpNotice, setLevelUpNotice] = useState(null);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export function StudentApp() {
     setQuizIndex(0);
     setRetryQueue([]);
     setFeedback(null);
-    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [], wrongDetails: [] });
     setStage(queue.length ? "quiz" : "done");
   }
 
@@ -87,11 +87,18 @@ export function StudentApp() {
     if (!currentQuiz || feedback) return;
     const correct = choice === currentQuiz.answer;
     const wrongKey = currentQuiz.word;
+    const wrongDetail = {
+      word: currentQuiz.word,
+      hanjaWord: currentQuiz.hanjaWord,
+      meaning: currentQuiz.meaning,
+      questionType: currentQuiz.type
+    };
     setStats((previous) => ({
       correct: previous.correct + (correct ? 1 : 0),
       total: previous.total + 1,
       wrong: correct ? previous.wrong.filter((word) => word !== wrongKey) : [...new Set([...previous.wrong, wrongKey])],
-      wrongHistory: correct ? previous.wrongHistory : [...new Set([...previous.wrongHistory, wrongKey])]
+      wrongHistory: correct ? previous.wrongHistory : [...new Set([...previous.wrongHistory, wrongKey])],
+      wrongDetails: correct ? previous.wrongDetails : mergeWrongDetails(previous.wrongDetails, wrongDetail)
     }));
     if (!correct) setRetryQueue((previous) => [...previous, currentQuiz]);
     setFeedback(correct ? "correct" : "wrong");
@@ -151,7 +158,7 @@ export function StudentApp() {
     setQuizIndex(0);
     setRetryQueue([]);
     setFeedback(null);
-    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [] });
+    setStats({ correct: 0, total: 0, wrong: [], wrongHistory: [], wrongDetails: [] });
     setLevelUpNotice(null);
   }
 
@@ -560,6 +567,13 @@ function buildQuizItems(lessonItems) {
       }
     ];
   });
+}
+
+function mergeWrongDetails(details, item) {
+  const key = `${item.word}:${item.questionType}`;
+  const current = Array.isArray(details) ? details : [];
+  if (current.some((detail) => `${detail.word}:${detail.questionType}` === key)) return current;
+  return [...current, item];
 }
 
 function makeChoices(answer, pool, offset = 0) {

@@ -20,6 +20,8 @@ export function AdminApp() {
   const [progressLevel, setProgressLevel] = useState("초급");
   const [progressData, setProgressData] = useState(null);
   const [progressStatus, setProgressStatus] = useState("");
+  const [wrongData, setWrongData] = useState(null);
+  const [wrongStatus, setWrongStatus] = useState("");
   const [level, setLevel] = useState("초급");
   const [day, setDay] = useState(1);
   const [status, setStatus] = useState("v2는 현재 새 구조를 세우는 단계입니다.");
@@ -49,6 +51,10 @@ export function AdminApp() {
   useEffect(() => {
     if (admin && view === "progress") loadProgress();
   }, [admin, view, progressLevel]);
+
+  useEffect(() => {
+    if (admin && view === "wrongWords") loadWrongWords();
+  }, [admin, view]);
 
   useEffect(() => {
     if (admin?.role === "master" && view === "content") loadLesson();
@@ -120,6 +126,22 @@ export function AdminApp() {
     } catch (error) {
       setProgressData(null);
       setProgressStatus(error.message || "학습도를 불러오지 못했습니다.");
+    }
+  }
+
+  async function loadWrongWords() {
+    setWrongStatus("오답 기록을 불러오는 중...");
+    try {
+      const response = await fetch("/api/admin/wrong-words", { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "오답 기록을 불러오지 못했습니다.");
+      setWrongData(data);
+      setWrongStatus(`오답 기록 ${data.wrongWords?.length || 0}개`);
+    } catch (error) {
+      setWrongData(null);
+      setWrongStatus(error.message || "오답 기록을 불러오지 못했습니다.");
     }
   }
 
@@ -407,6 +429,7 @@ export function AdminApp() {
       <nav className="adminTabs">
         <button className={view === "students" ? "active" : ""} onClick={() => setView("students")} type="button">학생 관리</button>
         <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")} type="button">학습도</button>
+        <button className={view === "wrongWords" ? "active" : ""} onClick={() => setView("wrongWords")} type="button">오답 모니터링</button>
         <button className={view === "test" ? "active" : ""} onClick={() => setView("test")} type="button">테스트지</button>
         {admin.role === "master" ? <button className={view === "content" ? "active" : ""} onClick={() => setView("content")} type="button">한자·어휘 관리</button> : null}
       </nav>
@@ -426,6 +449,13 @@ export function AdminApp() {
           status={progressStatus}
           data={progressData}
           onRefresh={loadProgress}
+        />
+      ) : null}
+      {view === "wrongWords" ? (
+        <WrongWordsPanel
+          data={wrongData}
+          status={wrongStatus}
+          onRefresh={loadWrongWords}
         />
       ) : null}
       {view === "test" ? (
@@ -643,6 +673,74 @@ function StudentList({ students, status, onRefresh, onEdit, onDelete }) {
           </article>
         ))}
         {!students.length ? <p className="statusText">등록된 학생이 없습니다.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function WrongWordsPanel({ data, status, onRefresh }) {
+  const [filters, setFilters] = useState({ query: "", grade: "전체", level: "전체", day: "" });
+  const rows = data?.wrongWords || [];
+  const extraGradeOptions = uniqueValues(rows.map((item) => item.grade)).filter((grade) => !gradeFilterOptions.includes(grade));
+  const filteredRows = filterWrongWords(rows, filters);
+
+  function updateFilter(key, value) {
+    setFilters((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function resetFilters() {
+    setFilters({ query: "", grade: "전체", level: "전체", day: "" });
+  }
+
+  return (
+    <section className="panel wrongWordsPanel">
+      <div className="sectionHeader">
+        <div>
+          <h2>오답 모니터링</h2>
+          <p>{status || "학생이 일차별로 틀렸던 어휘를 확인합니다."}</p>
+        </div>
+        <button className="btn secondary" type="button" onClick={onRefresh}>새로고침</button>
+      </div>
+      <div className="wrongFilters">
+        <label>검색<input value={filters.query} onChange={(event) => updateFilter("query", event.target.value)} placeholder="학생·어휘·뜻" /></label>
+        <label>학년
+          <select value={filters.grade} onChange={(event) => updateFilter("grade", event.target.value)}>
+            <option>전체</option>
+            {gradeFilterOptions.map((grade) => <option key={grade}>{grade}</option>)}
+            {extraGradeOptions.map((grade) => <option key={grade}>{grade}</option>)}
+          </select>
+        </label>
+        <label>난이도
+          <select value={filters.level} onChange={(event) => updateFilter("level", event.target.value)}>
+            <option>전체</option>
+            <option>초급</option>
+            <option>중급</option>
+            <option>고급</option>
+          </select>
+        </label>
+        <label>일차<input type="number" min="1" max="100" value={filters.day} onChange={(event) => updateFilter("day", event.target.value)} placeholder="전체" /></label>
+        <button className="btn secondary" type="button" onClick={resetFilters}>필터 초기화</button>
+      </div>
+      <p className="filterSummary">표시 {filteredRows.length}개 / 전체 {rows.length}개</p>
+      <div className="wrongWordList">
+        {filteredRows.map((item) => (
+          <article className="wrongWordItem" key={item.id}>
+            <div>
+              <strong>{item.student_name}</strong>
+              <span>{item.grade} · {item.level} · {item.day}일차</span>
+            </div>
+            <div>
+              <b>{item.hanja_word || item.word}</b>
+              <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
+            </div>
+            <div>
+              <em>{questionTypeLabel(item.question_type)}</em>
+              <small>{item.wrong_count}회 · {formatDateTime(item.last_wrong_at)}</small>
+            </div>
+          </article>
+        ))}
+        {!rows.length ? <p className="statusText">아직 저장된 오답 기록이 없습니다.</p> : null}
+        {rows.length && !filteredRows.length ? <p className="statusText">필터 조건에 맞는 오답 기록이 없습니다.</p> : null}
       </div>
     </section>
   );
@@ -869,6 +967,21 @@ function buildProgressMap(progress) {
   }, new Map());
 }
 
+function filterWrongWords(rows, filters) {
+  const query = String(filters.query || "").trim().toLowerCase();
+  const day = Number(filters.day || 0);
+  return rows.filter((item) => {
+    if (query) {
+      const haystack = `${item.student_name || ""} ${item.word || ""} ${item.hanja_word || ""} ${item.meaning || ""}`.toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    if (!matchesGradeFilter(item.grade, filters.grade)) return false;
+    if (filters.level !== "전체" && item.level !== filters.level) return false;
+    if (day && Number(item.day) !== day) return false;
+    return true;
+  });
+}
+
 function filterProgressStudents(students, progressMap, selectedDay, filters) {
   const query = String(filters.query || "").trim().toLowerCase();
   const minDay = Number(filters.minDay || 0);
@@ -908,6 +1021,24 @@ function clampDay(value, days) {
 
 function uniqueValues(values) {
   return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right, "ko"));
+}
+
+function questionTypeLabel(type) {
+  if (type === "meaning") return "뜻 고르기";
+  if (type === "blank") return "빈칸 어휘";
+  return "오답";
+}
+
+function formatDateTime(value) {
+  if (!value) return "시간 정보 없음";
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(new Date(value));
 }
 
 function progressCellState(student, day, record) {

@@ -57,6 +57,7 @@ export async function PUT(request) {
     }
 
     const wrong = Array.isArray(stats.wrong) ? stats.wrong : [];
+    const wrongDetails = normalizeWrongDetails(stats);
     const total = Math.max(0, Number(stats.total || 0));
     const correct = Math.max(0, Number(stats.correct || 0));
     const completed = total > 0 && wrong.length === 0;
@@ -103,6 +104,39 @@ export async function PUT(request) {
         total_count = excluded.total_count,
         attempts = excluded.attempts
     `;
+
+    for (const item of wrongDetails) {
+      await db`
+        insert into student_wrong_words (
+          student_id,
+          curriculum_day_id,
+          word,
+          hanja_word,
+          meaning,
+          question_type,
+          wrong_count,
+          first_wrong_at,
+          last_wrong_at
+        )
+        values (
+          ${student.id},
+          ${lesson.id},
+          ${item.word},
+          ${item.hanjaWord},
+          ${item.meaning},
+          ${item.questionType},
+          1,
+          now(),
+          now()
+        )
+        on conflict (student_id, curriculum_day_id, word, question_type)
+        do update set
+          hanja_word = excluded.hanja_word,
+          meaning = excluded.meaning,
+          wrong_count = student_wrong_words.wrong_count + 1,
+          last_wrong_at = now()
+      `;
+    }
 
     if (completed && Number(student.current_day) <= lessonDay) {
       const nextRows = await db`
@@ -153,4 +187,23 @@ export async function PUT(request) {
       { status: 500 }
     );
   }
+}
+
+function normalizeWrongDetails(stats) {
+  if (Array.isArray(stats.wrongDetails) && stats.wrongDetails.length) {
+    return stats.wrongDetails
+      .map((item) => ({
+        word: String(item.word || "").trim(),
+        hanjaWord: String(item.hanjaWord || "").trim(),
+        meaning: String(item.meaning || "").trim(),
+        questionType: String(item.questionType || "").trim()
+      }))
+      .filter((item) => item.word)
+      .slice(0, 100);
+  }
+  const wrongHistory = Array.isArray(stats.wrongHistory) ? stats.wrongHistory : [];
+  return wrongHistory
+    .map((word) => ({ word: String(word || "").trim(), hanjaWord: "", meaning: "", questionType: "" }))
+    .filter((item) => item.word)
+    .slice(0, 100);
 }

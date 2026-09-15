@@ -162,7 +162,23 @@ async function ensureSchema(db) {
       unique (student_id, curriculum_day_id)
     )
   `;
+  await db`
+    create table if not exists student_wrong_words (
+      id uuid primary key default gen_random_uuid(),
+      student_id uuid not null references students(id) on delete cascade,
+      curriculum_day_id uuid not null references curriculum_days(id) on delete cascade,
+      word text not null,
+      hanja_word text not null default '',
+      meaning text not null default '',
+      question_type text not null default '',
+      wrong_count integer not null default 1,
+      first_wrong_at timestamptz not null default now(),
+      last_wrong_at timestamptz not null default now(),
+      unique (student_id, curriculum_day_id, word, question_type)
+    )
+  `;
   await db`create index if not exists students_teacher_login_idx on students (teacher_id, login_id, password)`;
   await db`create unique index if not exists students_teacher_legacy_idx on students (teacher_id, legacy_id) where legacy_id <> ''`;
   await db`create index if not exists curriculum_level_day_idx on curriculum_days (level, day)`;
+  await db`create index if not exists student_wrong_words_student_day_idx on student_wrong_words (student_id, curriculum_day_id)`;
 }

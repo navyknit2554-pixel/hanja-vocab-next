@@ -1427,6 +1427,37 @@ textarea {
   white-space: nowrap;
 }
 
+.wrongFilters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(110px, .55fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 14px 0 10px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.wrongFilters label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 1000;
+}
+
+.wrongFilters input,
+.wrongFilters select {
+  min-height: 42px;
+}
+
+.wrongFilters .btn {
+  min-height: 42px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
 .filterSummary {
   margin: 0 0 10px;
   color: var(--green-dark);
@@ -1528,6 +1559,55 @@ textarea {
   margin-top: 3px;
   color: var(--muted);
   font-size: .85rem;
+}
+
+.wrongWordList {
+  display: grid;
+  gap: 10px;
+}
+
+.wrongWordItem {
+  display: grid;
+  grid-template-columns: minmax(130px, .8fr) minmax(220px, 1.3fr) minmax(120px, .6fr);
+  gap: 12px;
+  align-items: center;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff;
+}
+
+.wrongWordItem div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wrongWordItem strong,
+.wrongWordItem b {
+  color: var(--ink);
+  font-weight: 1000;
+}
+
+.wrongWordItem b {
+  font-size: 1.1rem;
+}
+
+.wrongWordItem span,
+.wrongWordItem small {
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.wrongWordItem em {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #fff1f5;
+  color: var(--pink);
+  font-style: normal;
+  font-weight: 1000;
 }
 
 .progressDot {
@@ -1650,6 +1730,11 @@ textarea {
   }
 
   .progressFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .wrongFilters,
+  .wrongWordItem {
     grid-template-columns: 1fr;
   }
 
