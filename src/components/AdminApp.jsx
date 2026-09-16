@@ -735,9 +735,9 @@ function WrongWordsPanel({ data, status, onRefresh }) {
             </header>
             <div className="wrongWordGroupList">
               {group.items.map((item) => (
-                <div className="wrongWordChip" key={item.id} title={`${item.word} · ${item.meaning || "뜻 정보 없음"}`}>
+                <div className="wrongWordChip" key={item.id} title={[item.word, item.meaning].filter(Boolean).join(" · ")}>
                   <b>{item.hanja_word || item.word}</b>
-                  <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
+                  {item.meaning ? <span>{item.word === item.hanja_word ? item.meaning : `${item.word} · ${item.meaning}`}</span> : null}
                   <small>{questionTypeLabel(item.question_type)} · {item.wrong_count}회</small>
                 </div>
               ))}
