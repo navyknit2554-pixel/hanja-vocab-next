@@ -683,6 +683,7 @@ function WrongWordsPanel({ data, status, onRefresh }) {
   const rows = data?.wrongWords || [];
   const extraGradeOptions = uniqueValues(rows.map((item) => item.grade)).filter((grade) => !gradeFilterOptions.includes(grade));
   const filteredRows = filterWrongWords(rows, filters);
+  const groupedRows = groupWrongWords(filteredRows);
 
   function updateFilter(key, value) {
     setFilters((previous) => ({ ...previous, [key]: value }));
@@ -721,21 +722,30 @@ function WrongWordsPanel({ data, status, onRefresh }) {
         <label>일차<input type="number" min="1" max="100" value={filters.day} onChange={(event) => updateFilter("day", event.target.value)} placeholder="전체" /></label>
         <button className="btn secondary" type="button" onClick={resetFilters}>필터 초기화</button>
       </div>
-      <p className="filterSummary">표시 {filteredRows.length}개 / 전체 {rows.length}개</p>
+      <p className="filterSummary">표시 {groupedRows.length}명·일차 / 오답 {filteredRows.length}개 / 전체 {rows.length}개</p>
       <div className="wrongWordList">
-        {filteredRows.map((item) => (
-          <article className="wrongWordItem" key={item.id}>
-            <div>
-              <strong>{item.student_name}</strong>
-              <span>{item.grade} · {item.level} · {item.day}일차</span>
-            </div>
-            <div>
-              <b>{item.hanja_word || item.word}</b>
-              <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
-            </div>
-            <div>
-              <em>{questionTypeLabel(item.question_type)}</em>
-              <small>{item.wrong_count}회 · {formatDateTime(item.last_wrong_at)}</small>
+        {groupedRows.map((group) => (
+          <article className="wrongWordGroup" key={group.key}>
+            <header>
+              <div>
+                <strong>{group.studentName}</strong>
+                <span>{group.grade} · {group.level} · {group.day}일차</span>
+              </div>
+              <small>{group.items.length}개 오답 · 최근 {formatDateTime(group.lastWrongAt)}</small>
+            </header>
+            <div className="wrongWordGroupList">
+              {group.items.map((item) => (
+                <div className="wrongWordRow" key={item.id}>
+                  <div>
+                    <b>{item.hanja_word || item.word}</b>
+                    <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
+                  </div>
+                  <div>
+                    <em>{questionTypeLabel(item.question_type)}</em>
+                    <small>{item.wrong_count}회 · {formatDateTime(item.last_wrong_at)}</small>
+                  </div>
+                </div>
+              ))}
             </div>
           </article>
         ))}
@@ -980,6 +990,40 @@ function filterWrongWords(rows, filters) {
     if (day && Number(item.day) !== day) return false;
     return true;
   });
+}
+
+function groupWrongWords(rows) {
+  const groups = new Map();
+  for (const item of rows) {
+    const key = `${item.student_id}:${item.level}:${item.day}`;
+    const group = groups.get(key) || {
+      key,
+      studentName: item.student_name,
+      grade: item.grade,
+      level: item.level,
+      day: item.day,
+      lastWrongAt: item.last_wrong_at,
+      items: []
+    };
+    group.items.push(item);
+    if (new Date(item.last_wrong_at).getTime() > new Date(group.lastWrongAt).getTime()) {
+      group.lastWrongAt = item.last_wrong_at;
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((left, right) => (
+        new Date(right.last_wrong_at).getTime() - new Date(left.last_wrong_at).getTime()
+          || String(left.word || "").localeCompare(String(right.word || ""), "ko")
+      ))
+    }))
+    .sort((left, right) => (
+      new Date(right.lastWrongAt).getTime() - new Date(left.lastWrongAt).getTime()
+        || Number(right.day) - Number(left.day)
+        || String(left.studentName || "").localeCompare(String(right.studentName || ""), "ko")
+    ));
 }
 
 function filterProgressStudents(students, progressMap, selectedDay, filters) {

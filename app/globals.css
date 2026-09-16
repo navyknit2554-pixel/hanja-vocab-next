@@ -1566,41 +1566,63 @@ textarea {
   gap: 10px;
 }
 
-.wrongWordItem {
+.wrongWordGroup {
   display: grid;
-  grid-template-columns: minmax(130px, .8fr) minmax(220px, 1.3fr) minmax(120px, .6fr);
   gap: 12px;
-  align-items: center;
   border: 2px solid var(--line);
   border-radius: 16px;
   padding: 14px;
   background: #fff;
 }
 
-.wrongWordItem div {
+.wrongWordGroup header {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.wrongWordGroup header div,
+.wrongWordRow div {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.wrongWordItem strong,
-.wrongWordItem b {
+.wrongWordGroup strong,
+.wrongWordRow b {
   color: var(--ink);
   font-weight: 1000;
 }
 
-.wrongWordItem b {
+.wrongWordRow b {
   font-size: 1.1rem;
 }
 
-.wrongWordItem span,
-.wrongWordItem small {
+.wrongWordGroup span,
+.wrongWordGroup small,
+.wrongWordRow span,
+.wrongWordRow small {
   color: var(--muted);
   font-weight: 900;
   line-height: 1.35;
 }
 
-.wrongWordItem em {
+.wrongWordGroupList {
+  display: grid;
+  gap: 8px;
+}
+
+.wrongWordRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, auto);
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.wrongWordRow em {
   width: fit-content;
   border-radius: 999px;
   padding: 5px 10px;
@@ -1734,7 +1756,8 @@ textarea {
   }
 
   .wrongFilters,
-  .wrongWordItem {
+  .wrongWordGroup header,
+  .wrongWordRow {
     grid-template-columns: 1fr;
   }
 
