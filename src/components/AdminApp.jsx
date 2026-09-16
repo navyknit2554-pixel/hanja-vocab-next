@@ -735,15 +735,10 @@ function WrongWordsPanel({ data, status, onRefresh }) {
             </header>
             <div className="wrongWordGroupList">
               {group.items.map((item) => (
-                <div className="wrongWordRow" key={item.id}>
-                  <div>
-                    <b>{item.hanja_word || item.word}</b>
-                    <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
-                  </div>
-                  <div>
-                    <em>{questionTypeLabel(item.question_type)}</em>
-                    <small>{item.wrong_count}회 · {formatDateTime(item.last_wrong_at)}</small>
-                  </div>
+                <div className="wrongWordChip" key={item.id} title={`${item.word} · ${item.meaning || "뜻 정보 없음"}`}>
+                  <b>{item.hanja_word || item.word}</b>
+                  <span>{item.word} · {item.meaning || "뜻 정보 없음"}</span>
+                  <small>{questionTypeLabel(item.question_type)} · {item.wrong_count}회</small>
                 </div>
               ))}
             </div>

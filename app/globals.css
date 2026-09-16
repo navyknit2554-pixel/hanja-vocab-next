@@ -1583,52 +1583,49 @@ textarea {
 }
 
 .wrongWordGroup header div,
-.wrongWordRow div {
+.wrongWordChip {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
 .wrongWordGroup strong,
-.wrongWordRow b {
+.wrongWordChip b {
   color: var(--ink);
   font-weight: 1000;
 }
 
-.wrongWordRow b {
+.wrongWordChip b {
   font-size: 1.1rem;
 }
 
 .wrongWordGroup span,
 .wrongWordGroup small,
-.wrongWordRow span,
-.wrongWordRow small {
+.wrongWordChip span,
+.wrongWordChip small {
   color: var(--muted);
   font-weight: 900;
   line-height: 1.35;
 }
 
 .wrongWordGroupList {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  align-items: stretch;
 }
 
-.wrongWordRow {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(120px, auto);
-  gap: 12px;
-  align-items: center;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
+.wrongWordChip {
+  flex: 1 1 190px;
+  max-width: 300px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fbfdff;
 }
 
-.wrongWordRow em {
-  width: fit-content;
-  border-radius: 999px;
-  padding: 5px 10px;
-  background: #fff1f5;
+.wrongWordChip small {
   color: var(--pink);
-  font-style: normal;
   font-weight: 1000;
 }
 
@@ -1756,8 +1753,7 @@ textarea {
   }
 
   .wrongFilters,
-  .wrongWordGroup header,
-  .wrongWordRow {
+  .wrongWordGroup header {
     grid-template-columns: 1fr;
   }
 
