@@ -947,11 +947,13 @@ textarea {
 
 .curriculumDayCard {
   display: grid;
-  grid-template-areas: "day hanja meta";
-  grid-template-columns: 58px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-areas:
+    "day hanja"
+    "meta meta";
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 3px 8px;
   align-items: center;
-  min-height: 48px;
+  min-height: 64px;
   border: 2px solid var(--line);
   border-radius: 12px;
   padding: 8px 10px;
@@ -1001,7 +1003,6 @@ textarea {
 .curriculumDayCard small {
   grid-area: meta;
   color: var(--muted);
-  white-space: nowrap;
   font-size: .82rem;
   font-weight: 900;
 }
@@ -1712,6 +1713,30 @@ textarea {
   justify-items: center;
   gap: 8px;
   padding: 18px 0 8px;
+}
+
+@media (max-width: 1100px) {
+  .progressFilters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .progressFilters .btn {
+    width: 100%;
+  }
+
+  .wrongFilters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wrongFilters .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .adminGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
