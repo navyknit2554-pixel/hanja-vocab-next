@@ -488,7 +488,8 @@ textarea {
 }
 
 .gameMenuCard.chain,
-.gameMenuCard.crossword {
+.gameMenuCard.crossword,
+.gameMenuCard.apple {
   border-color: #ffe4a6;
   background: linear-gradient(180deg, #fffdf5 0%, #fff0bd 100%);
   box-shadow: 0 6px 0 #efd788;
@@ -1113,6 +1114,80 @@ textarea {
   color: var(--muted);
   font-size: .88rem;
   font-weight: 800;
+}
+
+.appleGameCard {
+  overflow: hidden;
+}
+
+.appleBoard {
+  display: grid;
+  grid-template-columns: repeat(var(--apple-size), minmax(0, 1fr));
+  gap: 8px;
+  border: 2px solid #d9f4cd;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 244, 164, .55), transparent 22%),
+    linear-gradient(180deg, #fbfff7 0%, #f0ffe9 100%);
+  padding: 14px;
+  touch-action: none;
+  user-select: none;
+}
+
+.appleCell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 2px solid #ffb5bd;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
+    linear-gradient(180deg, #ff7f86 0%, #ff4f61 100%);
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-weight: 1000;
+  line-height: 1;
+  box-shadow: 0 5px 0 #d53a4a;
+  cursor: pointer;
+}
+
+.appleCell.selected {
+  border-color: #ffe783;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
+    linear-gradient(180deg, #ffdf65 0%, #ff9d2e 100%);
+  box-shadow: 0 5px 0 #d97819;
+  transform: translateY(-2px);
+}
+
+.appleCell.removed,
+.appleCell:disabled {
+  border-color: #d9efff;
+  background: #eef8ff;
+  color: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+.appleFoundWords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  border: 2px solid #e3f1ff;
+  border-radius: 18px;
+  background: #fff;
+  padding: 10px;
+}
+
+.appleFoundWords span {
+  border-radius: 999px;
+  background: #f4ffed;
+  color: var(--green-dark);
+  padding: 6px 10px;
+  font-weight: 1000;
 }
 
 .chainGameCard {
@@ -2850,6 +2925,11 @@ textarea {
 
   .crosswordClueList {
     max-height: 210px;
+  }
+
+  .appleBoard {
+    gap: 5px;
+    padding: 10px;
   }
 
   .chainArena {

@@ -191,7 +191,7 @@ export function StudentApp() {
       setStage("home");
       return;
     }
-    if (stage === "game" || stage === "runner" || stage === "crossword") {
+    if (stage === "game" || stage === "runner" || stage === "crossword" || stage === "apple") {
       setStage("gameMenu");
       return;
     }
@@ -238,10 +238,11 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
-              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} /> : null}
+              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} /> : null}
               {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "runner" ? <WordRunnerGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "crossword" ? <CrosswordBattleGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {stage === "apple" ? <WordAppleGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -367,7 +368,7 @@ function GameLearningButton({ onOpen }) {
   );
 }
 
-function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame }) {
+function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame }) {
   return (
     <section className="gameMenuGrid" aria-label="게임 선택">
       <button className="gameMenuCard" type="button" onClick={onBlockGame}>
@@ -381,6 +382,10 @@ function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame }) {
       <button className="gameMenuCard crossword" type="button" onClick={onCrosswordGame}>
         <span>배틀가로세로</span>
         <strong>뜻 힌트를 보고 가로세로 어휘를 완성해요</strong>
+      </button>
+      <button className="gameMenuCard apple" type="button" onClick={onAppleGame}>
+        <span>단어 사과</span>
+        <strong>글자를 드래그해 배운 어휘를 찾아요</strong>
       </button>
     </section>
   );
@@ -1198,6 +1203,215 @@ function CrosswordBattleGame({ hanja, lesson, onExit }) {
   );
 }
 
+function WordAppleGame({ hanja, lesson, onExit }) {
+  const puzzle = useMemo(() => buildAppleWordPuzzle(hanja), [hanja]);
+  const [removed, setRemoved] = useState({});
+  const [selection, setSelection] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [score, setScore] = useState(0);
+  const [foundWords, setFoundWords] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(90);
+  const [status, setStatus] = useState("");
+  const [isOver, setIsOver] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+  const foundSet = useMemo(() => new Set(foundWords), [foundWords]);
+
+  useEffect(() => {
+    setRemoved({});
+    setSelection([]);
+    setIsDragging(false);
+    setScore(0);
+    setFoundWords([]);
+    setTimeLeft(90);
+    setStatus("");
+    setIsOver(false);
+    setSaveState("idle");
+  }, [puzzle]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=apple&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => {
+    if (isOver || !puzzle.words.length) return undefined;
+    const timer = window.setInterval(() => {
+      setTimeLeft((previous) => {
+        if (previous <= 1) {
+          finishAppleGame(score, foundWords.length);
+          return 0;
+        }
+        return previous - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isOver, puzzle.words.length, score, foundWords.length]);
+
+  useEffect(() => {
+    function handlePointerUp() {
+      if (isDragging) finishSelection();
+    }
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => window.removeEventListener("pointerup", handlePointerUp);
+  }, [isDragging, selection, removed, score, foundWords, timeLeft]);
+
+  function startSelection(cell) {
+    if (isOver || removed[cell.id]) return;
+    setSelection([cell.id]);
+    setIsDragging(true);
+    setStatus("");
+  }
+
+  function addSelection(cell) {
+    if (!isDragging || isOver || removed[cell.id]) return;
+    setSelection((previous) => {
+      if (previous.includes(cell.id)) return previous;
+      const lastCell = puzzle.cellMap.get(previous[previous.length - 1]);
+      if (!lastCell || !areNeighborCells(lastCell, cell)) return previous;
+      return [...previous, cell.id];
+    });
+  }
+
+  function finishSelection() {
+    setIsDragging(false);
+    if (!selection.length) return;
+    const selectedCells = selection.map((id) => puzzle.cellMap.get(id)).filter(Boolean);
+    const selectedWord = selectedCells.map((cell) => cell.char).join("");
+    const reversedWord = selectedCells.map((cell) => cell.char).reverse().join("");
+    const matchedWord = puzzle.wordSet.has(selectedWord) ? selectedWord : puzzle.wordSet.has(reversedWord) ? reversedWord : "";
+    if (!matchedWord || foundSet.has(matchedWord)) {
+      setStatus("배운 어휘가 아니에요. 다시 드래그해요.");
+      setSelection([]);
+      return;
+    }
+    const nextRemoved = { ...removed };
+    selectedCells.forEach((cell) => {
+      nextRemoved[cell.id] = true;
+    });
+    const nextFoundWords = [...foundWords, matchedWord];
+    const nextScore = score + (matchedWord.length * 60) + Math.max(0, Math.floor(timeLeft / 6));
+    setRemoved(nextRemoved);
+    setFoundWords(nextFoundWords);
+    setScore(nextScore);
+    setSelection([]);
+    setStatus(`${matchedWord} 발견!`);
+    if (nextFoundWords.length >= puzzle.words.length) finishAppleGame(nextScore, nextFoundWords.length);
+  }
+
+  function restartAppleGame() {
+    setRemoved({});
+    setSelection([]);
+    setIsDragging(false);
+    setScore(0);
+    setFoundWords([]);
+    setTimeLeft(90);
+    setStatus("");
+    setIsOver(false);
+    setSaveState("idle");
+  }
+
+  async function finishAppleGame(finalScore, finalFoundCount) {
+    if (isOver) return;
+    setIsOver(true);
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "apple",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalFoundCount
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  if (!puzzle.words.length) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="search" small label="단어 사과" />
+        <h2>단어 사과</h2>
+        <p className="mutedText">드래그할 2글자 이상 어휘가 아직 부족합니다.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard appleGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 단어 사과</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{foundWords.length}</b> / {puzzle.words.length}개</span>
+        <span><b>{timeLeft}</b>초</span>
+      </div>
+      <div className="appleBoard" style={{ "--apple-size": puzzle.size }} onPointerLeave={() => isDragging && finishSelection()}>
+        {puzzle.cells.flat().map((cell) => {
+          const selected = selection.includes(cell.id);
+          return (
+            <button
+              className={`appleCell ${selected ? "selected" : ""} ${removed[cell.id] ? "removed" : ""}`}
+              disabled={isOver || removed[cell.id]}
+              key={cell.id}
+              type="button"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                startSelection(cell);
+              }}
+              onPointerEnter={() => addSelection(cell)}
+            >
+              {cell.char}
+            </button>
+          );
+        })}
+      </div>
+      <div className="appleFoundWords" aria-label="찾은 어휘">
+        {foundWords.length ? foundWords.map((word) => <span key={word}>{word}</span>) : <span>드래그해서 배운 어휘를 찾아요</span>}
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      {isOver ? (
+        <div className="crosswordResult" role="status">
+          <strong>{foundWords.length >= puzzle.words.length ? "모든 어휘 발견!" : "게임 종료"}</strong>
+          <p>{score}점 · {foundWords.length}개 어휘 발견</p>
+          <button className="btn secondary" type="button" onClick={restartAppleGame}>다시 하기</button>
+        </div>
+      ) : null}
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
 function WordChainGame({ hanja, lesson, onExit }) {
   const chainData = useMemo(() => buildChainData(hanja), [hanja]);
   const [target, setTarget] = useState("");
@@ -1730,6 +1944,80 @@ function makeRunnerHighLanes() {
   return lanes;
 }
 
+function buildAppleWordPuzzle(hanja) {
+  const words = [];
+  const seen = new Set();
+  (hanja || []).forEach((item) => {
+    (item.vocab || []).forEach((vocab) => {
+      const word = extractHangulChars(vocab.word).join("");
+      if (word.length < 2 || word.length > 5 || seen.has(word)) return;
+      seen.add(word);
+      words.push(word);
+    });
+  });
+  const selectedWords = shuffle(words).sort((a, b) => b.length - a.length).slice(0, 10);
+  const size = 6;
+  const cells = Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, col) => ({
+    id: `apple-${row}-${col}`,
+    row,
+    col,
+    char: ""
+  })));
+  const placedWords = [];
+  selectedWords.forEach((word) => {
+    const placement = findAppleWordPlacement(word, cells, size);
+    if (!placement) return;
+    Array.from(word).forEach((char, index) => {
+      const row = placement.row + (placement.dr * index);
+      const col = placement.col + (placement.dc * index);
+      cells[row][col].char = char;
+    });
+    placedWords.push(word);
+  });
+  const filler = Array.from(new Set(selectedWords.flatMap((word) => Array.from(word))));
+  cells.flat().forEach((cell) => {
+    if (!cell.char) cell.char = filler[Math.floor(Math.random() * filler.length)] || "가";
+  });
+  return {
+    size,
+    cells,
+    words: placedWords,
+    wordSet: new Set(placedWords),
+    cellMap: new Map(cells.flat().map((cell) => [cell.id, cell]))
+  };
+}
+
+function findAppleWordPlacement(word, cells, size) {
+  const directions = shuffle([
+    { dr: 0, dc: 1 },
+    { dr: 1, dc: 0 },
+    { dr: 1, dc: 1 },
+    { dr: -1, dc: 1 }
+  ]);
+  const attempts = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      directions.forEach((direction) => attempts.push({ row, col, ...direction }));
+    }
+  }
+  return shuffle(attempts).find((attempt) => canPlaceAppleWord(word, attempt, cells, size)) || null;
+}
+
+function canPlaceAppleWord(word, placement, cells, size) {
+  return Array.from(word).every((char, index) => {
+    const row = placement.row + (placement.dr * index);
+    const col = placement.col + (placement.dc * index);
+    if (row < 0 || col < 0 || row >= size || col >= size) return false;
+    return !cells[row][col].char || cells[row][col].char === char;
+  });
+}
+
+function areNeighborCells(a, b) {
+  const rowGap = Math.abs(a.row - b.row);
+  const colGap = Math.abs(a.col - b.col);
+  return rowGap <= 1 && colGap <= 1 && rowGap + colGap > 0;
+}
+
 function buildCrosswordPuzzle(hanja) {
   const words = [];
   const seen = new Set();
@@ -1762,6 +2050,7 @@ function createCrosswordGrid(size) {
     col,
     char: "",
     entryIds: [],
+    island: null,
     number: 0
   })));
 }
@@ -1770,6 +2059,7 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
   const grid = createCrosswordGrid(size);
   const entries = [];
   const usedWords = new Set();
+  const islandSizes = [0];
   const seedPool = candidates.slice(0, Math.min(6, candidates.length));
   const seed = seedPool[attemptIndex % seedPool.length];
   const seedPlacement = findCrosswordSeedPlacement(seed.word, grid, size, entries.length, attemptIndex);
@@ -1778,31 +2068,37 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
     ...seed,
     ...seedPlacement,
     id: `${seed.id}-0`,
+    island: 0,
     number: 1
   };
   placeCrosswordEntry(seedEntry, grid);
   entries.push(seedEntry);
   usedWords.add(seed.word);
+  islandSizes[0] = 1;
 
   let islandCount = 1;
-  for (let pass = 0; pass < 8 && entries.length < 12; pass += 1) {
+  for (let pass = 0; pass < 10 && entries.length < 12; pass += 1) {
     let placedThisPass = 0;
+    const targetIsland = pickSmallCrosswordIsland(islandSizes);
     shuffle(candidates).forEach((item) => {
       if (entries.length >= 12 || usedWords.has(item.word)) return;
-      const placement = findCrosswordPlacement(item.word, grid, size);
+      const placement = findCrosswordPlacement(item.word, grid, size, targetIsland);
       if (!placement) return;
       const entry = {
         ...item,
         ...placement,
         id: `${item.id}-${entries.length}`,
+        island: placement.island,
         number: entries.length + 1
       };
       placeCrosswordEntry(entry, grid);
       entries.push(entry);
       usedWords.add(item.word);
+      islandSizes[entry.island] = (islandSizes[entry.island] || 0) + 1;
       placedThisPass += 1;
     });
-    if (placedThisPass || islandCount >= 4 || entries.length >= 12) continue;
+    const canOpenIsland = islandSizes.every((sizeValue) => sizeValue >= 3) || !placedThisPass;
+    if (!canOpenIsland || islandCount >= 4 || entries.length >= 12) continue;
     const nextSeedOption = candidates
       .filter((item) => !usedWords.has(item.word))
       .map((item) => ({ item, placement: findCrosswordSeedPlacement(item.word, grid, size, islandCount, attemptIndex) }))
@@ -1813,11 +2109,13 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
       ...nextSeed,
       ...placement,
       id: `${nextSeed.id}-${entries.length}`,
+      island: islandCount,
       number: entries.length + 1
     };
     placeCrosswordEntry(entry, grid);
     entries.push(entry);
     usedWords.add(nextSeed.word);
+    islandSizes[islandCount] = 1;
     islandCount += 1;
   }
 
@@ -1826,6 +2124,12 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
     puzzle,
     score: scoreCrosswordPuzzle(entries, grid, size)
   };
+}
+
+function pickSmallCrosswordIsland(islandSizes) {
+  return islandSizes
+    .map((sizeValue, island) => ({ island, size: sizeValue }))
+    .sort((a, b) => a.size - b.size || a.island - b.island)[0]?.island || 0;
 }
 
 function findCrosswordSeedPlacement(word, grid, size, islandIndex = 0, attemptIndex = 0) {
@@ -1871,11 +2175,11 @@ function canPlaceCrosswordSeed(word, placement, grid, size) {
   });
 }
 
-function findCrosswordPlacement(word, grid, size) {
+function findCrosswordPlacement(word, grid, size, targetIsland = null) {
   const chars = Array.from(word);
   const attempts = [];
   grid.forEach((row) => row.forEach((cell) => {
-    if (!cell.char) return;
+    if (!cell.char || (targetIsland !== null && cell.island !== targetIsland)) return;
     chars.forEach((char, index) => {
       if (cell.char !== char) return;
       attempts.push({ row: cell.row, col: cell.col - index, direction: "across" });
@@ -1883,12 +2187,12 @@ function findCrosswordPlacement(word, grid, size) {
     });
   }));
   return shuffle(attempts)
-    .map((placement) => scoreCrosswordPlacement(word, placement, grid, size))
+    .map((placement) => scoreCrosswordPlacement(word, placement, grid, size, targetIsland))
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)[0] || null;
 }
 
-function scoreCrosswordPlacement(word, placement, grid, size) {
+function scoreCrosswordPlacement(word, placement, grid, size, targetIsland = null) {
   const chars = Array.from(word);
   let intersections = 0;
   let filledNeighbors = 0;
@@ -1905,6 +2209,7 @@ function scoreCrosswordPlacement(word, placement, grid, size) {
     const existing = grid[row][col].char;
     if (existing && existing !== chars[index]) return null;
     if (existing === chars[index]) {
+      if (targetIsland !== null && grid[row][col].island !== targetIsland) return null;
       intersections += 1;
       continue;
     }
@@ -1921,6 +2226,7 @@ function scoreCrosswordPlacement(word, placement, grid, size) {
   const centerDistance = Math.abs(center - middleRow) + Math.abs(center - middleCol);
   return {
     ...placement,
+    island: targetIsland ?? grid[placement.row]?.[placement.col]?.island ?? 0,
     score: (intersections * 120) + (chars.length * 8) - (centerDistance * 5)
   };
 }
@@ -1936,6 +2242,7 @@ function placeCrosswordEntry(entry, grid) {
     const col = entry.col + (entry.direction === "across" ? index : 0);
     grid[row][col].char = char;
     grid[row][col].entryIds.push(entry.id);
+    grid[row][col].island = entry.island ?? grid[row][col].island ?? 0;
     if (index === 0) grid[row][col].number = grid[row][col].number || entry.number;
   });
 }
