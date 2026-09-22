@@ -440,14 +440,24 @@ textarea {
   grid-template-columns: 1fr;
 }
 
-.gameActions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .gameStartBtn {
   background: #f4fff0;
   color: var(--green-dark);
   border-color: #c9f0bd;
+}
+
+.gameHeroAction {
+  display: grid;
+  margin: 16px 0 12px;
+}
+
+.gameHeroAction .btn {
+  min-height: 66px;
+  border-color: #bdeead;
+  background: linear-gradient(180deg, #f7fff2 0%, #d8ffc8 100%);
+  color: var(--green-dark);
+  font-size: 1.2rem;
+  box-shadow: 0 7px 0 #b7eaa8;
 }
 
 .stageNavigation {

@@ -97,11 +97,13 @@ export async function getStudentToday(studentId) {
 
   const lessonDetail = await getLessonDetail({ level: student.level, day: student.current_day }, db);
   if (!lessonDetail) return { student, lesson: null, hanja: [], leaderboard };
+  const gameHanja = await getCumulativeGameHanja({ level: student.level, day: student.current_day }, db);
 
   return {
     student,
     lesson: lessonDetail.lesson,
     hanja: lessonDetail.hanja,
+    gameHanja,
     leaderboard
   };
 }
@@ -243,4 +245,38 @@ export async function getLessonDetail({ level, day }, existingDb) {
     lesson,
     hanja: hanjaRows.map((item) => ({ ...item, vocab: vocabByHanjaId.get(item.id) || [] }))
   };
+}
+
+async function getCumulativeGameHanja({ level, day }, existingDb) {
+  const db = existingDb || await sql();
+  const rows = await db`
+    select
+      h.id,
+      c.day,
+      h.position,
+      h.character,
+      h.sound,
+      h.meaning,
+      coalesce(
+        json_agg(
+          json_build_object(
+            'id', v.id,
+            'position', v.position,
+            'hanja_word', v.hanja_word,
+            'word', v.word,
+            'meaning', v.meaning
+          )
+          order by c.day asc, h.position asc, v.position asc
+        ) filter (where v.id is not null),
+        '[]'
+      ) as vocab
+    from curriculum_days c
+    join hanja_items h on h.curriculum_day_id = c.id
+    left join vocab_items v on v.hanja_item_id = h.id
+    where c.level = ${level}
+      and c.day <= ${Number(day)}
+    group by h.id, c.day
+    order by c.day asc, h.position asc
+  `;
+  return rows;
 }

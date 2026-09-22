@@ -209,8 +209,9 @@ export function StudentApp() {
             <LockedLesson lock={payload.lock} onRefresh={loadToday} />
           ) : payload.lesson ? (
             <>
+              {stage === "home" ? <GameLearningButton onGame={startGame} /> : null}
               <LessonStats hanja={payload.hanja} />
-              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} onGame={startGame} /> : null}
+              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
               {stage !== "home" && stage !== "saving" ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
@@ -229,7 +230,7 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
-              {stage === "game" ? <WordBlockGame hanja={payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -347,7 +348,15 @@ function LessonStats({ hanja }) {
   );
 }
 
-function HomeLesson({ hanja, onCards, onQuiz, onGame }) {
+function GameLearningButton({ onGame }) {
+  return (
+    <div className="gameHeroAction">
+      <button className="btn primary gameStartBtn" type="button" onClick={onGame}>게임 학습</button>
+    </div>
+  );
+}
+
+function HomeLesson({ hanja, onCards, onQuiz }) {
   return (
     <>
       <div className="hanjaGrid previewGrid">
@@ -359,10 +368,9 @@ function HomeLesson({ hanja, onCards, onQuiz, onGame }) {
           </article>
         ))}
       </div>
-      <div className="studyActions gameActions">
+      <div className="studyActions">
         <button className="btn primary" type="button" onClick={onCards}>카드 학습 시작</button>
         <button className="btn secondary" type="button" onClick={onQuiz}>문제 바로 풀기</button>
-        <button className="btn secondary gameStartBtn" type="button" onClick={onGame}>단어 블록 게임</button>
       </div>
     </>
   );
