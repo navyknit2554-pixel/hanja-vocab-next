@@ -1218,6 +1218,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   const foundSet = useMemo(() => new Set(foundWords), [foundWords]);
   const selectionRef = useRef([]);
   const isDraggingRef = useRef(false);
+  const appleBoardRef = useRef(null);
 
   useEffect(() => {
     setRemoved({});
@@ -1266,11 +1267,26 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   }, [isOver, puzzle.words.length, score, foundWords.length]);
 
   useEffect(() => {
+    function handlePointerMove(event) {
+      if (!isDraggingRef.current) return;
+      if (event.cancelable) event.preventDefault();
+      moveSelectionFromPoint(event.clientX, event.clientY);
+    }
     function handlePointerUp() {
       if (isDraggingRef.current) finishSelection();
     }
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
     window.addEventListener("pointerup", handlePointerUp);
-    return () => window.removeEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("mousemove", handlePointerMove, { passive: false });
+    window.addEventListener("mouseup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+    };
   }, [removed, score, foundWords, timeLeft]);
 
   function startSelection(cell) {
@@ -1319,6 +1335,24 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     if (!touch) return;
     event.preventDefault();
     moveSelectionFromPoint(touch.clientX, touch.clientY);
+  }
+
+  function startSelectionFromPoint(clientX, clientY) {
+    const cell = getAppleCellFromPoint(clientX, clientY);
+    if (cell) startSelection(cell);
+  }
+
+  function startPointerSelection(event) {
+    event.preventDefault();
+    appleBoardRef.current?.setPointerCapture?.(event.pointerId);
+    startSelectionFromPoint(event.clientX, event.clientY);
+  }
+
+  function startTouchSelection(event) {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    event.preventDefault();
+    startSelectionFromPoint(touch.clientX, touch.clientY);
   }
 
   function finishSelection() {
@@ -1418,8 +1452,11 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       </div>
       <div
         className="appleBoard"
+        ref={appleBoardRef}
         style={{ "--apple-size": puzzle.size }}
+        onPointerDown={startPointerSelection}
         onPointerMove={moveSelection}
+        onTouchStart={startTouchSelection}
         onTouchMove={moveTouchSelection}
         onTouchEnd={() => isDraggingRef.current && finishSelection()}
         onTouchCancel={() => isDraggingRef.current && finishSelection()}
@@ -1434,14 +1471,6 @@ function WordAppleGame({ hanja, lesson, onExit }) {
               data-apple-cell-id={cell.id}
               key={cell.id}
               type="button"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                startSelection(cell);
-              }}
-              onTouchStart={(event) => {
-                event.preventDefault();
-                startSelection(cell);
-              }}
             >
               {cell.char}
             </button>
