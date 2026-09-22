@@ -83,6 +83,11 @@ export function StudentApp() {
     setStage(queue.length ? "quiz" : "done");
   }
 
+  function startGame() {
+    setFeedback(null);
+    setStage("game");
+  }
+
   function answerQuiz(choice) {
     if (!currentQuiz || feedback) return;
     const correct = choice === currentQuiz.answer;
@@ -180,6 +185,10 @@ export function StudentApp() {
     }
     if (stage === "done") {
       startQuiz();
+      return;
+    }
+    if (stage === "game") {
+      setStage("home");
     }
   }
 
@@ -201,7 +210,7 @@ export function StudentApp() {
           ) : payload.lesson ? (
             <>
               <LessonStats hanja={payload.hanja} />
-              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
+              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} onGame={startGame} /> : null}
               {stage !== "home" && stage !== "saving" ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
@@ -220,6 +229,7 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
+              {stage === "game" ? <WordBlockGame hanja={payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -337,7 +347,7 @@ function LessonStats({ hanja }) {
   );
 }
 
-function HomeLesson({ hanja, onCards, onQuiz }) {
+function HomeLesson({ hanja, onCards, onQuiz, onGame }) {
   return (
     <>
       <div className="hanjaGrid previewGrid">
@@ -349,9 +359,10 @@ function HomeLesson({ hanja, onCards, onQuiz }) {
           </article>
         ))}
       </div>
-      <div className="studyActions">
+      <div className="studyActions gameActions">
         <button className="btn primary" type="button" onClick={onCards}>카드 학습 시작</button>
         <button className="btn secondary" type="button" onClick={onQuiz}>문제 바로 풀기</button>
+        <button className="btn secondary gameStartBtn" type="button" onClick={onGame}>단어 블록 게임</button>
       </div>
     </>
   );
@@ -440,6 +451,248 @@ function StudyCard({ item, index, total, onPrev, onNext }) {
         <button className="btn primary" type="button" onClick={goNext}>{isLast ? "문제 풀기" : "다음 카드"}</button>
       </div>
     </article>
+  );
+}
+
+const GAME_COLUMNS = 6;
+const GAME_ROWS = 10;
+const GAME_DROP_MS = 950;
+const GAME_OFFSETS = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 }
+];
+
+function WordBlockGame({ hanja, lesson, onExit }) {
+  const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
+  const wordSet = useMemo(() => makeGameWordSet(pairs), [pairs]);
+  const [board, setBoard] = useState(() => createEmptyGameBoard());
+  const [active, setActive] = useState(null);
+  const [nextPair, setNextPair] = useState(null);
+  const [score, setScore] = useState(0);
+  const [clearedWords, setClearedWords] = useState(0);
+  const [isOver, setIsOver] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [status, setStatus] = useState("");
+  const [saveState, setSaveState] = useState("idle");
+
+  useEffect(() => {
+    const emptyBoard = createEmptyGameBoard();
+    const firstPair = pickGamePair(pairs);
+    const upcomingPair = pickGamePair(pairs);
+    setBoard(emptyBoard);
+    setScore(0);
+    setClearedWords(0);
+    setIsOver(false);
+    setStatus("");
+    setSaveState("idle");
+    setNextPair(upcomingPair);
+    if (!firstPair) {
+      setActive(null);
+      return;
+    }
+    const firstPiece = makeGamePiece(firstPair);
+    setActive(canPlaceGamePiece(emptyBoard, firstPiece) ? firstPiece : null);
+  }, [pairs]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => {
+    if (!active || isOver || !pairs.length) return undefined;
+    const timer = window.setInterval(() => {
+      stepDown();
+    }, GAME_DROP_MS);
+    return () => window.clearInterval(timer);
+  }, [active, board, isOver, pairs]);
+
+  async function saveGameScore(finalScore, finalClearedWords) {
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalClearedWords
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  function moveActive(dx, dy) {
+    if (!active || isOver) return;
+    const moved = { ...active, x: active.x + dx, y: active.y + dy };
+    if (canPlaceGamePiece(board, moved)) {
+      setActive(moved);
+      return;
+    }
+    if (dy > 0) lockActivePiece(active);
+  }
+
+  function stepDown() {
+    moveActive(0, 1);
+  }
+
+  function rotateActive() {
+    if (!active || isOver) return;
+    const rotated = { ...active, rotation: (active.rotation + 1) % GAME_OFFSETS.length };
+    if (canPlaceGamePiece(board, rotated)) setActive(rotated);
+  }
+
+  function hardDrop() {
+    if (!active || isOver) return;
+    let dropped = active;
+    while (canPlaceGamePiece(board, { ...dropped, y: dropped.y + 1 })) {
+      dropped = { ...dropped, y: dropped.y + 1 };
+    }
+    lockActivePiece(dropped);
+  }
+
+  function restartGame() {
+    const emptyBoard = createEmptyGameBoard();
+    const firstPair = pickGamePair(pairs);
+    setBoard(emptyBoard);
+    setScore(0);
+    setClearedWords(0);
+    setIsOver(false);
+    setStatus("");
+    setSaveState("idle");
+    setNextPair(pickGamePair(pairs));
+    setActive(firstPair ? makeGamePiece(firstPair) : null);
+  }
+
+  function lockActivePiece(piece) {
+    const placedBoard = placeGamePiece(board, piece);
+    const activeKeys = new Set(getGamePieceCells(piece).map((cell) => `${cell.x}:${cell.y}`));
+    const resolved = resolveGameMatches(placedBoard, wordSet, activeKeys);
+    const gainedScore = resolved.clearedCount * 100 + Math.max(0, resolved.chainCount - 1) * 50;
+    const finalScore = score + gainedScore;
+    const finalClearedWords = clearedWords + resolved.clearedCount;
+    const upcomingPair = nextPair || pickGamePair(pairs);
+    const nextPiece = upcomingPair ? makeGamePiece(upcomingPair) : null;
+
+    setBoard(resolved.board);
+    setScore(finalScore);
+    setClearedWords(finalClearedWords);
+    setStatus(resolved.clearedCount ? `${resolved.clearedCount}개 어휘 완성!` : "");
+    setNextPair(pickGamePair(pairs));
+
+    if (!nextPiece || !canPlaceGamePiece(resolved.board, nextPiece)) {
+      setActive(null);
+      setIsOver(true);
+      saveGameScore(finalScore, finalClearedWords);
+      return;
+    }
+    setActive(nextPiece);
+  }
+
+  const visibleBoard = useMemo(() => mergeActiveGamePiece(board, active), [board, active]);
+  const nextLabel = nextPair ? nextPair.chars.join(" ") : "-";
+
+  if (!pairs.length) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="book" small label="게임 준비" />
+        <h2>단어 블록 게임</h2>
+        <p className="mutedText">이 일차에는 게임으로 만들 수 있는 2글자 한자어가 아직 부족합니다.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 단어 블록</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{clearedWords}</b>개 완성</span>
+        <span>다음 {nextLabel}</span>
+      </div>
+      <div className="gameBoardWrap">
+        <div className="gameBoard" aria-label="단어 블록 판">
+          {visibleBoard.flatMap((row, y) => row.map((cell, x) => (
+            <span
+              className={`gameCell ${cell ? "filled" : ""} ${cell?.active ? "active" : ""}`}
+              key={`${x}-${y}`}
+            >
+              {cell?.char || ""}
+            </span>
+          )))}
+        </div>
+        {isOver ? (
+          <div className="gameOverPanel" role="status">
+            <strong>게임 종료</strong>
+            <p>{score}점 · {clearedWords}개 어휘 완성</p>
+            <button className="btn primary" type="button" onClick={restartGame}>다시 하기</button>
+          </div>
+        ) : null}
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      <div className="gameControls">
+        <button className="btn secondary" type="button" onClick={() => moveActive(-1, 0)} disabled={isOver}>왼쪽</button>
+        <button className="btn secondary" type="button" onClick={rotateActive} disabled={isOver}>회전</button>
+        <button className="btn secondary" type="button" onClick={() => moveActive(1, 0)} disabled={isOver}>오른쪽</button>
+        <button className="btn primary" type="button" onClick={hardDrop} disabled={isOver}>떨어뜨리기</button>
+      </div>
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
+function GameLeaderboard({ leaderboard, saveState }) {
+  const leaders = leaderboard?.top || [];
+  return (
+    <section className="gameLeaderboard" aria-label="게임 랭킹">
+      <div>
+        <span>게임 TOP 3</span>
+        <h3>{leaderboard?.day ? `${leaderboard.day}일차 점수 랭킹` : "점수 랭킹"}</h3>
+      </div>
+      {saveState === "saving" ? <p className="mutedText">점수 저장 중...</p> : null}
+      <div className="gameLeaderboardList">
+        {leaders.length ? leaders.map((student) => (
+          <article className={`leaderboardItem ${student.id === leaderboard.currentStudentId ? "mine" : ""}`} key={student.id}>
+            <strong>{student.rank}위</strong>
+            <div>
+              <b>{student.name}</b>
+              <span>{student.best_score}점 · {student.cleared_words}개 완성</span>
+            </div>
+          </article>
+        )) : <p className="emptyLeaderboard">아직 게임 기록이 없습니다.</p>}
+      </div>
+    </section>
   );
 }
 
@@ -587,6 +840,160 @@ function cleanExample(value) {
     .replace(/^\s*[\[(<【]?\s*(문장|대화|예문|구)\s*(\d+|[一二三])?\s*[\])>】]?\s*[:：.\-–—]*\s*/i, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function buildGamePairs(hanja) {
+  const pairs = [];
+  (hanja || []).forEach((item) => {
+    (item.vocab || []).forEach((vocab) => {
+      const chars = extractHanjaChars(vocab.hanja_word).slice(0, 2);
+      if (chars.length !== 2) return;
+      pairs.push({
+        id: vocab.id,
+        word: vocab.word,
+        hanjaWord: chars.join(""),
+        chars
+      });
+    });
+  });
+  const unique = new Map();
+  pairs.forEach((pair) => {
+    if (!unique.has(pair.hanjaWord)) unique.set(pair.hanjaWord, pair);
+  });
+  return [...unique.values()];
+}
+
+function extractHanjaChars(value) {
+  return Array.from(String(value || "").matchAll(/[\u3400-\u9fff]/g)).map((match) => match[0]);
+}
+
+function makeGameWordSet(pairs) {
+  const words = new Set();
+  pairs.forEach((pair) => {
+    words.add(pair.hanjaWord);
+    words.add([...pair.chars].reverse().join(""));
+  });
+  return words;
+}
+
+function createEmptyGameBoard() {
+  return Array.from({ length: GAME_ROWS }, () => Array.from({ length: GAME_COLUMNS }, () => null));
+}
+
+function pickGamePair(pairs) {
+  if (!pairs.length) return null;
+  return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+function makeGamePiece(pair) {
+  return {
+    x: Math.floor(GAME_COLUMNS / 2),
+    y: 1,
+    rotation: 2,
+    chars: pair.chars
+  };
+}
+
+function getGamePieceCells(piece) {
+  if (!piece) return [];
+  const offset = GAME_OFFSETS[piece.rotation] || GAME_OFFSETS[2];
+  return [
+    { x: piece.x, y: piece.y, char: piece.chars[0], active: true },
+    { x: piece.x + offset.x, y: piece.y + offset.y, char: piece.chars[1], active: true }
+  ];
+}
+
+function canPlaceGamePiece(board, piece) {
+  return getGamePieceCells(piece).every((cell) => (
+    cell.x >= 0
+    && cell.x < GAME_COLUMNS
+    && cell.y >= 0
+    && cell.y < GAME_ROWS
+    && !board[cell.y][cell.x]
+  ));
+}
+
+function placeGamePiece(board, piece) {
+  const nextBoard = cloneGameBoard(board);
+  getGamePieceCells(piece).forEach((cell) => {
+    if (cell.y >= 0 && cell.y < GAME_ROWS && cell.x >= 0 && cell.x < GAME_COLUMNS) {
+      nextBoard[cell.y][cell.x] = { char: cell.char };
+    }
+  });
+  return nextBoard;
+}
+
+function mergeActiveGamePiece(board, piece) {
+  const nextBoard = cloneGameBoard(board);
+  getGamePieceCells(piece).forEach((cell) => {
+    if (cell.y >= 0 && cell.y < GAME_ROWS && cell.x >= 0 && cell.x < GAME_COLUMNS) {
+      nextBoard[cell.y][cell.x] = { char: cell.char, active: true };
+    }
+  });
+  return nextBoard;
+}
+
+function resolveGameMatches(board, wordSet, requiredKeys = null) {
+  let workingBoard = cloneGameBoard(board);
+  let clearedCount = 0;
+  let chainCount = 0;
+
+  while (true) {
+    const clearKeys = new Set();
+    for (let y = 0; y < GAME_ROWS; y += 1) {
+      for (let x = 0; x < GAME_COLUMNS; x += 1) {
+        const cell = workingBoard[y][x];
+        if (!cell) continue;
+        const right = x + 1 < GAME_COLUMNS ? workingBoard[y][x + 1] : null;
+        const down = y + 1 < GAME_ROWS ? workingBoard[y + 1][x] : null;
+        if (right && wordSet.has(`${cell.char}${right.char}`)) {
+          addGameMatch(clearKeys, `${x}:${y}`, `${x + 1}:${y}`, requiredKeys, chainCount);
+        }
+        if (down && wordSet.has(`${cell.char}${down.char}`)) {
+          addGameMatch(clearKeys, `${x}:${y}`, `${x}:${y + 1}`, requiredKeys, chainCount);
+        }
+      }
+    }
+    if (!clearKeys.size) break;
+    chainCount += 1;
+    clearedCount += Math.floor(clearKeys.size / 2);
+    clearKeys.forEach((key) => {
+      const [x, y] = key.split(":").map(Number);
+      workingBoard[y][x] = null;
+    });
+    workingBoard = applyGameGravity(workingBoard);
+  }
+
+  return { board: workingBoard, clearedCount, chainCount };
+}
+
+function addGameMatch(clearKeys, firstKey, secondKey, requiredKeys, chainCount) {
+  if (requiredKeys && chainCount === 0) {
+    const firstIsNew = requiredKeys.has(firstKey);
+    const secondIsNew = requiredKeys.has(secondKey);
+    if (!firstIsNew && !secondIsNew) return;
+    if (firstIsNew && secondIsNew) return;
+  }
+  clearKeys.add(firstKey);
+  clearKeys.add(secondKey);
+}
+
+function applyGameGravity(board) {
+  const nextBoard = createEmptyGameBoard();
+  for (let x = 0; x < GAME_COLUMNS; x += 1) {
+    const blocks = [];
+    for (let y = GAME_ROWS - 1; y >= 0; y -= 1) {
+      if (board[y][x]) blocks.push(board[y][x]);
+    }
+    blocks.forEach((block, index) => {
+      nextBoard[GAME_ROWS - 1 - index][x] = block;
+    });
+  }
+  return nextBoard;
+}
+
+function cloneGameBoard(board) {
+  return board.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
 }
 
 function highlightWord(sentence, word) {
