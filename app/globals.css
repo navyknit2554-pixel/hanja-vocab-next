@@ -878,6 +878,7 @@ textarea {
 
 .gameOverPanel {
   position: absolute;
+  z-index: 12;
   inset: 10px;
   display: grid;
   place-content: center;
@@ -885,6 +886,7 @@ textarea {
   border-radius: 18px;
   background: rgba(255, 255, 255, .9);
   text-align: center;
+  pointer-events: auto;
 }
 
 .gameOverPanel strong {
