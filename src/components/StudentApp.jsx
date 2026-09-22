@@ -474,7 +474,7 @@ const GAME_OFFSETS = [
   { x: -1, y: 0 }
 ];
 const RUNNER_LANES = 3;
-const RUNNER_TICK_MS = 80;
+const RUNNER_TICK_MS = 95;
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -772,7 +772,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     if (!currentRound || isOver || resolvingRef.current) return undefined;
     const timer = window.setInterval(() => {
       setProgress((previous) => {
-        const next = Math.min(100, previous + 3.2);
+        const next = Math.min(100, previous + 2.4);
         if (next >= 100) window.setTimeout(resolveRunnerRound, 0);
         return next;
       });
@@ -897,7 +897,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
       <div className="gameScoreBar">
         <span><b>{score}</b>점</span>
         <span><b>{clearedWords}</b>개 획득</span>
-        <span>{currentRound?.needsJump ? "점프 카드" : "기본 카드"}</span>
+        <span>정답 카드 찾기</span>
       </div>
       <article className="runnerPrompt">
         <span>{currentRound?.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
@@ -909,7 +909,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
         ))}
         <div className="runnerCards" style={{ "--runner-y": `${progress * 2.65}px` }}>
           {currentRound?.choices.map((choice, index) => (
-            <span className={`runnerCard ${currentRound.needsJump && index === currentRound.correctLane ? "high" : ""}`} key={`${choice}-${index}`}>
+            <span className={`runnerCard ${currentRound.highLanes?.includes(index) ? "high" : ""}`} key={`${choice}-${index}`}>
               {choice}
             </span>
           ))}
@@ -1164,15 +1164,23 @@ function makeRunnerRound(questions) {
   const distractors = shuffle(questions.filter((item) => item.word !== answer.word)).slice(0, 2);
   const choices = shuffle([answer, ...distractors]).map((item) => item.word);
   const correctLane = choices.findIndex((word) => word === answer.word);
-  const needsJump = Math.random() < 0.35;
+  const highLanes = makeRunnerHighLanes();
+  const needsJump = highLanes.includes(correctLane);
   return {
     answer: answer.word,
     prompt: answer.prompt || answer.meaning,
     type: answer.type,
     choices,
     correctLane,
+    highLanes,
     needsJump
   };
+}
+
+function makeRunnerHighLanes() {
+  if (Math.random() > 0.42) return [];
+  const lanes = shuffle([0, 1, 2]).slice(0, Math.random() > 0.7 ? 2 : 1);
+  return lanes;
 }
 
 function extractHangulChars(value) {
