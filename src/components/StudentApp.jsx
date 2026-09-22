@@ -83,7 +83,7 @@ export function StudentApp() {
     setStage(queue.length ? "quiz" : "done");
   }
 
-  function startGame(gameType = "game") {
+  function startGame(gameType = "gameMenu") {
     setFeedback(null);
     setStage(gameType);
   }
@@ -187,7 +187,15 @@ export function StudentApp() {
       startQuiz();
       return;
     }
-    if (stage === "game" || stage === "runner") {
+    if (stage === "gameMenu") {
+      setStage("home");
+      return;
+    }
+    if (stage === "game" || stage === "runner" || stage === "chain") {
+      setStage("gameMenu");
+      return;
+    }
+    if (stage === "gameMenu") {
       setStage("home");
     }
   }
@@ -209,7 +217,7 @@ export function StudentApp() {
             <LockedLesson lock={payload.lock} onRefresh={loadToday} />
           ) : payload.lesson ? (
             <>
-              {stage === "home" ? <GameLearningButton onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} /> : null}
+              {stage === "home" ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
               <LessonStats hanja={payload.hanja} />
               {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
               {stage !== "home" && stage !== "saving" ? (
@@ -230,8 +238,10 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
+              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onChainGame={() => startGame("chain")} /> : null}
               {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "runner" ? <WordRunnerGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {stage === "chain" ? <WordChainGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -349,12 +359,30 @@ function LessonStats({ hanja }) {
   );
 }
 
-function GameLearningButton({ onBlockGame, onRunnerGame }) {
+function GameLearningButton({ onOpen }) {
   return (
     <div className="gameHeroAction">
-      <button className="btn primary gameStartBtn" type="button" onClick={onBlockGame}>단어 블록</button>
-      <button className="btn secondary runnerStartBtn" type="button" onClick={onRunnerGame}>빙하 달리기</button>
+      <button className="btn primary gameStartBtn" type="button" onClick={onOpen}>게임 학습</button>
     </div>
+  );
+}
+
+function GameMenu({ onBlockGame, onRunnerGame, onChainGame }) {
+  return (
+    <section className="gameMenuGrid" aria-label="게임 선택">
+      <button className="gameMenuCard" type="button" onClick={onBlockGame}>
+        <span>단어 블록</span>
+        <strong>이어 붙이면 단어가 터져요</strong>
+      </button>
+      <button className="gameMenuCard runner" type="button" onClick={onRunnerGame}>
+        <span>빙하 달리기</span>
+        <strong>정답 단어 카드를 피해 없이 먹어요</strong>
+      </button>
+      <button className="gameMenuCard chain" type="button" onClick={onChainGame}>
+        <span>꼬리물기</span>
+        <strong>이어지는 음절을 먹어 꼬리를 길게 만들어요</strong>
+      </button>
+    </section>
   );
 }
 
@@ -951,13 +979,192 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
   );
 }
 
+function WordChainGame({ hanja, lesson, onExit }) {
+  const chainData = useMemo(() => buildChainData(hanja), [hanja]);
+  const [target, setTarget] = useState("");
+  const [choices, setChoices] = useState([]);
+  const [tail, setTail] = useState([]);
+  const [score, setScore] = useState(0);
+  const [clearedWords, setClearedWords] = useState(0);
+  const [isOver, setIsOver] = useState(false);
+  const [status, setStatus] = useState("");
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+
+  useEffect(() => {
+    if (!chainData.starts.length) return;
+    restartChain();
+  }, [chainData]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=chain&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  function restartChain() {
+    const start = chainData.starts[Math.floor(Math.random() * chainData.starts.length)] || "";
+    setTarget(start);
+    setTail([start]);
+    setScore(0);
+    setClearedWords(0);
+    setIsOver(false);
+    setStatus("");
+    setSaveState("idle");
+    setChoices(makeChainChoices(start, chainData));
+  }
+
+  function chooseSyllable(choice) {
+    if (isOver) return;
+    const candidates = chainData.byStart.get(target) || [];
+    const match = candidates.find((item) => item.next === choice);
+    if (!match) {
+      setIsOver(true);
+      setStatus(`${target}${choice}는 배운 어휘가 아니에요.`);
+      saveChainScore(score, clearedWords);
+      return;
+    }
+    const nextScore = score + 100;
+    const nextCleared = clearedWords + 1;
+    const nextTail = [...tail, choice].slice(-9);
+    setScore(nextScore);
+    setClearedWords(nextCleared);
+    setTail(nextTail);
+    setStatus(`${match.word} 완성!`);
+    const nextTarget = choice;
+    const nextChoices = makeChainChoices(nextTarget, chainData);
+    if (!nextChoices.length) {
+      setIsOver(true);
+      saveChainScore(nextScore, nextCleared);
+      return;
+    }
+    setTarget(nextTarget);
+    setChoices(nextChoices);
+  }
+
+  async function saveChainScore(finalScore, finalClearedWords) {
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "chain",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalClearedWords
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  if (!chainData.starts.length) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="curious" small label="꼬리 준비" />
+        <h2>꼬리물기</h2>
+        <p className="mutedText">이어 먹을 수 있는 2글자 이상 어휘가 아직 부족합니다.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard chainGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 꼬리물기</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{clearedWords}</b>개 연결</span>
+        <span>현재 {target}</span>
+      </div>
+      <div className="chainArena">
+        <div className="chainTail" aria-label="꼬리">
+          {tail.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}
+        </div>
+        <strong className="chainTarget">{target}</strong>
+        <div className="chainChoices">
+          {choices.map((choice) => (
+            <button className="chainChoice" key={choice} type="button" onClick={() => chooseSyllable(choice)} disabled={isOver}>
+              {choice}
+            </button>
+          ))}
+        </div>
+        {isOver ? (
+          <div className="gameOverPanel" role="status">
+            <strong>게임 종료</strong>
+            <p>{score}점 · {clearedWords}개 단어 연결</p>
+            <button className="btn primary" type="button" onClick={restartChain}>다시 하기</button>
+          </div>
+        ) : null}
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
 function GameLeaderboard({ leaderboard, saveState }) {
-  const leaders = leaderboard?.top || [];
+  const scopes = leaderboard?.scopes || [];
+  const [activeScopeKey, setActiveScopeKey] = useState("all");
+  const activeScope = scopes.find((scope) => scope.key === activeScopeKey) || scopes[0];
+  const leaders = activeScope?.top || [];
+  if (!scopes.length || !activeScope) {
+    return (
+      <section className="gameLeaderboard" aria-label="게임 랭킹">
+        <div>
+          <span>게임 TOP 3</span>
+          <h3>점수 랭킹</h3>
+        </div>
+        {saveState === "saving" ? <p className="mutedText">점수 저장 중...</p> : <p className="emptyLeaderboard">아직 게임 기록이 없습니다.</p>}
+      </section>
+    );
+  }
   return (
     <section className="gameLeaderboard" aria-label="게임 랭킹">
       <div>
         <span>게임 TOP 3</span>
-        <h3>{leaderboard?.day ? `${leaderboard.day}일차 점수 랭킹` : "점수 랭킹"}</h3>
+        <h3>{activeScope.title}</h3>
+      </div>
+      <div className="leaderboardTabs gameRankTabs" role="tablist" aria-label="게임 랭킹 범위">
+        {scopes.map((scope) => (
+          <button
+            className={scope.key === activeScope.key ? "active" : ""}
+            key={scope.key}
+            type="button"
+            role="tab"
+            aria-selected={scope.key === activeScope.key}
+            onClick={() => setActiveScopeKey(scope.key)}
+          >
+            {scope.label}
+          </button>
+        ))}
       </div>
       {saveState === "saving" ? <p className="mutedText">점수 저장 중...</p> : null}
       <div className="gameLeaderboardList">
@@ -965,7 +1172,7 @@ function GameLeaderboard({ leaderboard, saveState }) {
           <article className={`leaderboardItem ${student.id === leaderboard.currentStudentId ? "mine" : ""}`} key={student.id}>
             <strong>{student.rank}위</strong>
             <div>
-              <b>{student.name}</b>
+              <b>{student.name} <small>({student.day}일차)</small></b>
               <span>{student.best_score}점 · {student.cleared_words}개 완성</span>
             </div>
           </article>
@@ -1190,6 +1397,39 @@ function makeRunnerHighLanes() {
   if (Math.random() > 0.42) return [];
   const lanes = shuffle([0, 1, 2]).slice(0, Math.random() > 0.7 ? 2 : 1);
   return lanes;
+}
+
+function buildChainData(hanja) {
+  const byStart = new Map();
+  const syllables = new Set();
+  (hanja || []).forEach((item) => {
+    (item.vocab || []).forEach((vocab) => {
+      const chars = extractHangulChars(vocab.word);
+      if (chars.length < 2) return;
+      for (let index = 0; index < chars.length - 1; index += 1) {
+        const start = chars[index];
+        const next = chars[index + 1];
+        const list = byStart.get(start) || [];
+        list.push({ next, word: `${start}${next}`, fullWord: vocab.word });
+        byStart.set(start, list);
+        syllables.add(start);
+        syllables.add(next);
+      }
+    });
+  });
+  return {
+    byStart,
+    syllables: [...syllables],
+    starts: [...byStart.keys()].filter((key) => (byStart.get(key) || []).length)
+  };
+}
+
+function makeChainChoices(target, chainData) {
+  const candidates = chainData.byStart.get(target) || [];
+  if (!candidates.length) return [];
+  const answer = candidates[Math.floor(Math.random() * candidates.length)]?.next;
+  const distractors = shuffle(chainData.syllables.filter((item) => item !== answer)).slice(0, 4);
+  return shuffle([...new Set([answer, ...distractors])].slice(0, 5));
 }
 
 function extractHangulChars(value) {

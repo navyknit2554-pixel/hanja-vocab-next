@@ -17,7 +17,7 @@ export async function GET(request) {
     const gameType = normalizeGameType(searchParams.get("gameType"));
     if (!level || !day) return NextResponse.json({ ok: false, message: "게임 범위를 확인해 주세요." }, { status: 400 });
 
-    const leaderboard = await getGameLeaderboard(db, student, level, day, gameType);
+    const leaderboard = await getGameLeaderboard(db, student, gameType);
     return NextResponse.json({ ok: true, leaderboard });
   } catch (error) {
     console.error("student game leaderboard failed", error);
@@ -43,7 +43,7 @@ export async function POST(request) {
       values (${student.id}, ${gameType}, ${level}, ${day}, ${score}, ${clearedWords})
     `;
 
-    const leaderboard = await getGameLeaderboard(db, student, level, day, gameType);
+    const leaderboard = await getGameLeaderboard(db, student, gameType);
     return NextResponse.json({ ok: true, leaderboard });
   } catch (error) {
     console.error("student game score save failed", error);
@@ -67,44 +67,61 @@ async function getStudentContext() {
   return { db, student };
 }
 
-async function getGameLeaderboard(db, student, level, day, gameType) {
+async function getGameLeaderboard(db, student, gameType) {
   const rows = await db`
-    with best_scores as (
+    with ranked_scores as (
       select
         s.id,
         s.name,
         s.grade,
-        max(g.score)::int as best_score,
-        max(g.cleared_words)::int as cleared_words,
-        max(g.created_at) as last_played_at
+        s.level,
+        g.day,
+        g.score::int as best_score,
+        g.cleared_words::int as cleared_words,
+        g.created_at as last_played_at,
+        row_number() over (
+          partition by s.id
+          order by g.score desc, g.cleared_words desc, g.created_at asc
+        ) as score_rank
       from students s
       join student_game_scores g on g.student_id = s.id
       where s.teacher_id = ${student.teacher_id}
-        and s.level = ${level}
         and g.game_type = ${gameType}
-        and g.level = ${level}
-        and g.day = ${day}
-      group by s.id
     )
     select *
-    from best_scores
+    from ranked_scores
+    where score_rank = 1
     order by best_score desc, cleared_words desc, last_played_at asc, name asc
-    limit 10
   `;
   const ranked = rows.map((row, index) => ({ ...row, rank: index + 1 }));
+  const scopes = [
+    { key: "all", label: "전체", title: "전체 게임 랭킹", rows: ranked },
+    { key: "elementary", label: "초등부", title: "초등부 게임 랭킹", rows: ranked.filter((row) => /^초[1-6]$/.test(String(row.grade || ""))) },
+    { key: "middle", label: "중등부", title: "중등부 게임 랭킹", rows: ranked.filter((row) => /^중[1-3]$/.test(String(row.grade || ""))) },
+    { key: "high", label: "고등부", title: "고등부 게임 랭킹", rows: ranked.filter((row) => /^고[1-3]$/.test(String(row.grade || ""))) }
+  ];
   return {
     currentStudentId: student.id,
     gameType,
-    level,
-    day,
-    top: ranked.slice(0, 3),
-    mine: ranked.find((row) => row.id === student.id) || null
+    scopes: scopes.map((scope) => rankGameScope(scope, student.id))
   };
 }
 
 function normalizeGameType(value) {
   const type = String(value || "block").trim();
-  return type === "runner" ? "runner" : "block";
+  if (type === "runner" || type === "chain") return type;
+  return "block";
+}
+
+function rankGameScope(scope, currentStudentId) {
+  const ranked = scope.rows.map((row, index) => ({ ...row, rank: index + 1 }));
+  return {
+    key: scope.key,
+    label: scope.label,
+    title: scope.title,
+    top: ranked.slice(0, 3),
+    mine: ranked.find((row) => row.id === currentStudentId) || null
+  };
 }
 
 function clampInteger(value, min, max) {

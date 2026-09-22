@@ -448,8 +448,6 @@ textarea {
 
 .gameHeroAction {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
   margin: 16px 0 12px;
 }
 
@@ -462,13 +460,47 @@ textarea {
   box-shadow: 0 7px 0 #b7eaa8;
 }
 
-.runnerStartBtn {
-  min-height: 66px;
+.gameMenuGrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.gameMenuCard {
+  display: grid;
+  gap: 6px;
+  min-height: 94px;
+  border: 2px solid #c9f0bd;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fbfff7 0%, #e8ffdd 100%);
+  color: var(--ink);
+  padding: 16px;
+  text-align: left;
+  font: inherit;
+  box-shadow: 0 6px 0 #cdeec1;
+  cursor: pointer;
+}
+
+.gameMenuCard.runner {
   border-color: #cdeeff;
-  background: linear-gradient(180deg, #f7fdff 0%, #d8f2ff 100%);
-  color: #2570a5;
-  font-size: 1.2rem;
-  box-shadow: 0 7px 0 #b7def1;
+  background: linear-gradient(180deg, #f8fdff 0%, #dff4ff 100%);
+  box-shadow: 0 6px 0 #c5e6f5;
+}
+
+.gameMenuCard.chain {
+  border-color: #ffe4a6;
+  background: linear-gradient(180deg, #fffdf5 0%, #fff0bd 100%);
+  box-shadow: 0 6px 0 #efd788;
+}
+
+.gameMenuCard span {
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.gameMenuCard strong {
+  font-size: 1.12rem;
+  line-height: 1.35;
 }
 
 .stageNavigation {
@@ -926,6 +958,92 @@ textarea {
 .gameLeaderboardList {
   display: grid;
   gap: 8px;
+}
+
+.gameRankTabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.leaderboardItem b small {
+  color: var(--muted);
+  font-size: .85em;
+}
+
+.chainGameCard {
+  overflow: hidden;
+}
+
+.chainArena {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  min-height: 360px;
+  border: 2px solid #ffe4a6;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 238, 148, .42), transparent 34%),
+    linear-gradient(180deg, #fffdf7 0%, #fff8dc 100%);
+  padding: 22px 14px;
+}
+
+.chainTail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.chainTail span,
+.chainTarget,
+.chainChoice {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-weight: 1000;
+}
+
+.chainTail span {
+  width: 42px;
+  height: 42px;
+  border: 2px solid #bfeab5;
+  background: #f0ffe8;
+  color: var(--green-dark);
+}
+
+.chainTarget {
+  width: 78px;
+  height: 78px;
+  border: 3px solid #77da4d;
+  background: linear-gradient(180deg, #ecffdf 0%, #c8ff9f 100%);
+  color: var(--ink);
+  font-size: 2.2rem;
+  box-shadow: 0 8px 0 #b8e99d;
+}
+
+.chainChoices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.chainChoice {
+  width: 62px;
+  height: 62px;
+  border: 2px solid #d9efff;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.45rem;
+  box-shadow: 0 5px 0 #d8edf8;
+  cursor: pointer;
+}
+
+.chainChoice:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #d8edf8;
 }
 
 .runnerGameCard {
