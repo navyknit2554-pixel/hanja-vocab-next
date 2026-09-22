@@ -831,7 +831,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     const round = roundRef.current;
     if (!round) return;
     const reachedCorrectLane = laneRef.current === round.correctLane;
-    const reachedHeight = !round.needsJump || jumpRef.current;
+    const reachedHeight = round.needsJump ? jumpRef.current : !jumpRef.current;
     if (reachedCorrectLane && reachedHeight) {
       const finalScore = scoreRef.current + 100;
       const finalCleared = clearedRef.current + 1;
@@ -845,7 +845,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
       return;
     }
     setIsOver(true);
-    setStatus(reachedCorrectLane ? "점프가 필요했어요!" : `${round.answer} 카드를 골라야 했어요.`);
+    setStatus(reachedCorrectLane ? (round.needsJump ? "점프가 필요했어요!" : "낮은 카드는 점프하지 않아야 해요.") : `${round.answer} 카드를 골라야 했어요.`);
     saveRunnerScore(scoreRef.current, clearedRef.current);
   }
 
@@ -907,7 +907,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
         {Array.from({ length: RUNNER_LANES }).map((_, index) => (
           <span className="runnerLane" key={index} />
         ))}
-        <div className="runnerCards" style={{ "--runner-y": `${progress * 2.65}px` }}>
+        <div className="runnerCards" style={{ "--runner-y": `${progress * 2.65}px`, "--runner-scale": `${progress * 0.0048}` }}>
           {currentRound?.choices.map((choice, index) => (
             <span className={`runnerCard ${currentRound.highLanes?.includes(index) ? "high" : ""}`} key={`${choice}-${index}`}>
               {choice}
