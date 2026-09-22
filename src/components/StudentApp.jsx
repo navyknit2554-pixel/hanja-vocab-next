@@ -1402,6 +1402,8 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     );
   }
 
+  const remainingWords = Math.max(0, puzzle.words.length - foundWords.length);
+
   return (
     <section className="wordGameCard appleGameCard">
       <div className="gameHeader">
@@ -1413,7 +1415,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       </div>
       <div className="gameScoreBar">
         <span><b>{score}</b>점</span>
-        <span><b>{foundWords.length}</b> / {puzzle.words.length}개</span>
+        <span>남은 <b>{remainingWords}</b>개</span>
         <span><b>{timeLeft}</b>초</span>
       </div>
       <div
@@ -1449,6 +1451,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         })}
       </div>
       <div className="appleFoundWords" aria-label="찾은 어휘">
+        <span className="appleProgress">찾은 {foundWords.length}개 · 남은 {remainingWords}개</span>
         {foundWords.length ? foundWords.map((word) => <span key={word}>{word}</span>) : <span>드래그해서 배운 어휘를 찾아요</span>}
       </div>
       {status ? <p className="gameStatus">{status}</p> : null}
