@@ -976,6 +976,8 @@ textarea {
 .chainArena {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: stretch;
   gap: 12px;
   min-height: 450px;
   border: 2px solid #d9efff;
@@ -1092,13 +1094,72 @@ textarea {
 
 .chainControls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    ". up ."
+    "left center right"
+    ". down .";
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  align-content: center;
+  justify-content: center;
   gap: 8px;
+  border: 2px solid #d9efff;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .72);
+  padding: 12px;
 }
 
-.chainControls .btn {
-  min-height: 48px;
-  padding-inline: 8px;
+.chainPadButton,
+.chainPadCenter {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.chainPadButton {
+  border: 2px solid #bfeab5;
+  background: linear-gradient(180deg, #f8fff4 0%, #bff0aa 100%);
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 1000;
+  box-shadow: 0 4px 0 #94d57d;
+  cursor: pointer;
+}
+
+.chainPadButton:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #94d57d;
+}
+
+.chainPadButton:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.chainPadButton.up {
+  grid-area: up;
+}
+
+.chainPadButton.left {
+  grid-area: left;
+}
+
+.chainPadButton.right {
+  grid-area: right;
+}
+
+.chainPadButton.down {
+  grid-area: down;
+}
+
+.chainPadCenter {
+  grid-area: center;
+  border: 2px solid #d9efff;
+  background: #fff;
+  box-shadow: inset 0 0 0 6px #f0f9ff;
 }
 
 @keyframes chainPulse {
@@ -2634,6 +2695,29 @@ textarea {
 
   .runnerTrack {
     min-height: 350px;
+  }
+
+  .chainArena {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    padding: 10px;
+  }
+
+  .chainControls {
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .chainPadButton,
+  .chainPadCenter {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .chainPadButton {
+    font-size: .9rem;
   }
 }
 

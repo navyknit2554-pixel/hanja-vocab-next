@@ -1048,7 +1048,7 @@ function WordChainGame({ hanja, lesson, onExit }) {
   }, []);
 
   function restartChain() {
-    const start = chainData.starts[Math.floor(Math.random() * chainData.starts.length)] || "";
+    const start = pickChainStart(chainData);
     const nextOrb = makeChainOrb(start, chainData);
     const startHead = { x: 50, y: 50 };
     const startDirection = { x: 1, y: 0 };
@@ -1126,18 +1126,27 @@ function WordChainGame({ hanja, lesson, onExit }) {
     setStatus(`${match.word} 완성!`);
     const nextTarget = currentOrb.char;
     const nextOrb = makeChainOrb(nextTarget, chainData);
-    if (!nextOrb.orb) {
-      setIsOver(true);
-      isOverRef.current = true;
-      saveChainScore(nextScore, nextCleared);
+    if (nextOrb.orb) {
+      setTarget(nextTarget);
+      targetRef.current = nextTarget;
+      setOrb(nextOrb.orb);
+      orbRef.current = nextOrb.orb;
+      setDecoys(nextOrb.decoys);
+      decoysRef.current = nextOrb.decoys;
       return;
     }
-    setTarget(nextTarget);
-    targetRef.current = nextTarget;
-    setOrb(nextOrb.orb);
-    orbRef.current = nextOrb.orb;
-    setDecoys(nextOrb.decoys);
-    decoysRef.current = nextOrb.decoys;
+    const nextStart = pickChainStart(chainData, nextTarget);
+    const restartOrb = makeChainOrb(nextStart, chainData);
+    const continuedTail = [...nextTail, nextStart].slice(-12);
+    tailRef.current = continuedTail;
+    setTail(continuedTail);
+    setTarget(nextStart);
+    targetRef.current = nextStart;
+    setOrb(restartOrb.orb);
+    orbRef.current = restartOrb.orb;
+    setDecoys(restartOrb.decoys);
+    decoysRef.current = restartOrb.decoys;
+    setStatus(`${match.word} 완성! ${nextStart}부터 계속 이어가요.`);
   }
 
   async function saveChainScore(finalScore, finalClearedWords) {
@@ -1220,10 +1229,11 @@ function WordChainGame({ hanja, lesson, onExit }) {
           ) : null}
         </div>
         <div className="chainControls" aria-label="이동 컨트롤">
-          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 0, y: -1 })} disabled={isOver}>위</button>
-          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: -1, y: 0 })} disabled={isOver}>왼쪽</button>
-          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 1, y: 0 })} disabled={isOver}>오른쪽</button>
-          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 0, y: 1 })} disabled={isOver}>아래</button>
+          <button className="chainPadButton up" type="button" onClick={() => setChainDirection({ x: 0, y: -1 })} disabled={isOver} aria-label="위">▲</button>
+          <button className="chainPadButton left" type="button" onClick={() => setChainDirection({ x: -1, y: 0 })} disabled={isOver} aria-label="왼쪽">◀</button>
+          <span className="chainPadCenter" aria-hidden="true" />
+          <button className="chainPadButton right" type="button" onClick={() => setChainDirection({ x: 1, y: 0 })} disabled={isOver} aria-label="오른쪽">▶</button>
+          <button className="chainPadButton down" type="button" onClick={() => setChainDirection({ x: 0, y: 1 })} disabled={isOver} aria-label="아래">▼</button>
         </div>
       </div>
       {status ? <p className="gameStatus">{status}</p> : null}
@@ -1524,6 +1534,12 @@ function buildChainData(hanja) {
     syllables: [...syllables],
     starts: [...byStart.keys()].filter((key) => (byStart.get(key) || []).length)
   };
+}
+
+function pickChainStart(chainData, avoid = "") {
+  const starts = (chainData.starts || []).filter((item) => item !== avoid);
+  const pool = starts.length ? starts : chainData.starts;
+  return pool[Math.floor(Math.random() * pool.length)] || "";
 }
 
 function makeChainOrb(target, chainData) {
