@@ -600,7 +600,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
     const placedBoard = placeGamePiece(board, piece);
     const activeKeys = new Set(getGamePieceCells(piece).map((cell) => `${cell.x}:${cell.y}`));
     const resolved = resolveGameMatches(placedBoard, wordSet, activeKeys);
-    const gainedScore = resolved.clearedCount * 100 + Math.max(0, resolved.chainCount - 1) * 50;
+    const gainedScore = resolved.clearedCount * 100;
     const finalScore = score + gainedScore;
     const finalClearedWords = clearedWords + resolved.clearedCount;
     const upcomingPair = nextPair || pickGamePair(pairs);
@@ -942,30 +942,27 @@ function mergeActiveGamePiece(board, piece) {
   return nextBoard;
 }
 
-function resolveGameMatches(board, wordSet, requiredKeys = null) {
+function resolveGameMatches(board, wordSet, requiredKeys = new Set()) {
   let workingBoard = cloneGameBoard(board);
+  const clearKeys = new Set();
   let clearedCount = 0;
-  let chainCount = 0;
 
-  while (true) {
-    const clearKeys = new Set();
-    for (let y = 0; y < GAME_ROWS; y += 1) {
-      for (let x = 0; x < GAME_COLUMNS; x += 1) {
-        const cell = workingBoard[y][x];
-        if (!cell) continue;
-        const right = x + 1 < GAME_COLUMNS ? workingBoard[y][x + 1] : null;
-        const down = y + 1 < GAME_ROWS ? workingBoard[y + 1][x] : null;
-        if (right && wordSet.has(`${cell.char}${right.char}`)) {
-          addGameMatch(clearKeys, `${x}:${y}`, `${x + 1}:${y}`, requiredKeys, chainCount);
-        }
-        if (down && wordSet.has(`${cell.char}${down.char}`)) {
-          addGameMatch(clearKeys, `${x}:${y}`, `${x}:${y + 1}`, requiredKeys, chainCount);
-        }
+  for (let y = 0; y < GAME_ROWS; y += 1) {
+    for (let x = 0; x < GAME_COLUMNS; x += 1) {
+      const cell = workingBoard[y][x];
+      if (!cell) continue;
+      const right = x + 1 < GAME_COLUMNS ? workingBoard[y][x + 1] : null;
+      const down = y + 1 < GAME_ROWS ? workingBoard[y + 1][x] : null;
+      if (right && wordSet.has(`${cell.char}${right.char}`)) {
+        clearedCount += addPlacedGameMatch(clearKeys, `${x}:${y}`, `${x + 1}:${y}`, requiredKeys);
+      }
+      if (down && wordSet.has(`${cell.char}${down.char}`)) {
+        clearedCount += addPlacedGameMatch(clearKeys, `${x}:${y}`, `${x}:${y + 1}`, requiredKeys);
       }
     }
-    if (!clearKeys.size) break;
-    chainCount += 1;
-    clearedCount += Math.floor(clearKeys.size / 2);
+  }
+
+  if (clearKeys.size) {
     clearKeys.forEach((key) => {
       const [x, y] = key.split(":").map(Number);
       workingBoard[y][x] = null;
@@ -973,18 +970,16 @@ function resolveGameMatches(board, wordSet, requiredKeys = null) {
     workingBoard = applyGameGravity(workingBoard);
   }
 
-  return { board: workingBoard, clearedCount, chainCount };
+  return { board: workingBoard, clearedCount };
 }
 
-function addGameMatch(clearKeys, firstKey, secondKey, requiredKeys, chainCount) {
-  if (requiredKeys && chainCount === 0) {
-    const firstIsNew = requiredKeys.has(firstKey);
-    const secondIsNew = requiredKeys.has(secondKey);
-    if (!firstIsNew && !secondIsNew) return;
-    if (firstIsNew && secondIsNew) return;
-  }
+function addPlacedGameMatch(clearKeys, firstKey, secondKey, requiredKeys) {
+  const firstIsNew = requiredKeys.has(firstKey);
+  const secondIsNew = requiredKeys.has(secondKey);
+  if (firstIsNew === secondIsNew) return 0;
   clearKeys.add(firstKey);
   clearKeys.add(secondKey);
+  return 1;
 }
 
 function applyGameGravity(board) {
