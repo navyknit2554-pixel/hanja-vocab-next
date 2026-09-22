@@ -1139,17 +1139,17 @@ textarea {
   place-items: center;
   aspect-ratio: 1;
   min-width: 0;
-  border: 2px solid #ffb5bd;
+  border: 2px solid #aeea9a;
   border-radius: 999px;
   background:
     radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
-    linear-gradient(180deg, #ff7f86 0%, #ff4f61 100%);
+    linear-gradient(180deg, #8df06b 0%, #38c82b 100%);
   color: #fff;
   font: inherit;
   font-size: clamp(1rem, 4vw, 1.35rem);
   font-weight: 1000;
   line-height: 1;
-  box-shadow: 0 5px 0 #d53a4a;
+  box-shadow: 0 5px 0 #2aa51f;
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -1157,11 +1157,11 @@ textarea {
 }
 
 .appleCell.selected {
-  border-color: #ffe783;
+  border-color: #d7ff8c;
   background:
     radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
-    linear-gradient(180deg, #ffdf65 0%, #ff9d2e 100%);
-  box-shadow: 0 5px 0 #d97819;
+    linear-gradient(180deg, #c8ff78 0%, #49dcb5 100%);
+  box-shadow: 0 5px 0 #33b993;
   transform: translateY(-2px);
 }
 
