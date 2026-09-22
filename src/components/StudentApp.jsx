@@ -1289,6 +1289,27 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     };
   }, [removed, score, foundWords, timeLeft]);
 
+  useEffect(() => {
+    const board = appleBoardRef.current;
+    if (!board) return undefined;
+    function handleNativePointerDown(event) {
+      if (event.cancelable) event.preventDefault();
+      startSelectionFromPoint(event.clientX, event.clientY);
+    }
+    function handleNativeTouchStart(event) {
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      if (event.cancelable) event.preventDefault();
+      startSelectionFromPoint(touch.clientX, touch.clientY);
+    }
+    board.addEventListener("pointerdown", handleNativePointerDown, { capture: true, passive: false });
+    board.addEventListener("touchstart", handleNativeTouchStart, { capture: true, passive: false });
+    return () => {
+      board.removeEventListener("pointerdown", handleNativePointerDown, true);
+      board.removeEventListener("touchstart", handleNativeTouchStart, true);
+    };
+  }, [puzzle, removed, isOver]);
+
   function startSelection(cell) {
     if (isOver || removed[cell.id]) return;
     selectionRef.current = [cell.id];
@@ -1312,7 +1333,12 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   }
 
   function getAppleCellFromPoint(clientX, clientY) {
-    const element = document.elementFromPoint(clientX, clientY)?.closest?.("[data-apple-cell-id]");
+    const board = appleBoardRef.current;
+    const elements = board ? Array.from(board.querySelectorAll("[data-apple-cell-id]")) : [];
+    const element = elements.find((item) => {
+      const rect = item.getBoundingClientRect();
+      return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    }) || document.elementFromPoint(clientX, clientY)?.closest?.("[data-apple-cell-id]");
     const cellId = element?.getAttribute?.("data-apple-cell-id");
     return cellId ? puzzle.cellMap.get(cellId) : null;
   }
