@@ -1029,29 +1029,29 @@ textarea {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 34px;
+  height: 34px;
   translate: -50% -50%;
   border: 2px solid rgba(255, 255, 255, .9);
   border-radius: 999px;
-  font-size: 1.7rem;
+  font-size: 0;
   font-weight: 1000;
   line-height: 1;
-  box-shadow: 0 8px 0 rgba(13, 34, 86, .14);
+  box-shadow: 0 5px 0 rgba(13, 34, 86, .14);
   z-index: 2;
 }
 
 .chainOrb.decoy {
-  background: rgba(255, 255, 255, .88);
-  color: #64708a;
+  background: radial-gradient(circle at 35% 28%, #ffffff 0 18%, #dbeaff 19% 100%);
+  color: transparent;
 }
 
 .chainOrb.targetOrb {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(180deg, #fff8bb 0%, #a9f566 100%);
+  width: 40px;
+  height: 40px;
+  background: radial-gradient(circle at 35% 28%, #ffffff 0 16%, #c5ff80 17% 100%);
   border-color: #8ce85f;
-  color: var(--green-dark);
+  color: transparent;
   animation: chainPulse 1.05s ease-in-out infinite;
   z-index: 3;
 }
