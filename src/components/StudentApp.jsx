@@ -83,9 +83,9 @@ export function StudentApp() {
     setStage(queue.length ? "quiz" : "done");
   }
 
-  function startGame() {
+  function startGame(gameType = "game") {
     setFeedback(null);
-    setStage("game");
+    setStage(gameType);
   }
 
   function answerQuiz(choice) {
@@ -187,7 +187,7 @@ export function StudentApp() {
       startQuiz();
       return;
     }
-    if (stage === "game") {
+    if (stage === "game" || stage === "runner") {
       setStage("home");
     }
   }
@@ -209,7 +209,7 @@ export function StudentApp() {
             <LockedLesson lock={payload.lock} onRefresh={loadToday} />
           ) : payload.lesson ? (
             <>
-              {stage === "home" ? <GameLearningButton onGame={startGame} /> : null}
+              {stage === "home" ? <GameLearningButton onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} /> : null}
               <LessonStats hanja={payload.hanja} />
               {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
               {stage !== "home" && stage !== "saving" ? (
@@ -231,6 +231,7 @@ export function StudentApp() {
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
               {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {stage === "runner" ? <WordRunnerGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -348,10 +349,11 @@ function LessonStats({ hanja }) {
   );
 }
 
-function GameLearningButton({ onGame }) {
+function GameLearningButton({ onBlockGame, onRunnerGame }) {
   return (
     <div className="gameHeroAction">
-      <button className="btn primary gameStartBtn" type="button" onClick={onGame}>게임 학습</button>
+      <button className="btn primary gameStartBtn" type="button" onClick={onBlockGame}>단어 블록</button>
+      <button className="btn secondary runnerStartBtn" type="button" onClick={onRunnerGame}>빙하 달리기</button>
     </div>
   );
 }
@@ -471,6 +473,8 @@ const GAME_OFFSETS = [
   { x: 0, y: 1 },
   { x: -1, y: 0 }
 ];
+const RUNNER_LANES = 3;
+const RUNNER_TICK_MS = 70;
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -513,7 +517,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
     async function loadLeaderboard() {
       if (!lesson?.level || !lesson?.day) return;
       try {
-        const response = await fetch(`/api/student/game-score?level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const response = await fetch(`/api/student/game-score?gameType=block&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
         const data = await response.json();
         if (!ignore && data.ok) setLeaderboard(data.leaderboard);
       } catch {
@@ -546,6 +550,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          gameType: "block",
           level: lesson.level,
           day: lesson.day,
           score: finalScore,
@@ -701,6 +706,230 @@ function WordBlockGame({ hanja, lesson, onExit }) {
         <button className="btn secondary" type="button" onClick={rotateActive} disabled={isOver || Boolean(matchAnimation)}>회전</button>
         <button className="btn secondary" type="button" onClick={() => moveActive(1, 0)} disabled={isOver || Boolean(matchAnimation)}>오른쪽</button>
         <button className="btn primary" type="button" onClick={hardDrop} disabled={isOver || Boolean(matchAnimation)}>떨어뜨리기</button>
+      </div>
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
+function WordRunnerGame({ hanja, lesson, onExit }) {
+  const questions = useMemo(() => buildRunnerQuestions(hanja), [hanja]);
+  const [currentRound, setCurrentRound] = useState(null);
+  const [lane, setLane] = useState(1);
+  const [isJumping, setIsJumping] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [score, setScore] = useState(0);
+  const [clearedWords, setClearedWords] = useState(0);
+  const [isOver, setIsOver] = useState(false);
+  const [status, setStatus] = useState("");
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+  const laneRef = useRef(1);
+  const jumpRef = useRef(false);
+  const roundRef = useRef(null);
+  const scoreRef = useRef(0);
+  const clearedRef = useRef(0);
+  const resolvingRef = useRef(false);
+  const jumpTimerRef = useRef(null);
+  const roundTimerRef = useRef(null);
+
+  useEffect(() => {
+    laneRef.current = lane;
+  }, [lane]);
+
+  useEffect(() => {
+    jumpRef.current = isJumping;
+  }, [isJumping]);
+
+  useEffect(() => {
+    if (questions.length < RUNNER_LANES) return;
+    resetRunner();
+    return () => {
+      window.clearTimeout(jumpTimerRef.current);
+      window.clearTimeout(roundTimerRef.current);
+    };
+  }, [questions]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=runner&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => {
+    if (!currentRound || isOver || resolvingRef.current) return undefined;
+    const timer = window.setInterval(() => {
+      setProgress((previous) => {
+        const next = Math.min(100, previous + 4);
+        if (next >= 100) window.setTimeout(resolveRunnerRound, 0);
+        return next;
+      });
+    }, RUNNER_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [currentRound, isOver]);
+
+  function resetRunner() {
+    window.clearTimeout(jumpTimerRef.current);
+    window.clearTimeout(roundTimerRef.current);
+    const firstRound = makeRunnerRound(questions);
+    setLane(1);
+    laneRef.current = 1;
+    setIsJumping(false);
+    jumpRef.current = false;
+    setProgress(0);
+    setScore(0);
+    scoreRef.current = 0;
+    setClearedWords(0);
+    clearedRef.current = 0;
+    setIsOver(false);
+    setStatus("");
+    setSaveState("idle");
+    resolvingRef.current = false;
+    setCurrentRound(firstRound);
+    roundRef.current = firstRound;
+  }
+
+  function moveRunner(direction) {
+    if (isOver || resolvingRef.current) return;
+    setLane((previous) => Math.min(RUNNER_LANES - 1, Math.max(0, previous + direction)));
+  }
+
+  function jumpRunner() {
+    if (isOver || resolvingRef.current || isJumping) return;
+    setIsJumping(true);
+    jumpRef.current = true;
+    window.clearTimeout(jumpTimerRef.current);
+    jumpTimerRef.current = window.setTimeout(() => {
+      setIsJumping(false);
+      jumpRef.current = false;
+    }, 620);
+  }
+
+  function startNextRunnerRound() {
+    const nextRound = makeRunnerRound(questions);
+    setCurrentRound(nextRound);
+    roundRef.current = nextRound;
+    setProgress(0);
+    resolvingRef.current = false;
+  }
+
+  function resolveRunnerRound() {
+    if (resolvingRef.current || isOver) return;
+    resolvingRef.current = true;
+    const round = roundRef.current;
+    if (!round) return;
+    const reachedCorrectLane = laneRef.current === round.correctLane;
+    const reachedHeight = !round.needsJump || jumpRef.current;
+    if (reachedCorrectLane && reachedHeight) {
+      const finalScore = scoreRef.current + 100;
+      const finalCleared = clearedRef.current + 1;
+      scoreRef.current = finalScore;
+      clearedRef.current = finalCleared;
+      setScore(finalScore);
+      setClearedWords(finalCleared);
+      setStatus(`${round.answer} 획득!`);
+      window.clearTimeout(roundTimerRef.current);
+      roundTimerRef.current = window.setTimeout(startNextRunnerRound, 430);
+      return;
+    }
+    setIsOver(true);
+    setStatus(reachedCorrectLane ? "점프가 필요했어요!" : `${round.answer} 카드를 골라야 했어요.`);
+    saveRunnerScore(scoreRef.current, clearedRef.current);
+  }
+
+  async function saveRunnerScore(finalScore, finalClearedWords) {
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "runner",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalClearedWords
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  if (questions.length < RUNNER_LANES) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="study" small label="달리기 준비" />
+        <h2>빙하 달리기</h2>
+        <p className="mutedText">이 게임에 사용할 어휘가 아직 부족합니다. 3개 이상의 어휘가 필요해요.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard runnerGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 빙하 달리기</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{clearedWords}</b>개 획득</span>
+        <span>{currentRound?.needsJump ? "점프 카드" : "기본 카드"}</span>
+      </div>
+      <article className="runnerPrompt">
+        <span>{currentRound?.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
+        <strong>{currentRound?.prompt}</strong>
+      </article>
+      <div className="runnerTrack" aria-label="빙하 달리기">
+        {Array.from({ length: RUNNER_LANES }).map((_, index) => (
+          <span className="runnerLane" key={index} />
+        ))}
+        <div className="runnerCards" style={{ "--runner-progress": `${progress}%` }}>
+          {currentRound?.choices.map((choice, index) => (
+            <span className={`runnerCard ${currentRound.needsJump && index === currentRound.correctLane ? "high" : ""}`} key={`${choice}-${index}`}>
+              {choice}
+            </span>
+          ))}
+        </div>
+        <div className={`runnerPlayer lane-${lane} ${isJumping ? "jumping" : ""}`}>
+          <Mascot variant="wink" small label="" />
+        </div>
+        {isOver ? (
+          <div className="gameOverPanel" role="status">
+            <strong>게임 종료</strong>
+            <p>{score}점 · {clearedWords}개 단어 획득</p>
+            <button className="btn primary" type="button" onClick={resetRunner}>다시 하기</button>
+          </div>
+        ) : null}
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      <div className="runnerControls">
+        <button className="btn secondary" type="button" onClick={() => moveRunner(-1)} disabled={isOver}>왼쪽</button>
+        <button className="btn primary" type="button" onClick={jumpRunner} disabled={isOver}>점프</button>
+        <button className="btn secondary" type="button" onClick={() => moveRunner(1)} disabled={isOver}>오른쪽</button>
       </div>
       <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
     </section>
@@ -897,6 +1126,47 @@ function buildGamePairs(hanja) {
     if (!unique.has(pair.gameWord)) unique.set(pair.gameWord, pair);
   });
   return [...unique.values()];
+}
+
+function buildRunnerQuestions(hanja) {
+  const questions = (hanja || []).flatMap((item) => (item.vocab || [])
+    .filter((vocab) => vocab.word && vocab.meaning)
+    .map((vocab) => {
+      const example = cleanExample(vocab.examples?.[0]?.text || "");
+      const canBlank = example && example.includes(vocab.word);
+      const useBlank = canBlank && Math.random() > 0.45;
+      return {
+        id: vocab.id,
+        word: vocab.word,
+        meaning: vocab.meaning,
+        example,
+        type: useBlank ? "blank" : "meaning",
+        prompt: useBlank
+          ? example.replaceAll(vocab.word, "____")
+          : vocab.meaning
+      };
+    }));
+  const unique = new Map();
+  questions.forEach((question) => {
+    if (!unique.has(question.word)) unique.set(question.word, question);
+  });
+  return [...unique.values()];
+}
+
+function makeRunnerRound(questions) {
+  const answer = questions[Math.floor(Math.random() * questions.length)];
+  const distractors = shuffle(questions.filter((item) => item.word !== answer.word)).slice(0, 2);
+  const choices = shuffle([answer, ...distractors]).map((item) => item.word);
+  const correctLane = choices.findIndex((word) => word === answer.word);
+  const needsJump = Math.random() < 0.35;
+  return {
+    answer: answer.word,
+    prompt: answer.prompt || answer.meaning,
+    type: answer.type,
+    choices,
+    correctLane,
+    needsJump
+  };
 }
 
 function extractHangulChars(value) {

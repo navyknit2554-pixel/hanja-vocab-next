@@ -181,6 +181,7 @@ async function ensureSchema(db) {
     create table if not exists student_game_scores (
       id uuid primary key default gen_random_uuid(),
       student_id uuid not null references students(id) on delete cascade,
+      game_type text not null default 'block',
       level text not null,
       day integer not null,
       score integer not null default 0,
@@ -188,10 +189,12 @@ async function ensureSchema(db) {
       created_at timestamptz not null default now()
     )
   `;
+  await db`alter table student_game_scores add column if not exists game_type text not null default 'block'`;
   await db`create index if not exists students_teacher_login_idx on students (teacher_id, login_id, password)`;
   await db`create unique index if not exists students_teacher_legacy_idx on students (teacher_id, legacy_id) where legacy_id <> ''`;
   await db`create index if not exists curriculum_level_day_idx on curriculum_days (level, day)`;
   await db`create index if not exists student_wrong_words_student_day_idx on student_wrong_words (student_id, curriculum_day_id)`;
   await db`create index if not exists student_game_scores_lesson_idx on student_game_scores (level, day, score desc)`;
+  await db`create index if not exists student_game_scores_type_lesson_idx on student_game_scores (game_type, level, day, score desc)`;
   await db`create index if not exists student_game_scores_student_idx on student_game_scores (student_id, created_at desc)`;
 }

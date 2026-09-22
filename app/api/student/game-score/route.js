@@ -14,9 +14,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const level = String(searchParams.get("level") || student.level || "").trim();
     const day = Number(searchParams.get("day") || student.current_day || 0);
+    const gameType = normalizeGameType(searchParams.get("gameType"));
     if (!level || !day) return NextResponse.json({ ok: false, message: "게임 범위를 확인해 주세요." }, { status: 400 });
 
-    const leaderboard = await getGameLeaderboard(db, student, level, day);
+    const leaderboard = await getGameLeaderboard(db, student, level, day, gameType);
     return NextResponse.json({ ok: true, leaderboard });
   } catch (error) {
     console.error("student game leaderboard failed", error);
@@ -32,16 +33,17 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const level = String(body.level || student.level || "").trim();
     const day = Number(body.day || student.current_day || 0);
+    const gameType = normalizeGameType(body.gameType);
     const score = clampInteger(body.score, 0, 999999);
     const clearedWords = clampInteger(body.clearedWords, 0, 9999);
     if (!level || !day) return NextResponse.json({ ok: false, message: "게임 범위를 확인해 주세요." }, { status: 400 });
 
     await db`
-      insert into student_game_scores (student_id, level, day, score, cleared_words)
-      values (${student.id}, ${level}, ${day}, ${score}, ${clearedWords})
+      insert into student_game_scores (student_id, game_type, level, day, score, cleared_words)
+      values (${student.id}, ${gameType}, ${level}, ${day}, ${score}, ${clearedWords})
     `;
 
-    const leaderboard = await getGameLeaderboard(db, student, level, day);
+    const leaderboard = await getGameLeaderboard(db, student, level, day, gameType);
     return NextResponse.json({ ok: true, leaderboard });
   } catch (error) {
     console.error("student game score save failed", error);
@@ -65,7 +67,7 @@ async function getStudentContext() {
   return { db, student };
 }
 
-async function getGameLeaderboard(db, student, level, day) {
+async function getGameLeaderboard(db, student, level, day, gameType) {
   const rows = await db`
     with best_scores as (
       select
@@ -79,6 +81,7 @@ async function getGameLeaderboard(db, student, level, day) {
       join student_game_scores g on g.student_id = s.id
       where s.teacher_id = ${student.teacher_id}
         and s.level = ${level}
+        and g.game_type = ${gameType}
         and g.level = ${level}
         and g.day = ${day}
       group by s.id
@@ -91,11 +94,17 @@ async function getGameLeaderboard(db, student, level, day) {
   const ranked = rows.map((row, index) => ({ ...row, rank: index + 1 }));
   return {
     currentStudentId: student.id,
+    gameType,
     level,
     day,
     top: ranked.slice(0, 3),
     mine: ranked.find((row) => row.id === student.id) || null
   };
+}
+
+function normalizeGameType(value) {
+  const type = String(value || "block").trim();
+  return type === "runner" ? "runner" : "block";
 }
 
 function clampInteger(value, min, max) {
