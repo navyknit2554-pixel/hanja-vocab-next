@@ -1745,8 +1745,8 @@ function buildCrosswordPuzzle(hanja) {
       });
     });
   });
-  const candidates = shuffle(words).sort((a, b) => b.word.length - a.word.length).slice(0, 16);
-  const size = 11;
+  const candidates = shuffle(words).sort((a, b) => b.word.length - a.word.length).slice(0, 20);
+  const size = 13;
   return buildBestCrosswordLayout(candidates, size);
 }
 
@@ -1769,23 +1769,26 @@ function createCrosswordGrid(size) {
 function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
   const grid = createCrosswordGrid(size);
   const entries = [];
+  const usedWords = new Set();
   const seedPool = candidates.slice(0, Math.min(6, candidates.length));
   const seed = seedPool[attemptIndex % seedPool.length];
-  const remaining = shuffle(candidates.filter((item) => item !== seed));
+  const seedPlacement = findCrosswordSeedPlacement(seed.word, grid, size, entries.length, attemptIndex);
+  if (!seedPlacement) return { puzzle: { size, cells: grid, entries }, score: 0 };
   const seedEntry = {
     ...seed,
-    row: Math.floor(size / 2),
-    col: Math.max(0, Math.floor((size - seed.word.length) / 2)),
-    direction: "across",
+    ...seedPlacement,
     id: `${seed.id}-0`,
     number: 1
   };
   placeCrosswordEntry(seedEntry, grid);
   entries.push(seedEntry);
+  usedWords.add(seed.word);
 
-  for (let pass = 0; pass < 3 && entries.length < 10; pass += 1) {
-    remaining.forEach((item) => {
-      if (entries.length >= 10 || entries.some((entry) => entry.word === item.word)) return;
+  let islandCount = 1;
+  for (let pass = 0; pass < 8 && entries.length < 12; pass += 1) {
+    let placedThisPass = 0;
+    shuffle(candidates).forEach((item) => {
+      if (entries.length >= 12 || usedWords.has(item.word)) return;
       const placement = findCrosswordPlacement(item.word, grid, size);
       if (!placement) return;
       const entry = {
@@ -1796,7 +1799,26 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
       };
       placeCrosswordEntry(entry, grid);
       entries.push(entry);
+      usedWords.add(item.word);
+      placedThisPass += 1;
     });
+    if (placedThisPass || islandCount >= 4 || entries.length >= 12) continue;
+    const nextSeedOption = candidates
+      .filter((item) => !usedWords.has(item.word))
+      .map((item) => ({ item, placement: findCrosswordSeedPlacement(item.word, grid, size, islandCount, attemptIndex) }))
+      .find((option) => option.placement);
+    if (!nextSeedOption) continue;
+    const { item: nextSeed, placement } = nextSeedOption;
+    const entry = {
+      ...nextSeed,
+      ...placement,
+      id: `${nextSeed.id}-${entries.length}`,
+      number: entries.length + 1
+    };
+    placeCrosswordEntry(entry, grid);
+    entries.push(entry);
+    usedWords.add(nextSeed.word);
+    islandCount += 1;
   }
 
   const puzzle = { size, cells: grid, entries };
@@ -1804,6 +1826,49 @@ function buildCrosswordLayoutAttempt(candidates, size, attemptIndex) {
     puzzle,
     score: scoreCrosswordPuzzle(entries, grid, size)
   };
+}
+
+function findCrosswordSeedPlacement(word, grid, size, islandIndex = 0, attemptIndex = 0) {
+  const anchors = getCrosswordSeedAnchors(size, islandIndex, attemptIndex);
+  const attempts = anchors.flatMap((anchor) => [
+    { row: anchor.row, col: anchor.col - Math.floor(word.length / 2), direction: "across" },
+    { row: anchor.row - Math.floor(word.length / 2), col: anchor.col, direction: "down" }
+  ]);
+  return attempts.find((placement) => canPlaceCrosswordSeed(word, placement, grid, size)) || null;
+}
+
+function getCrosswordSeedAnchors(size, islandIndex, attemptIndex) {
+  const low = Math.floor(size * .25);
+  const mid = Math.floor(size / 2);
+  const high = Math.floor(size * .75);
+  const anchors = [
+    { row: mid, col: mid },
+    { row: low, col: low },
+    { row: high, col: high },
+    { row: low, col: high },
+    { row: high, col: low }
+  ];
+  const rotated = anchors.slice(islandIndex).concat(anchors.slice(0, islandIndex));
+  return attemptIndex % 2 ? rotated.reverse() : rotated;
+}
+
+function canPlaceCrosswordSeed(word, placement, grid, size) {
+  const chars = Array.from(word);
+  return chars.every((char, index) => {
+    const row = placement.row + (placement.direction === "down" ? index : 0);
+    const col = placement.col + (placement.direction === "across" ? index : 0);
+    if (row < 0 || col < 0 || row >= size || col >= size) return false;
+    if (grid[row][col].char && grid[row][col].char !== char) return false;
+    for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+      for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
+        const neighborRow = row + rowOffset;
+        const neighborCol = col + colOffset;
+        if (neighborRow < 0 || neighborCol < 0 || neighborRow >= size || neighborCol >= size) continue;
+        if (grid[neighborRow][neighborCol].char) return false;
+      }
+    }
+    return true;
+  });
 }
 
 function findCrosswordPlacement(word, grid, size) {
