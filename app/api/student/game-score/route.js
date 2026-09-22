@@ -109,7 +109,7 @@ async function getGameLeaderboard(db, student, gameType) {
 
 function normalizeGameType(value) {
   const type = String(value || "block").trim();
-  if (type === "runner" || type === "chain") return type;
+  if (type === "runner" || type === "crossword") return type;
   return "block";
 }
 

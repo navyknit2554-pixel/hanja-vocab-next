@@ -487,7 +487,8 @@ textarea {
   box-shadow: 0 6px 0 #c5e6f5;
 }
 
-.gameMenuCard.chain {
+.gameMenuCard.chain,
+.gameMenuCard.crossword {
   border-color: #ffe4a6;
   background: linear-gradient(180deg, #fffdf5 0%, #fff0bd 100%);
   box-shadow: 0 6px 0 #efd788;
@@ -967,6 +968,151 @@ textarea {
 .leaderboardItem b small {
   color: var(--muted);
   font-size: .85em;
+}
+
+.crosswordGameCard {
+  overflow: hidden;
+}
+
+.crosswordBattle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 270px);
+  gap: 14px;
+  align-items: start;
+}
+
+.crosswordBoard {
+  display: grid;
+  grid-template-columns: repeat(var(--crossword-size), minmax(0, 1fr));
+  gap: 3px;
+  border: 2px solid #d9efff;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f8fdff 0%, #edf9ff 100%);
+  padding: 12px;
+}
+
+.crosswordCell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 2px solid #d8e9ff;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(.72rem, 2.5vw, 1.05rem);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.crosswordCell.empty {
+  visibility: hidden;
+}
+
+.crosswordCell.filled {
+  cursor: pointer;
+}
+
+.crosswordCell.active {
+  border-color: #8de36a;
+  background: #f4ffed;
+}
+
+.crosswordCell.solved {
+  border-color: #bfeab5;
+  background: #fbfff7;
+}
+
+.crosswordCell small {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  color: var(--green-dark);
+  font-size: .55rem;
+  line-height: 1;
+}
+
+.crosswordClues,
+.crosswordResult {
+  display: grid;
+  gap: 12px;
+  border: 2px solid #d9efff;
+  border-radius: 20px;
+  background: #fff;
+  padding: 14px;
+}
+
+.crosswordClues span {
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.crosswordClues h3,
+.crosswordClues p,
+.crosswordResult p {
+  margin: 0;
+}
+
+.crosswordClues h3,
+.crosswordResult strong {
+  color: var(--ink);
+  font-size: 1.25rem;
+  font-weight: 1000;
+}
+
+.crosswordClues p {
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.crosswordAnswerForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.crosswordAnswerForm input {
+  min-width: 0;
+}
+
+.crosswordClueList {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.crosswordClueList button {
+  display: grid;
+  gap: 4px;
+  border: 2px solid #e3f1ff;
+  border-radius: 14px;
+  background: #fbfdff;
+  color: var(--ink);
+  padding: 10px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.crosswordClueList button.active {
+  border-color: #8de36a;
+  background: #f5fff0;
+}
+
+.crosswordClueList button.solved {
+  border-color: #d9f4cd;
+  background: #fbfff7;
+  opacity: .72;
+}
+
+.crosswordClueList button span {
+  color: var(--muted);
+  font-size: .88rem;
+  font-weight: 800;
 }
 
 .chainGameCard {
@@ -2691,6 +2837,19 @@ textarea {
 
   .runnerTrack {
     min-height: 350px;
+  }
+
+  .crosswordBattle {
+    grid-template-columns: 1fr;
+  }
+
+  .crosswordBoard {
+    gap: 2px;
+    padding: 8px;
+  }
+
+  .crosswordClueList {
+    max-height: 210px;
   }
 
   .chainArena {

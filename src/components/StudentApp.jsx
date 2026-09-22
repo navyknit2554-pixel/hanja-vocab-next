@@ -191,7 +191,7 @@ export function StudentApp() {
       setStage("home");
       return;
     }
-    if (stage === "game" || stage === "runner" || stage === "chain") {
+    if (stage === "game" || stage === "runner" || stage === "crossword") {
       setStage("gameMenu");
       return;
     }
@@ -238,10 +238,10 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
-              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onChainGame={() => startGame("chain")} /> : null}
+              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} /> : null}
               {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "runner" ? <WordRunnerGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
-              {stage === "chain" ? <WordChainGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {stage === "crossword" ? <CrosswordBattleGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -367,7 +367,7 @@ function GameLearningButton({ onOpen }) {
   );
 }
 
-function GameMenu({ onBlockGame, onRunnerGame, onChainGame }) {
+function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame }) {
   return (
     <section className="gameMenuGrid" aria-label="게임 선택">
       <button className="gameMenuCard" type="button" onClick={onBlockGame}>
@@ -378,9 +378,9 @@ function GameMenu({ onBlockGame, onRunnerGame, onChainGame }) {
         <span>빙하 달리기</span>
         <strong>정답 단어 카드를 피해 없이 먹어요</strong>
       </button>
-      <button className="gameMenuCard chain" type="button" onClick={onChainGame}>
-        <span>꼬리물기</span>
-        <strong>이어지는 음절을 먹어 꼬리를 길게 만들어요</strong>
+      <button className="gameMenuCard crossword" type="button" onClick={onCrosswordGame}>
+        <span>배틀가로세로</span>
+        <strong>뜻 힌트를 보고 가로세로 어휘를 완성해요</strong>
       </button>
     </section>
   );
@@ -979,6 +979,225 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
   );
 }
 
+function CrosswordBattleGame({ hanja, lesson, onExit }) {
+  const puzzle = useMemo(() => buildCrosswordPuzzle(hanja), [hanja]);
+  const [solved, setSolved] = useState({});
+  const [activeId, setActiveId] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(120);
+  const [status, setStatus] = useState("");
+  const [isOver, setIsOver] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+
+  const activeEntry = puzzle.entries.find((entry) => entry.id === activeId) || puzzle.entries[0] || null;
+  const solvedCount = Object.keys(solved).length;
+
+  useEffect(() => {
+    const firstEntry = puzzle.entries[0]?.id || "";
+    setSolved({});
+    setActiveId(firstEntry);
+    setAnswer("");
+    setScore(0);
+    setTimeLeft(120);
+    setStatus("");
+    setIsOver(false);
+    setSaveState("idle");
+  }, [puzzle]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=crossword&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => {
+    if (isOver || !puzzle.entries.length) return undefined;
+    const timer = window.setInterval(() => {
+      setTimeLeft((previous) => {
+        if (previous <= 1) {
+          finishGame(score, solvedCount);
+          return 0;
+        }
+        return previous - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isOver, puzzle.entries.length, score, solvedCount]);
+
+  function selectEntry(entryId) {
+    if (isOver) return;
+    setActiveId(entryId);
+    setAnswer("");
+    setStatus("");
+  }
+
+  function submitCrosswordAnswer(event) {
+    event.preventDefault();
+    if (!activeEntry || isOver || solved[activeEntry.id]) return;
+    const normalizedAnswer = normalizeGameAnswer(answer);
+    if (!normalizedAnswer) return;
+    if (normalizedAnswer !== normalizeGameAnswer(activeEntry.word)) {
+      setScore((previous) => Math.max(0, previous - 20));
+      setStatus("아쉬워요. 힌트를 다시 보고 도전해요.");
+      setAnswer("");
+      return;
+    }
+    const nextSolved = { ...solved, [activeEntry.id]: true };
+    const nextSolvedCount = Object.keys(nextSolved).length;
+    const nextScore = score + 100 + Math.max(0, Math.floor(timeLeft / 5));
+    setSolved(nextSolved);
+    setScore(nextScore);
+    setStatus(`${activeEntry.word} 정답!`);
+    setAnswer("");
+    const nextEntry = puzzle.entries.find((entry) => !nextSolved[entry.id]);
+    if (nextEntry) {
+      setActiveId(nextEntry.id);
+      return;
+    }
+    finishGame(nextScore, nextSolvedCount);
+  }
+
+  function restartCrossword() {
+    const firstEntry = puzzle.entries[0]?.id || "";
+    setSolved({});
+    setActiveId(firstEntry);
+    setAnswer("");
+    setScore(0);
+    setTimeLeft(120);
+    setStatus("");
+    setIsOver(false);
+    setSaveState("idle");
+  }
+
+  async function finishGame(finalScore, finalSolvedCount) {
+    if (isOver) return;
+    setIsOver(true);
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "crossword",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalSolvedCount
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  if (!puzzle.entries.length) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="search" small label="가로세로" />
+        <h2>배틀가로세로</h2>
+        <p className="mutedText">가로세로 판을 만들 2글자 이상 어휘가 아직 부족합니다.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard crosswordGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 배틀가로세로</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{solvedCount}</b> / {puzzle.entries.length}개</span>
+        <span><b>{timeLeft}</b>초</span>
+      </div>
+      <div className="crosswordBattle">
+        <div className="crosswordBoard" style={{ "--crossword-size": puzzle.size }} aria-label="배틀가로세로 판">
+          {puzzle.cells.flat().map((cell) => {
+            const isActive = activeEntry && cell.entryIds.includes(activeEntry.id);
+            const isSolvedCell = cell.entryIds.some((entryId) => solved[entryId]);
+            return (
+              <button
+                className={`crosswordCell ${cell.char ? "filled" : "empty"} ${isActive ? "active" : ""} ${isSolvedCell ? "solved" : ""}`}
+                disabled={!cell.char || isOver}
+                key={`${cell.row}-${cell.col}`}
+                type="button"
+                onClick={() => cell.entryIds[0] && selectEntry(cell.entryIds[0])}
+              >
+                {cell.number ? <small>{cell.number}</small> : null}
+                <span>{isSolvedCell ? cell.char : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+        <aside className="crosswordClues" aria-label="가로세로 힌트">
+          <div>
+            <span>힌트</span>
+            <h3>{activeEntry ? `${activeEntry.number}. ${activeEntry.direction === "across" ? "가로" : "세로"}` : "선택"}</h3>
+            <p>{activeEntry?.meaning || "힌트를 선택해 주세요."}</p>
+          </div>
+          <form className="crosswordAnswerForm" onSubmit={submitCrosswordAnswer}>
+            <input
+              value={answer}
+              onChange={(event) => setAnswer(event.target.value)}
+              placeholder="정답 어휘"
+              disabled={isOver || !activeEntry || solved[activeEntry.id]}
+            />
+            <button className="btn primary" type="submit" disabled={isOver || !activeEntry || solved[activeEntry.id]}>입력</button>
+          </form>
+          <div className="crosswordClueList">
+            {puzzle.entries.map((entry) => (
+              <button
+                className={`${entry.id === activeId ? "active" : ""} ${solved[entry.id] ? "solved" : ""}`}
+                key={entry.id}
+                type="button"
+                onClick={() => selectEntry(entry.id)}
+                disabled={isOver}
+              >
+                <b>{entry.number}. {entry.direction === "across" ? "가로" : "세로"}</b>
+                <span>{entry.meaning}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      {isOver ? (
+        <div className="crosswordResult" role="status">
+          <strong>{solvedCount >= puzzle.entries.length ? "가로세로 완성!" : "게임 종료"}</strong>
+          <p>{score}점 · {solvedCount}개 어휘 완성</p>
+          <button className="btn secondary" type="button" onClick={restartCrossword}>다시 하기</button>
+        </div>
+      ) : null}
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
 function WordChainGame({ hanja, lesson, onExit }) {
   const chainData = useMemo(() => buildChainData(hanja), [hanja]);
   const [target, setTarget] = useState("");
@@ -1509,6 +1728,102 @@ function makeRunnerHighLanes() {
   if (Math.random() > 0.42) return [];
   const lanes = shuffle([0, 1, 2]).slice(0, Math.random() > 0.7 ? 2 : 1);
   return lanes;
+}
+
+function buildCrosswordPuzzle(hanja) {
+  const words = [];
+  const seen = new Set();
+  (hanja || []).forEach((item) => {
+    (item.vocab || []).forEach((vocab) => {
+      const word = extractHangulChars(vocab.word).join("");
+      if (word.length < 2 || word.length > 6 || !vocab.meaning || seen.has(word)) return;
+      seen.add(word);
+      words.push({
+        id: `crossword-${vocab.id || word}`,
+        word,
+        meaning: vocab.meaning
+      });
+    });
+  });
+  const candidates = shuffle(words).sort((a, b) => b.word.length - a.word.length).slice(0, 10);
+  const size = 11;
+  const grid = Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, col) => ({
+    row,
+    col,
+    char: "",
+    entryIds: [],
+    number: 0
+  })));
+  const entries = [];
+
+  candidates.forEach((item, index) => {
+    const placement = index === 0
+      ? {
+          row: Math.floor(size / 2),
+          col: Math.max(0, Math.floor((size - item.word.length) / 2)),
+          direction: "across"
+        }
+      : findCrosswordPlacement(item.word, grid, size) || findCrosswordFallback(item.word, grid, size);
+    if (!placement) return;
+    const entry = {
+      ...item,
+      ...placement,
+      id: `${item.id}-${entries.length}`,
+      number: entries.length + 1
+    };
+    placeCrosswordEntry(entry, grid);
+    entries.push(entry);
+  });
+
+  return { size, cells: grid, entries };
+}
+
+function findCrosswordPlacement(word, grid, size) {
+  const chars = Array.from(word);
+  const attempts = [];
+  grid.forEach((row) => row.forEach((cell) => {
+    if (!cell.char) return;
+    chars.forEach((char, index) => {
+      if (cell.char !== char) return;
+      attempts.push({ row: cell.row, col: cell.col - index, direction: "across" });
+      attempts.push({ row: cell.row - index, col: cell.col, direction: "down" });
+    });
+  }));
+  return shuffle(attempts).find((placement) => canPlaceCrosswordWord(word, placement, grid, size)) || null;
+}
+
+function findCrosswordFallback(word, grid, size) {
+  const attempts = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col <= size - word.length; col += 1) {
+      attempts.push({ row, col, direction: "across" });
+    }
+  }
+  return attempts.find((placement) => canPlaceCrosswordWord(word, placement, grid, size)) || null;
+}
+
+function canPlaceCrosswordWord(word, placement, grid, size) {
+  const chars = Array.from(word);
+  return chars.every((char, index) => {
+    const row = placement.row + (placement.direction === "down" ? index : 0);
+    const col = placement.col + (placement.direction === "across" ? index : 0);
+    if (row < 0 || col < 0 || row >= size || col >= size) return false;
+    return !grid[row][col].char || grid[row][col].char === char;
+  });
+}
+
+function placeCrosswordEntry(entry, grid) {
+  Array.from(entry.word).forEach((char, index) => {
+    const row = entry.row + (entry.direction === "down" ? index : 0);
+    const col = entry.col + (entry.direction === "across" ? index : 0);
+    grid[row][col].char = char;
+    grid[row][col].entryIds.push(entry.id);
+    if (index === 0) grid[row][col].number = grid[row][col].number || entry.number;
+  });
+}
+
+function normalizeGameAnswer(value) {
+  return extractHangulChars(value).join("");
 }
 
 function buildChainData(hanja) {
