@@ -474,7 +474,7 @@ const GAME_OFFSETS = [
   { x: -1, y: 0 }
 ];
 const RUNNER_LANES = 3;
-const RUNNER_TICK_MS = 70;
+const RUNNER_TICK_MS = 80;
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -772,7 +772,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     if (!currentRound || isOver || resolvingRef.current) return undefined;
     const timer = window.setInterval(() => {
       setProgress((previous) => {
-        const next = Math.min(100, previous + 4);
+        const next = Math.min(100, previous + 3.2);
         if (next >= 100) window.setTimeout(resolveRunnerRound, 0);
         return next;
       });
@@ -907,15 +907,21 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
         {Array.from({ length: RUNNER_LANES }).map((_, index) => (
           <span className="runnerLane" key={index} />
         ))}
-        <div className="runnerCards" style={{ "--runner-progress": `${progress}%` }}>
+        <div className="runnerCards" style={{ "--runner-y": `${progress * 2.65}px` }}>
           {currentRound?.choices.map((choice, index) => (
             <span className={`runnerCard ${currentRound.needsJump && index === currentRound.correctLane ? "high" : ""}`} key={`${choice}-${index}`}>
               {choice}
             </span>
           ))}
         </div>
-        <div className={`runnerPlayer lane-${lane} ${isJumping ? "jumping" : ""}`}>
-          <Mascot variant="wink" small label="" />
+        <div className={`runnerPlayer lane-${lane} ${isJumping ? "jumping" : ""}`} aria-label="초록이">
+          <div className="runnerBack" aria-hidden="true">
+            <span className="runnerCap" />
+            <span className="runnerHead" />
+            <span className="runnerBody" />
+            <span className="runnerFoot left" />
+            <span className="runnerFoot right" />
+          </div>
         </div>
         {isOver ? (
           <div className="gameOverPanel" role="status">
