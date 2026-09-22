@@ -982,7 +982,10 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
 function WordChainGame({ hanja, lesson, onExit }) {
   const chainData = useMemo(() => buildChainData(hanja), [hanja]);
   const [target, setTarget] = useState("");
-  const [choices, setChoices] = useState([]);
+  const [orb, setOrb] = useState(null);
+  const [decoys, setDecoys] = useState([]);
+  const [head, setHead] = useState({ x: 50, y: 50 });
+  const [direction, setDirection] = useState({ x: 1, y: 0 });
   const [tail, setTail] = useState([]);
   const [score, setScore] = useState(0);
   const [clearedWords, setClearedWords] = useState(0);
@@ -990,6 +993,15 @@ function WordChainGame({ hanja, lesson, onExit }) {
   const [status, setStatus] = useState("");
   const [leaderboard, setLeaderboard] = useState(null);
   const [saveState, setSaveState] = useState("idle");
+  const headRef = useRef({ x: 50, y: 50 });
+  const directionRef = useRef({ x: 1, y: 0 });
+  const orbRef = useRef(null);
+  const decoysRef = useRef([]);
+  const isOverRef = useRef(false);
+  const scoreRef = useRef(0);
+  const clearedRef = useRef(0);
+  const targetRef = useRef("");
+  const tailRef = useRef([]);
 
   useEffect(() => {
     if (!chainData.starts.length) return;
@@ -1014,44 +1026,118 @@ function WordChainGame({ hanja, lesson, onExit }) {
     };
   }, [lesson?.level, lesson?.day]);
 
+  useEffect(() => {
+    if (!chainData.starts.length || isOver) return undefined;
+    const timer = window.setInterval(() => {
+      moveChainHead();
+    }, 95);
+    return () => window.clearInterval(timer);
+  }, [chainData, isOver]);
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === "ArrowUp") setChainDirection({ x: 0, y: -1 });
+      if (event.key === "ArrowDown") setChainDirection({ x: 0, y: 1 });
+      if (event.key === "ArrowLeft") setChainDirection({ x: -1, y: 0 });
+      if (event.key === "ArrowRight") setChainDirection({ x: 1, y: 0 });
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   function restartChain() {
     const start = chainData.starts[Math.floor(Math.random() * chainData.starts.length)] || "";
+    const nextOrb = makeChainOrb(start, chainData);
+    const startHead = { x: 50, y: 50 };
+    const startDirection = { x: 1, y: 0 };
     setTarget(start);
+    targetRef.current = start;
     setTail([start]);
+    tailRef.current = [start];
+    setHead(startHead);
+    headRef.current = startHead;
+    setDirection(startDirection);
+    directionRef.current = startDirection;
+    setOrb(nextOrb.orb);
+    orbRef.current = nextOrb.orb;
+    setDecoys(nextOrb.decoys);
+    decoysRef.current = nextOrb.decoys;
     setScore(0);
+    scoreRef.current = 0;
     setClearedWords(0);
+    clearedRef.current = 0;
     setIsOver(false);
+    isOverRef.current = false;
     setStatus("");
     setSaveState("idle");
-    setChoices(makeChainChoices(start, chainData));
   }
 
-  function chooseSyllable(choice) {
-    if (isOver) return;
-    const candidates = chainData.byStart.get(target) || [];
-    const match = candidates.find((item) => item.next === choice);
-    if (!match) {
-      setIsOver(true);
-      setStatus(`${target}${choice}는 배운 어휘가 아니에요.`);
-      saveChainScore(score, clearedWords);
+  function setChainDirection(nextDirection) {
+    if (isOverRef.current) return;
+    setDirection(nextDirection);
+    directionRef.current = nextDirection;
+  }
+
+  function moveChainHead() {
+    if (isOverRef.current || !orbRef.current) return;
+    const current = headRef.current;
+    const currentDirection = directionRef.current;
+    const nextHead = {
+      x: clampNumber(current.x + currentDirection.x * 2.8, 6, 94),
+      y: clampNumber(current.y + currentDirection.y * 2.8, 9, 91)
+    };
+    headRef.current = nextHead;
+    setHead(nextHead);
+    if (distancePercent(nextHead, orbRef.current) < 8.6) {
+      eatChainOrb();
       return;
     }
-    const nextScore = score + 100;
-    const nextCleared = clearedWords + 1;
-    const nextTail = [...tail, choice].slice(-9);
+    if (decoysRef.current.some((item) => distancePercent(nextHead, item) < 7.8)) {
+      setIsOver(true);
+      isOverRef.current = true;
+      setStatus("다른 음절에 닿았어요. 다시 도전해요!");
+      saveChainScore(scoreRef.current, clearedRef.current);
+    }
+  }
+
+  function eatChainOrb() {
+    const currentOrb = orbRef.current;
+    if (!currentOrb) return;
+    const candidates = chainData.byStart.get(targetRef.current) || [];
+    const match = candidates.find((item) => item.next === currentOrb.char);
+    if (!match) {
+      setIsOver(true);
+      isOverRef.current = true;
+      setStatus(`${targetRef.current}${currentOrb.char}는 배운 어휘가 아니에요.`);
+      saveChainScore(scoreRef.current, clearedRef.current);
+      return;
+    }
+    const nextScore = scoreRef.current + 100;
+    const nextCleared = clearedRef.current + 1;
+    const nextTail = [...tailRef.current, currentOrb.char].slice(-12);
+    scoreRef.current = nextScore;
+    clearedRef.current = nextCleared;
+    tailRef.current = nextTail;
     setScore(nextScore);
     setClearedWords(nextCleared);
     setTail(nextTail);
     setStatus(`${match.word} 완성!`);
-    const nextTarget = choice;
-    const nextChoices = makeChainChoices(nextTarget, chainData);
-    if (!nextChoices.length) {
+    const nextTarget = currentOrb.char;
+    const nextOrb = makeChainOrb(nextTarget, chainData);
+    if (!nextOrb.orb) {
       setIsOver(true);
+      isOverRef.current = true;
       saveChainScore(nextScore, nextCleared);
       return;
     }
     setTarget(nextTarget);
-    setChoices(nextChoices);
+    targetRef.current = nextTarget;
+    setOrb(nextOrb.orb);
+    orbRef.current = nextOrb.orb;
+    setDecoys(nextOrb.decoys);
+    decoysRef.current = nextOrb.decoys;
   }
 
   async function saveChainScore(finalScore, finalClearedWords) {
@@ -1105,24 +1191,40 @@ function WordChainGame({ hanja, lesson, onExit }) {
         <span>현재 {target}</span>
       </div>
       <div className="chainArena">
-        <div className="chainTail" aria-label="꼬리">
-          {tail.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}
-        </div>
-        <strong className="chainTarget">{target}</strong>
-        <div className="chainChoices">
-          {choices.map((choice) => (
-            <button className="chainChoice" key={choice} type="button" onClick={() => chooseSyllable(choice)} disabled={isOver}>
-              {choice}
-            </button>
+        <div className="chainSpace" aria-label="꼬리물기 공간">
+          {decoys.map((item) => (
+            <span className="chainOrb decoy" key={item.id} style={{ left: `${item.x}%`, top: `${item.y}%` }}>{item.char}</span>
           ))}
-        </div>
-        {isOver ? (
-          <div className="gameOverPanel" role="status">
-            <strong>게임 종료</strong>
-            <p>{score}점 · {clearedWords}개 단어 연결</p>
-            <button className="btn primary" type="button" onClick={restartChain}>다시 하기</button>
+          {orb ? <span className="chainOrb targetOrb" style={{ left: `${orb.x}%`, top: `${orb.y}%` }}>{orb.char}</span> : null}
+          <div className="chainWorm" style={{ left: `${head.x}%`, top: `${head.y}%` }}>
+            {tail.map((item, index) => (
+              <span
+                className={`chainSegment ${index + 1 === tail.length ? "head" : ""}`}
+                key={`${item}-${index}`}
+                style={{
+                  "--segment-index": tail.length - index - 1,
+                  "--segment-x": `${direction.x * -1 * (tail.length - index - 1) * 12}px`,
+                  "--segment-y": `${direction.y * -1 * (tail.length - index - 1) * 12}px`
+                }}
+              >
+                {item}
+              </span>
+            ))}
           </div>
-        ) : null}
+          {isOver ? (
+            <div className="gameOverPanel" role="status">
+              <strong>게임 종료</strong>
+              <p>{score}점 · {clearedWords}개 단어 연결</p>
+              <button className="btn primary" type="button" onClick={restartChain}>다시 하기</button>
+            </div>
+          ) : null}
+        </div>
+        <div className="chainControls" aria-label="이동 컨트롤">
+          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 0, y: -1 })} disabled={isOver}>위</button>
+          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: -1, y: 0 })} disabled={isOver}>왼쪽</button>
+          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 1, y: 0 })} disabled={isOver}>오른쪽</button>
+          <button className="btn secondary" type="button" onClick={() => setChainDirection({ x: 0, y: 1 })} disabled={isOver}>아래</button>
+        </div>
       </div>
       {status ? <p className="gameStatus">{status}</p> : null}
       <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
@@ -1424,12 +1526,42 @@ function buildChainData(hanja) {
   };
 }
 
-function makeChainChoices(target, chainData) {
+function makeChainOrb(target, chainData) {
   const candidates = chainData.byStart.get(target) || [];
-  if (!candidates.length) return [];
+  if (!candidates.length) return { orb: null, decoys: [] };
   const answer = candidates[Math.floor(Math.random() * candidates.length)]?.next;
-  const distractors = shuffle(chainData.syllables.filter((item) => item !== answer)).slice(0, 4);
-  return shuffle([...new Set([answer, ...distractors])].slice(0, 5));
+  if (!answer) return { orb: null, decoys: [] };
+  const orb = {
+    id: `target-${Date.now()}-${Math.random()}`,
+    char: answer,
+    x: randomPercent(18, 82),
+    y: randomPercent(18, 78)
+  };
+  const decoys = shuffle(chainData.syllables.filter((item) => item && item !== answer))
+    .slice(0, 5)
+    .map((char, index) => ({
+      id: `decoy-${char}-${index}-${Date.now()}-${Math.random()}`,
+      char,
+      x: randomPercent(12, 88),
+      y: randomPercent(14, 84)
+    }))
+    .filter((item) => distancePercent(item, orb) > 11);
+  return { orb, decoys };
+}
+
+function randomPercent(min, max) {
+  return Math.round((min + Math.random() * (max - min)) * 10) / 10;
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function distancePercent(a, b) {
+  if (!a || !b) return Infinity;
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt((dx * dx) + (dy * dy));
 }
 
 function extractHangulChars(value) {

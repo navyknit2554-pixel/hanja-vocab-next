@@ -976,74 +976,147 @@ textarea {
 .chainArena {
   position: relative;
   display: grid;
-  justify-items: center;
-  gap: 16px;
-  min-height: 360px;
-  border: 2px solid #ffe4a6;
+  gap: 12px;
+  min-height: 450px;
+  border: 2px solid #d9efff;
   border-radius: 22px;
   background:
-    radial-gradient(circle at 50% 34%, rgba(255, 238, 148, .42), transparent 34%),
-    linear-gradient(180deg, #fffdf7 0%, #fff8dc 100%);
-  padding: 22px 14px;
+    radial-gradient(circle at 18% 18%, rgba(255, 244, 164, .7), transparent 15%),
+    linear-gradient(180deg, #f7fdff 0%, #eef9ff 48%, #f6fff2 100%);
+  padding: 14px;
 }
 
-.chainTail {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  min-height: 48px;
+.chainSpace {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border: 2px solid #dcecff;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(255, 255, 255, .95) 0 2px, transparent 3px),
+    radial-gradient(circle at 72% 18%, rgba(255, 255, 255, .85) 0 2px, transparent 3px),
+    radial-gradient(circle at 28% 72%, rgba(255, 255, 255, .8) 0 2px, transparent 3px),
+    radial-gradient(circle at 86% 64%, rgba(255, 255, 255, .75) 0 2px, transparent 3px),
+    linear-gradient(145deg, #22366d 0%, #3269a8 48%, #bdf3ff 100%);
+  box-shadow: inset 0 -18px 0 rgba(255, 255, 255, .24);
 }
 
-.chainTail span,
-.chainTarget,
-.chainChoice {
+.chainSpace::before,
+.chainSpace::after {
+  position: absolute;
+  content: "";
+  inset: auto -12% 8% -12%;
+  height: 70px;
+  background:
+    radial-gradient(ellipse at 18% 58%, rgba(255, 255, 255, .92) 0 34px, transparent 36px),
+    radial-gradient(ellipse at 54% 70%, rgba(225, 250, 255, .88) 0 42px, transparent 45px),
+    radial-gradient(ellipse at 84% 60%, rgba(255, 255, 255, .9) 0 31px, transparent 33px);
+  opacity: .72;
+  animation: chainDrift 7s linear infinite;
+}
+
+.chainSpace::after {
+  bottom: 28%;
+  height: 32px;
+  opacity: .35;
+  animation-duration: 11s;
+  animation-direction: reverse;
+}
+
+.chainOrb {
+  position: absolute;
   display: grid;
   place-items: center;
+  width: 54px;
+  height: 54px;
+  translate: -50% -50%;
+  border: 2px solid rgba(255, 255, 255, .9);
   border-radius: 999px;
+  font-size: 1.7rem;
   font-weight: 1000;
+  line-height: 1;
+  box-shadow: 0 8px 0 rgba(13, 34, 86, .14);
+  z-index: 2;
 }
 
-.chainTail span {
-  width: 42px;
-  height: 42px;
-  border: 2px solid #bfeab5;
-  background: #f0ffe8;
+.chainOrb.decoy {
+  background: rgba(255, 255, 255, .88);
+  color: #64708a;
+}
+
+.chainOrb.targetOrb {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(180deg, #fff8bb 0%, #a9f566 100%);
+  border-color: #8ce85f;
   color: var(--green-dark);
+  animation: chainPulse 1.05s ease-in-out infinite;
+  z-index: 3;
 }
 
-.chainTarget {
-  width: 78px;
-  height: 78px;
-  border: 3px solid #77da4d;
-  background: linear-gradient(180deg, #ecffdf 0%, #c8ff9f 100%);
+.chainWorm {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transition: left .08s linear, top .08s linear;
+  z-index: 4;
+}
+
+.chainSegment {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  margin: -21.5px 0 0 -21.5px;
+  transform: translate(var(--segment-x), var(--segment-y));
+  border: 2px solid #c4f6ac;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4ffe9 0%, #7ee848 100%);
   color: var(--ink);
-  font-size: 2.2rem;
-  box-shadow: 0 8px 0 #b8e99d;
+  font-size: 1.25rem;
+  font-weight: 1000;
+  box-shadow: 0 5px 0 rgba(44, 128, 16, .22);
 }
 
-.chainChoices {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
+.chainSegment.head {
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-color: #fff2a8;
+  background: linear-gradient(180deg, #fffbd1 0%, #40d51f 100%);
+  color: #142042;
+  font-size: 1.75rem;
+  box-shadow: 0 8px 0 rgba(31, 107, 12, .24);
 }
 
-.chainChoice {
-  width: 62px;
-  height: 62px;
-  border: 2px solid #d9efff;
-  background: #fff;
-  color: var(--ink);
-  font: inherit;
-  font-size: 1.45rem;
-  box-shadow: 0 5px 0 #d8edf8;
-  cursor: pointer;
+.chainControls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.chainChoice:active {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 #d8edf8;
+.chainControls .btn {
+  min-height: 48px;
+  padding-inline: 8px;
+}
+
+@keyframes chainPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes chainDrift {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(8%);
+  }
 }
 
 .runnerGameCard {
