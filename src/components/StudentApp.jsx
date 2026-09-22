@@ -27,6 +27,9 @@ export function StudentApp() {
   const quizItems = useMemo(() => buildQuizItems(lessonItems), [lessonItems]);
   const currentCard = lessonItems[cardIndex];
   const currentQuiz = quizQueue[quizIndex];
+  const gameHanja = payload?.gameHanja || payload?.hanja || [];
+  const gameLesson = payload?.gameLesson || payload?.lesson || null;
+  const canPlayGame = Boolean(gameLesson && gameHanja.length);
 
   async function loadToday() {
     try {
@@ -214,10 +217,21 @@ export function StudentApp() {
           {levelUpNotice ? <LevelUpOverlay level={levelUpNotice.level} /> : null}
           <GradeLeaderboard leaderboard={payload.leaderboard} />
           {payload.lock ? (
-            <LockedLesson lock={payload.lock} onRefresh={loadToday} />
+            <>
+              {stage === "home" && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
+              {stage === "home" ? <LockedLesson lock={payload.lock} onRefresh={loadToday} /> : null}
+              {stage !== "home" && canPlayGame ? (
+                <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
+              ) : null}
+              {canPlayGame && stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} /> : null}
+              {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+            </>
           ) : payload.lesson ? (
             <>
-              {stage === "home" ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
+              {stage === "home" && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
               <LessonStats hanja={payload.hanja} />
               {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
               {stage !== "home" && stage !== "saving" ? (
@@ -239,10 +253,10 @@ export function StudentApp() {
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
               {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} /> : null}
-              {stage === "game" ? <WordBlockGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
-              {stage === "runner" ? <WordRunnerGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
-              {stage === "crossword" ? <CrosswordBattleGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
-              {stage === "apple" ? <WordAppleGame hanja={payload.gameHanja || payload.hanja} lesson={payload.lesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>

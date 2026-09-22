@@ -53,15 +53,22 @@ export async function getStudentToday(studentId) {
     const progress = progressRows[0];
     const unlockedAt = progress?.unlocked_at ? new Date(progress.unlocked_at) : null;
     if (unlockedAt && unlockedAt.getTime() > Date.now()) {
+      const previousDay = Math.max(1, Number(student.current_day) - 1);
+      const gameHanja = await getCumulativeGameHanja({ level: student.level, day: previousDay }, db);
       return {
         student,
         lesson: null,
         hanja: [],
+        gameHanja,
+        gameLesson: {
+          level: student.level,
+          day: previousDay
+        },
         leaderboard,
         lock: {
           day: Number(student.current_day),
           availableAt: unlockedAt.toISOString(),
-          previousDay: Math.max(1, Number(student.current_day) - 1)
+          previousDay
         }
       };
     }
@@ -81,15 +88,22 @@ export async function getStudentToday(studentId) {
       limit 1
     `;
     if (recentCompletionRows[0]) {
+      const previousDay = Number(student.current_day) - 1;
+      const gameHanja = await getCumulativeGameHanja({ level: student.level, day: previousDay }, db);
       return {
         student,
         lesson: null,
         hanja: [],
+        gameHanja,
+        gameLesson: {
+          level: student.level,
+          day: previousDay
+        },
         leaderboard,
         lock: {
           day: Number(student.current_day),
           availableAt: lockUntil.toISOString(),
-          previousDay: Number(student.current_day) - 1
+          previousDay
         }
       };
     }
