@@ -1272,18 +1272,31 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       if (event.cancelable) event.preventDefault();
       moveSelectionFromPoint(event.clientX, event.clientY);
     }
+    function handleTouchMove(event) {
+      if (!isDraggingRef.current) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      if (event.cancelable) event.preventDefault();
+      moveSelectionFromPoint(touch.clientX, touch.clientY);
+    }
     function handlePointerUp() {
       if (isDraggingRef.current) finishSelection();
     }
     window.addEventListener("pointermove", handlePointerMove, { passive: false });
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handlePointerUp, { passive: false });
+    window.addEventListener("touchcancel", handlePointerUp, { passive: false });
     window.addEventListener("mousemove", handlePointerMove, { passive: false });
     window.addEventListener("mouseup", handlePointerUp);
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handlePointerUp);
+      window.removeEventListener("touchcancel", handlePointerUp);
       window.removeEventListener("mousemove", handlePointerMove);
       window.removeEventListener("mouseup", handlePointerUp);
     };
@@ -1296,17 +1309,46 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       if (event.cancelable) event.preventDefault();
       startSelectionFromPoint(event.clientX, event.clientY);
     }
+    function handleNativePointerMove(event) {
+      if (!isDraggingRef.current) return;
+      if (event.cancelable) event.preventDefault();
+      moveSelectionFromPoint(event.clientX, event.clientY);
+    }
     function handleNativeTouchStart(event) {
       const touch = event.touches?.[0];
       if (!touch) return;
       if (event.cancelable) event.preventDefault();
       startSelectionFromPoint(touch.clientX, touch.clientY);
     }
+    function handleNativeTouchMove(event) {
+      if (!isDraggingRef.current) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      if (event.cancelable) event.preventDefault();
+      moveSelectionFromPoint(touch.clientX, touch.clientY);
+    }
+    function handleNativeMouseDown(event) {
+      if (event.cancelable) event.preventDefault();
+      startSelectionFromPoint(event.clientX, event.clientY);
+    }
+    function handleNativeMouseMove(event) {
+      if (!isDraggingRef.current) return;
+      if (event.cancelable) event.preventDefault();
+      moveSelectionFromPoint(event.clientX, event.clientY);
+    }
     board.addEventListener("pointerdown", handleNativePointerDown, { capture: true, passive: false });
+    board.addEventListener("pointermove", handleNativePointerMove, { capture: true, passive: false });
     board.addEventListener("touchstart", handleNativeTouchStart, { capture: true, passive: false });
+    board.addEventListener("touchmove", handleNativeTouchMove, { capture: true, passive: false });
+    board.addEventListener("mousedown", handleNativeMouseDown, { capture: true, passive: false });
+    board.addEventListener("mousemove", handleNativeMouseMove, { capture: true, passive: false });
     return () => {
       board.removeEventListener("pointerdown", handleNativePointerDown, true);
+      board.removeEventListener("pointermove", handleNativePointerMove, true);
       board.removeEventListener("touchstart", handleNativeTouchStart, true);
+      board.removeEventListener("touchmove", handleNativeTouchMove, true);
+      board.removeEventListener("mousedown", handleNativeMouseDown, true);
+      board.removeEventListener("mousemove", handleNativeMouseMove, true);
     };
   }, [puzzle, removed, isOver]);
 
@@ -1349,36 +1391,9 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     if (cell) addSelection(cell);
   }
 
-  function moveSelection(event) {
-    if (!isDraggingRef.current || isOver) return;
-    event.preventDefault();
-    moveSelectionFromPoint(event.clientX, event.clientY);
-  }
-
-  function moveTouchSelection(event) {
-    if (!isDraggingRef.current || isOver) return;
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    event.preventDefault();
-    moveSelectionFromPoint(touch.clientX, touch.clientY);
-  }
-
   function startSelectionFromPoint(clientX, clientY) {
     const cell = getAppleCellFromPoint(clientX, clientY);
     if (cell) startSelection(cell);
-  }
-
-  function startPointerSelection(event) {
-    event.preventDefault();
-    appleBoardRef.current?.setPointerCapture?.(event.pointerId);
-    startSelectionFromPoint(event.clientX, event.clientY);
-  }
-
-  function startTouchSelection(event) {
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    event.preventDefault();
-    startSelectionFromPoint(touch.clientX, touch.clientY);
   }
 
   function finishSelection() {
@@ -1480,13 +1495,6 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         className="appleBoard"
         ref={appleBoardRef}
         style={{ "--apple-size": puzzle.size }}
-        onPointerDown={startPointerSelection}
-        onPointerMove={moveSelection}
-        onTouchStart={startTouchSelection}
-        onTouchMove={moveTouchSelection}
-        onTouchEnd={() => isDraggingRef.current && finishSelection()}
-        onTouchCancel={() => isDraggingRef.current && finishSelection()}
-        onPointerLeave={() => isDraggingRef.current && finishSelection()}
       >
         {puzzle.cells.flat().map((cell) => {
           const selected = selection.includes(cell.id);
