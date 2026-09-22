@@ -1286,6 +1286,15 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     });
   }
 
+  function moveSelection(event) {
+    if (!isDragging || isOver) return;
+    event.preventDefault();
+    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest?.("[data-apple-cell-id]");
+    const cellId = element?.getAttribute?.("data-apple-cell-id");
+    const cell = cellId ? puzzle.cellMap.get(cellId) : null;
+    if (cell) addSelection(cell);
+  }
+
   function finishSelection() {
     setIsDragging(false);
     if (!selection.length) return;
@@ -1376,20 +1385,26 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         <span><b>{foundWords.length}</b> / {puzzle.words.length}개</span>
         <span><b>{timeLeft}</b>초</span>
       </div>
-      <div className="appleBoard" style={{ "--apple-size": puzzle.size }} onPointerLeave={() => isDragging && finishSelection()}>
+      <div
+        className="appleBoard"
+        style={{ "--apple-size": puzzle.size }}
+        onPointerMove={moveSelection}
+        onPointerLeave={() => isDragging && finishSelection()}
+      >
         {puzzle.cells.flat().map((cell) => {
           const selected = selection.includes(cell.id);
           return (
             <button
               className={`appleCell ${selected ? "selected" : ""} ${removed[cell.id] ? "removed" : ""}`}
               disabled={isOver || removed[cell.id]}
+              data-apple-cell-id={cell.id}
               key={cell.id}
               type="button"
               onPointerDown={(event) => {
                 event.preventDefault();
+                event.currentTarget.setPointerCapture?.(event.pointerId);
                 startSelection(cell);
               }}
-              onPointerEnter={() => addSelection(cell)}
             >
               {cell.char}
             </button>
