@@ -1135,34 +1135,52 @@ textarea {
 }
 
 .appleCell {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
   min-width: 0;
-  border: 2px solid #aeea9a;
+  border: 2px solid #bdeeb2;
   border-radius: 999px;
   background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
-    linear-gradient(180deg, #8df06b 0%, #38c82b 100%);
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .95) 0 13%, transparent 14%),
+    linear-gradient(180deg, #baf7a6 0%, #65d95c 100%);
   color: #fff;
   font: inherit;
-  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-size: clamp(1.16rem, 4.8vw, 1.58rem);
   font-weight: 1000;
   line-height: 1;
-  box-shadow: 0 5px 0 #2aa51f;
+  text-shadow: 0 1px 0 rgba(24, 104, 22, .22);
+  box-shadow: 0 5px 0 #7ecf71;
   cursor: pointer;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
+.appleCell::after {
+  position: absolute;
+  content: "";
+  bottom: -5px;
+  left: 50%;
+  width: 10px;
+  height: 8px;
+  border-radius: 0 0 8px 8px;
+  background: #65d95c;
+  transform: translateX(-50%);
+}
+
 .appleCell.selected {
-  border-color: #d7ff8c;
+  border-color: #dfffb0;
   background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, .95) 0 11%, transparent 12%),
-    linear-gradient(180deg, #c8ff78 0%, #49dcb5 100%);
-  box-shadow: 0 5px 0 #33b993;
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .95) 0 13%, transparent 14%),
+    linear-gradient(180deg, #d5ff9a 0%, #8be7c7 100%);
+  box-shadow: 0 5px 0 #8ccfb8;
   transform: translateY(-2px);
+}
+
+.appleCell.selected::after {
+  background: #8be7c7;
 }
 
 .appleCell.removed,
@@ -1172,6 +1190,11 @@ textarea {
   color: transparent;
   box-shadow: none;
   cursor: default;
+}
+
+.appleCell.removed::after,
+.appleCell:disabled::after {
+  background: #eef8ff;
 }
 
 .appleFoundWords {

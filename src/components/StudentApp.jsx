@@ -384,7 +384,7 @@ function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame }) {
         <strong>뜻 힌트를 보고 가로세로 어휘를 완성해요</strong>
       </button>
       <button className="gameMenuCard apple" type="button" onClick={onAppleGame}>
-        <span>단어 사과</span>
+        <span>초록이 풍선 단어</span>
         <strong>글자를 드래그해 배운 어휘를 찾아요</strong>
       </button>
     </section>
@@ -1428,8 +1428,8 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   if (!puzzle.words.length) {
     return (
       <article className="wordGameCard">
-        <Mascot variant="search" small label="단어 사과" />
-        <h2>단어 사과</h2>
+        <Mascot variant="search" small label="풍선 단어" />
+        <h2>초록이 풍선 단어</h2>
         <p className="mutedText">드래그할 2글자 이상 어휘가 아직 부족합니다.</p>
         <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
       </article>
@@ -1440,7 +1440,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     <section className="wordGameCard appleGameCard">
       <div className="gameHeader">
         <div>
-          <span>초록이 단어 사과</span>
+          <span>초록이 풍선 단어</span>
           <h2>{lesson?.day || ""}일차 게임</h2>
         </div>
         <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
