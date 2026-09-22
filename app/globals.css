@@ -1193,11 +1193,6 @@ textarea {
   font-weight: 1000;
 }
 
-.appleFoundWords .appleProgress {
-  background: #eef8ff;
-  color: var(--ink);
-}
-
 .chainGameCard {
   overflow: hidden;
 }

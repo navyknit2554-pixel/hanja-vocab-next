@@ -1288,7 +1288,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       const current = selectionRef.current.length ? selectionRef.current : previous;
       if (current.includes(cell.id)) return current;
       const lastCell = puzzle.cellMap.get(current[current.length - 1]);
-      if (!lastCell || !areNeighborCells(lastCell, cell)) return previous;
+      if (!lastCell || !canConnectAppleCells(lastCell, cell, removed, puzzle)) return previous;
       const nextSelection = [...current, cell.id];
       selectionRef.current = nextSelection;
       return nextSelection;
@@ -1402,8 +1402,6 @@ function WordAppleGame({ hanja, lesson, onExit }) {
     );
   }
 
-  const remainingWords = Math.max(0, puzzle.words.length - foundWords.length);
-
   return (
     <section className="wordGameCard appleGameCard">
       <div className="gameHeader">
@@ -1415,7 +1413,7 @@ function WordAppleGame({ hanja, lesson, onExit }) {
       </div>
       <div className="gameScoreBar">
         <span><b>{score}</b>점</span>
-        <span>남은 <b>{remainingWords}</b>개</span>
+        <span><b>{foundWords.length}</b> / {puzzle.words.length}개</span>
         <span><b>{timeLeft}</b>초</span>
       </div>
       <div
@@ -1451,7 +1449,6 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         })}
       </div>
       <div className="appleFoundWords" aria-label="찾은 어휘">
-        <span className="appleProgress">찾은 {foundWords.length}개 · 남은 {remainingWords}개</span>
         {foundWords.length ? foundWords.map((word) => <span key={word}>{word}</span>) : <span>드래그해서 배운 어휘를 찾아요</span>}
       </div>
       {status ? <p className="gameStatus">{status}</p> : null}
@@ -2067,10 +2064,27 @@ function canPlaceAppleWord(word, placement, cells, size) {
   });
 }
 
-function areNeighborCells(a, b) {
+function canConnectAppleCells(a, b, removed, puzzle) {
   const rowGap = Math.abs(a.row - b.row);
   const colGap = Math.abs(a.col - b.col);
-  return rowGap <= 1 && colGap <= 1 && rowGap + colGap > 0;
+  if (rowGap <= 1 && colGap <= 1 && rowGap + colGap > 0) return true;
+  const sameRow = a.row === b.row;
+  const sameCol = a.col === b.col;
+  const sameDiagonal = rowGap === colGap;
+  if (!sameRow && !sameCol && !sameDiagonal) return false;
+  const rowStep = Math.sign(b.row - a.row);
+  const colStep = Math.sign(b.col - a.col);
+  let row = a.row + rowStep;
+  let col = a.col + colStep;
+  let crossedBlank = false;
+  while (row !== b.row || col !== b.col) {
+    const middleCell = puzzle.cells[row]?.[col];
+    if (!middleCell || !removed[middleCell.id]) return false;
+    crossedBlank = true;
+    row += rowStep;
+    col += colStep;
+  }
+  return crossedBlank;
 }
 
 function buildCrosswordPuzzle(hanja) {
