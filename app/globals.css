@@ -1151,6 +1151,9 @@ textarea {
   line-height: 1;
   box-shadow: 0 5px 0 #d53a4a;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .appleCell.selected {

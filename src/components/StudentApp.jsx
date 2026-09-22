@@ -1216,11 +1216,15 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   const [leaderboard, setLeaderboard] = useState(null);
   const [saveState, setSaveState] = useState("idle");
   const foundSet = useMemo(() => new Set(foundWords), [foundWords]);
+  const selectionRef = useRef([]);
+  const isDraggingRef = useRef(false);
 
   useEffect(() => {
     setRemoved({});
     setSelection([]);
+    selectionRef.current = [];
     setIsDragging(false);
+    isDraggingRef.current = false;
     setScore(0);
     setFoundWords([]);
     setTimeLeft(90);
@@ -1263,42 +1267,67 @@ function WordAppleGame({ hanja, lesson, onExit }) {
 
   useEffect(() => {
     function handlePointerUp() {
-      if (isDragging) finishSelection();
+      if (isDraggingRef.current) finishSelection();
     }
     window.addEventListener("pointerup", handlePointerUp);
     return () => window.removeEventListener("pointerup", handlePointerUp);
-  }, [isDragging, selection, removed, score, foundWords, timeLeft]);
+  }, [removed, score, foundWords, timeLeft]);
 
   function startSelection(cell) {
     if (isOver || removed[cell.id]) return;
+    selectionRef.current = [cell.id];
     setSelection([cell.id]);
     setIsDragging(true);
+    isDraggingRef.current = true;
     setStatus("");
   }
 
   function addSelection(cell) {
-    if (!isDragging || isOver || removed[cell.id]) return;
+    if (!isDraggingRef.current || isOver || removed[cell.id]) return;
     setSelection((previous) => {
-      if (previous.includes(cell.id)) return previous;
-      const lastCell = puzzle.cellMap.get(previous[previous.length - 1]);
+      const current = selectionRef.current.length ? selectionRef.current : previous;
+      if (current.includes(cell.id)) return current;
+      const lastCell = puzzle.cellMap.get(current[current.length - 1]);
       if (!lastCell || !areNeighborCells(lastCell, cell)) return previous;
-      return [...previous, cell.id];
+      const nextSelection = [...current, cell.id];
+      selectionRef.current = nextSelection;
+      return nextSelection;
     });
   }
 
-  function moveSelection(event) {
-    if (!isDragging || isOver) return;
-    event.preventDefault();
-    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest?.("[data-apple-cell-id]");
+  function getAppleCellFromPoint(clientX, clientY) {
+    const element = document.elementFromPoint(clientX, clientY)?.closest?.("[data-apple-cell-id]");
     const cellId = element?.getAttribute?.("data-apple-cell-id");
-    const cell = cellId ? puzzle.cellMap.get(cellId) : null;
+    return cellId ? puzzle.cellMap.get(cellId) : null;
+  }
+
+  function moveSelectionFromPoint(clientX, clientY) {
+    if (!isDraggingRef.current || isOver) return;
+    const cell = getAppleCellFromPoint(clientX, clientY);
     if (cell) addSelection(cell);
   }
 
+  function moveSelection(event) {
+    if (!isDraggingRef.current || isOver) return;
+    event.preventDefault();
+    moveSelectionFromPoint(event.clientX, event.clientY);
+  }
+
+  function moveTouchSelection(event) {
+    if (!isDraggingRef.current || isOver) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    event.preventDefault();
+    moveSelectionFromPoint(touch.clientX, touch.clientY);
+  }
+
   function finishSelection() {
+    const currentSelection = selectionRef.current;
     setIsDragging(false);
-    if (!selection.length) return;
-    const selectedCells = selection.map((id) => puzzle.cellMap.get(id)).filter(Boolean);
+    isDraggingRef.current = false;
+    selectionRef.current = [];
+    if (!currentSelection.length) return;
+    const selectedCells = currentSelection.map((id) => puzzle.cellMap.get(id)).filter(Boolean);
     const selectedWord = selectedCells.map((cell) => cell.char).join("");
     const reversedWord = selectedCells.map((cell) => cell.char).reverse().join("");
     const matchedWord = puzzle.wordSet.has(selectedWord) ? selectedWord : puzzle.wordSet.has(reversedWord) ? reversedWord : "";
@@ -1324,7 +1353,9 @@ function WordAppleGame({ hanja, lesson, onExit }) {
   function restartAppleGame() {
     setRemoved({});
     setSelection([]);
+    selectionRef.current = [];
     setIsDragging(false);
+    isDraggingRef.current = false;
     setScore(0);
     setFoundWords([]);
     setTimeLeft(90);
@@ -1389,7 +1420,10 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         className="appleBoard"
         style={{ "--apple-size": puzzle.size }}
         onPointerMove={moveSelection}
-        onPointerLeave={() => isDragging && finishSelection()}
+        onTouchMove={moveTouchSelection}
+        onTouchEnd={() => isDraggingRef.current && finishSelection()}
+        onTouchCancel={() => isDraggingRef.current && finishSelection()}
+        onPointerLeave={() => isDraggingRef.current && finishSelection()}
       >
         {puzzle.cells.flat().map((cell) => {
           const selected = selection.includes(cell.id);
@@ -1402,7 +1436,10 @@ function WordAppleGame({ hanja, lesson, onExit }) {
               type="button"
               onPointerDown={(event) => {
                 event.preventDefault();
-                event.currentTarget.setPointerCapture?.(event.pointerId);
+                startSelection(cell);
+              }}
+              onTouchStart={(event) => {
+                event.preventDefault();
                 startSelection(cell);
               }}
             >
