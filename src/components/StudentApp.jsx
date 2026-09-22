@@ -726,6 +726,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
   const [saveState, setSaveState] = useState("idle");
   const laneRef = useRef(1);
   const jumpRef = useRef(false);
+  const jumpGraceUntilRef = useRef(0);
   const roundRef = useRef(null);
   const scoreRef = useRef(0);
   const clearedRef = useRef(0);
@@ -788,6 +789,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     laneRef.current = 1;
     setIsJumping(false);
     jumpRef.current = false;
+    jumpGraceUntilRef.current = 0;
     setProgress(0);
     setScore(0);
     scoreRef.current = 0;
@@ -810,6 +812,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     if (isOver || resolvingRef.current || isJumping) return;
     setIsJumping(true);
     jumpRef.current = true;
+    jumpGraceUntilRef.current = Date.now() + 1050;
     window.clearTimeout(jumpTimerRef.current);
     jumpTimerRef.current = window.setTimeout(() => {
       setIsJumping(false);
@@ -831,7 +834,8 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     const round = roundRef.current;
     if (!round) return;
     const reachedCorrectLane = laneRef.current === round.correctLane;
-    const reachedHeight = round.needsJump ? jumpRef.current : !jumpRef.current;
+    const jumpWasRecent = jumpRef.current || Date.now() <= jumpGraceUntilRef.current;
+    const reachedHeight = round.needsJump ? jumpWasRecent : !jumpRef.current;
     if (reachedCorrectLane && reachedHeight) {
       const finalScore = scoreRef.current + 100;
       const finalCleared = clearedRef.current + 1;
@@ -904,6 +908,11 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
         <strong>{currentRound?.prompt}</strong>
       </article>
       <div className="runnerTrack" aria-label="빙하 달리기">
+        <span className="runnerMountains" aria-hidden="true" />
+        <span className="runnerIce ice-a" aria-hidden="true" />
+        <span className="runnerIce ice-b" aria-hidden="true" />
+        <span className="runnerWater water-a" aria-hidden="true" />
+        <span className="runnerWater water-b" aria-hidden="true" />
         {Array.from({ length: RUNNER_LANES }).map((_, index) => (
           <span className="runnerLane" key={index} />
         ))}

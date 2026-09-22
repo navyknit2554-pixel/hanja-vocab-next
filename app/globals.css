@@ -997,6 +997,70 @@ textarea {
   background: linear-gradient(180deg, rgba(255, 255, 255, .82), rgba(255, 255, 255, 0));
 }
 
+.runnerMountains {
+  position: absolute;
+  left: -45%;
+  right: -45%;
+  top: 26px;
+  height: 54px;
+  z-index: 0;
+  background:
+    linear-gradient(135deg, transparent 0 37%, rgba(121, 190, 218, .52) 38% 48%, transparent 49%) 0 0 / 150px 54px repeat-x,
+    linear-gradient(225deg, transparent 0 37%, rgba(74, 157, 194, .38) 38% 48%, transparent 49%) 56px 0 / 170px 54px repeat-x;
+  opacity: .68;
+  animation: runnerMountainsDrift 18s linear infinite;
+}
+
+.runnerIce,
+.runnerWater {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: center bottom;
+}
+
+.runnerIce {
+  width: 44px;
+  height: 20px;
+  border: 2px solid rgba(117, 201, 232, .58);
+  border-radius: 54% 46% 58% 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(205, 243, 255, .84));
+  box-shadow: 0 5px 12px rgba(70, 160, 200, .14);
+}
+
+.runnerWater {
+  width: 54px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(255, 255, 255, .75) 0 18%, transparent 19%),
+    linear-gradient(180deg, rgba(71, 188, 232, .62), rgba(40, 146, 207, .48));
+  box-shadow: inset 0 -4px 8px rgba(20, 120, 176, .22), 0 5px 11px rgba(40, 146, 207, .12);
+}
+
+.runnerIce.ice-a {
+  left: 18%;
+  animation: runnerSceneryFlow 4.6s linear infinite;
+}
+
+.runnerIce.ice-b {
+  left: 70%;
+  animation: runnerSceneryFlow 6.2s linear infinite;
+  animation-delay: -2.4s;
+}
+
+.runnerWater.water-a {
+  left: 42%;
+  animation: runnerSceneryFlow 5.4s linear infinite;
+  animation-delay: -1.8s;
+}
+
+.runnerWater.water-b {
+  left: 9%;
+  animation: runnerSceneryFlow 7s linear infinite;
+  animation-delay: -4.4s;
+}
+
 .runnerLane {
   position: relative;
   z-index: 1;
@@ -1281,6 +1345,34 @@ textarea {
   }
   50% {
     transform: translateY(0) rotate(-8deg);
+  }
+}
+
+@keyframes runnerMountainsDrift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(150px);
+  }
+}
+
+@keyframes runnerSceneryFlow {
+  0% {
+    opacity: 0;
+    top: 82px;
+    transform: translateX(-50%) scale(.28);
+  }
+  14% {
+    opacity: .85;
+  }
+  72% {
+    opacity: .7;
+  }
+  100% {
+    opacity: 0;
+    top: 330px;
+    transform: translateX(-50%) scale(1.65);
   }
 }
 
