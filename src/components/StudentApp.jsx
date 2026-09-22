@@ -484,6 +484,8 @@ function WordBlockGame({ hanja, lesson, onExit }) {
   const [leaderboard, setLeaderboard] = useState(null);
   const [status, setStatus] = useState("");
   const [saveState, setSaveState] = useState("idle");
+  const [matchAnimation, setMatchAnimation] = useState(null);
+  const matchTimerRef = useRef(null);
 
   useEffect(() => {
     const emptyBoard = createEmptyGameBoard();
@@ -495,6 +497,8 @@ function WordBlockGame({ hanja, lesson, onExit }) {
     setIsOver(false);
     setStatus("");
     setSaveState("idle");
+    setMatchAnimation(null);
+    window.clearTimeout(matchTimerRef.current);
     setNextPair(upcomingPair);
     if (!firstPair) {
       setActive(null);
@@ -521,6 +525,10 @@ function WordBlockGame({ hanja, lesson, onExit }) {
       ignore = true;
     };
   }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => () => {
+    window.clearTimeout(matchTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!active || isOver || !pairs.length) return undefined;
@@ -555,7 +563,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
   }
 
   function moveActive(dx, dy) {
-    if (!active || isOver) return;
+    if (!active || isOver || matchAnimation) return;
     const moved = { ...active, x: active.x + dx, y: active.y + dy };
     if (canPlaceGamePiece(board, moved)) {
       setActive(moved);
@@ -569,13 +577,13 @@ function WordBlockGame({ hanja, lesson, onExit }) {
   }
 
   function rotateActive() {
-    if (!active || isOver) return;
+    if (!active || isOver || matchAnimation) return;
     const rotated = { ...active, rotation: (active.rotation + 1) % GAME_OFFSETS.length };
     if (canPlaceGamePiece(board, rotated)) setActive(rotated);
   }
 
   function hardDrop() {
-    if (!active || isOver) return;
+    if (!active || isOver || matchAnimation) return;
     let dropped = active;
     while (canPlaceGamePiece(board, { ...dropped, y: dropped.y + 1 })) {
       dropped = { ...dropped, y: dropped.y + 1 };
@@ -592,6 +600,8 @@ function WordBlockGame({ hanja, lesson, onExit }) {
     setIsOver(false);
     setStatus("");
     setSaveState("idle");
+    setMatchAnimation(null);
+    window.clearTimeout(matchTimerRef.current);
     setNextPair(pickGamePair(pairs));
     setActive(firstPair ? makeGamePiece(firstPair) : null);
   }
@@ -606,22 +616,39 @@ function WordBlockGame({ hanja, lesson, onExit }) {
     const upcomingPair = nextPair || pickGamePair(pairs);
     const nextPiece = upcomingPair ? makeGamePiece(upcomingPair) : null;
 
-    setBoard(resolved.board);
-    setScore(finalScore);
-    setClearedWords(finalClearedWords);
-    setStatus(resolved.clearedCount ? `${resolved.clearedCount}개 어휘 완성!` : "");
-    setNextPair(pickGamePair(pairs));
+    const finishPlacement = () => {
+      setBoard(resolved.board);
+      setScore(finalScore);
+      setClearedWords(finalClearedWords);
+      setMatchAnimation(null);
+      setNextPair(pickGamePair(pairs));
 
-    if (!nextPiece || !canPlaceGamePiece(resolved.board, nextPiece)) {
+      if (!nextPiece || !canPlaceGamePiece(resolved.board, nextPiece)) {
+        setActive(null);
+        setIsOver(true);
+        saveGameScore(finalScore, finalClearedWords);
+        return;
+      }
+      setActive(nextPiece);
+    };
+
+    if (resolved.clearedCount) {
+      const matchedLabel = resolved.matchedWords.join(", ");
+      setBoard(placedBoard);
       setActive(null);
-      setIsOver(true);
-      saveGameScore(finalScore, finalClearedWords);
+      setMatchAnimation({ keys: resolved.clearKeys, label: matchedLabel });
+      setStatus(`${matchedLabel} 완성!`);
+      window.clearTimeout(matchTimerRef.current);
+      matchTimerRef.current = window.setTimeout(finishPlacement, 520);
       return;
     }
-    setActive(nextPiece);
+
+    setStatus("");
+    finishPlacement();
   }
 
   const visibleBoard = useMemo(() => mergeActiveGamePiece(board, active), [board, active]);
+  const matchedKeys = matchAnimation?.keys || [];
   const nextLabel = nextPair ? nextPair.chars.join(" ") : "-";
 
   if (!pairs.length) {
@@ -653,7 +680,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
         <div className="gameBoard" aria-label="단어 블록 판">
           {visibleBoard.flatMap((row, y) => row.map((cell, x) => (
             <span
-              className={`gameCell ${cell ? "filled" : ""} ${cell?.active ? "active" : ""}`}
+              className={`gameCell ${cell ? "filled" : ""} ${cell?.active ? "active" : ""} ${matchedKeys.includes(`${x}:${y}`) ? "matched" : ""}`}
               key={`${x}-${y}`}
             >
               {cell?.char || ""}
@@ -670,10 +697,10 @@ function WordBlockGame({ hanja, lesson, onExit }) {
       </div>
       {status ? <p className="gameStatus">{status}</p> : null}
       <div className="gameControls">
-        <button className="btn secondary" type="button" onClick={() => moveActive(-1, 0)} disabled={isOver}>왼쪽</button>
-        <button className="btn secondary" type="button" onClick={rotateActive} disabled={isOver}>회전</button>
-        <button className="btn secondary" type="button" onClick={() => moveActive(1, 0)} disabled={isOver}>오른쪽</button>
-        <button className="btn primary" type="button" onClick={hardDrop} disabled={isOver}>떨어뜨리기</button>
+        <button className="btn secondary" type="button" onClick={() => moveActive(-1, 0)} disabled={isOver || Boolean(matchAnimation)}>왼쪽</button>
+        <button className="btn secondary" type="button" onClick={rotateActive} disabled={isOver || Boolean(matchAnimation)}>회전</button>
+        <button className="btn secondary" type="button" onClick={() => moveActive(1, 0)} disabled={isOver || Boolean(matchAnimation)}>오른쪽</button>
+        <button className="btn primary" type="button" onClick={hardDrop} disabled={isOver || Boolean(matchAnimation)}>떨어뜨리기</button>
       </div>
       <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
     </section>
@@ -945,6 +972,7 @@ function mergeActiveGamePiece(board, piece) {
 function resolveGameMatches(board, wordSet, requiredKeys = new Set()) {
   let workingBoard = cloneGameBoard(board);
   const clearKeys = new Set();
+  const matchedWords = [];
   let clearedCount = 0;
 
   for (let y = 0; y < GAME_ROWS; y += 1) {
@@ -954,10 +982,10 @@ function resolveGameMatches(board, wordSet, requiredKeys = new Set()) {
       const right = x + 1 < GAME_COLUMNS ? workingBoard[y][x + 1] : null;
       const down = y + 1 < GAME_ROWS ? workingBoard[y + 1][x] : null;
       if (right && wordSet.has(`${cell.char}${right.char}`)) {
-        clearedCount += addPlacedGameMatch(clearKeys, `${x}:${y}`, `${x + 1}:${y}`, requiredKeys);
+        clearedCount += addPlacedGameMatch(clearKeys, matchedWords, `${x}:${y}`, `${x + 1}:${y}`, `${cell.char}${right.char}`, requiredKeys);
       }
       if (down && wordSet.has(`${cell.char}${down.char}`)) {
-        clearedCount += addPlacedGameMatch(clearKeys, `${x}:${y}`, `${x}:${y + 1}`, requiredKeys);
+        clearedCount += addPlacedGameMatch(clearKeys, matchedWords, `${x}:${y}`, `${x}:${y + 1}`, `${cell.char}${down.char}`, requiredKeys);
       }
     }
   }
@@ -970,15 +998,16 @@ function resolveGameMatches(board, wordSet, requiredKeys = new Set()) {
     workingBoard = applyGameGravity(workingBoard);
   }
 
-  return { board: workingBoard, clearedCount };
+  return { board: workingBoard, clearedCount, clearKeys: [...clearKeys], matchedWords: [...new Set(matchedWords)] };
 }
 
-function addPlacedGameMatch(clearKeys, firstKey, secondKey, requiredKeys) {
+function addPlacedGameMatch(clearKeys, matchedWords, firstKey, secondKey, word, requiredKeys) {
   const firstIsNew = requiredKeys.has(firstKey);
   const secondIsNew = requiredKeys.has(secondKey);
   if (firstIsNew === secondIsNew) return 0;
   clearKeys.add(firstKey);
   clearKeys.add(secondKey);
+  matchedWords.push(word);
   return 1;
 }
 
