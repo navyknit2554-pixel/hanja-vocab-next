@@ -828,7 +828,7 @@ textarea {
   border-radius: 12px;
   background: rgba(255, 255, 255, .72);
   color: var(--ink);
-  font-size: clamp(1.25rem, 7vw, 2rem);
+  font-size: clamp(1.1rem, 6vw, 1.75rem);
   font-weight: 1000;
   line-height: 1;
 }

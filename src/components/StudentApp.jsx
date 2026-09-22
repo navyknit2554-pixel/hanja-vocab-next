@@ -621,7 +621,7 @@ function WordBlockGame({ hanja, lesson, onExit }) {
       <article className="wordGameCard">
         <Mascot variant="book" small label="게임 준비" />
         <h2>단어 블록 게임</h2>
-        <p className="mutedText">이 일차에는 게임으로 만들 수 있는 2글자 한자어가 아직 부족합니다.</p>
+        <p className="mutedText">이 일차에는 게임으로 만들 수 있는 2글자 어휘가 아직 부족합니다.</p>
         <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
       </article>
     );
@@ -846,31 +846,32 @@ function buildGamePairs(hanja) {
   const pairs = [];
   (hanja || []).forEach((item) => {
     (item.vocab || []).forEach((vocab) => {
-      const chars = extractHanjaChars(vocab.hanja_word).slice(0, 2);
+      const chars = extractHangulChars(vocab.word).slice(0, 2);
       if (chars.length !== 2) return;
       pairs.push({
         id: vocab.id,
         word: vocab.word,
-        hanjaWord: chars.join(""),
-        chars
+        gameWord: chars.join(""),
+        chars,
+        hanjaWord: vocab.hanja_word
       });
     });
   });
   const unique = new Map();
   pairs.forEach((pair) => {
-    if (!unique.has(pair.hanjaWord)) unique.set(pair.hanjaWord, pair);
+    if (!unique.has(pair.gameWord)) unique.set(pair.gameWord, pair);
   });
   return [...unique.values()];
 }
 
-function extractHanjaChars(value) {
-  return Array.from(String(value || "").matchAll(/[\u3400-\u9fff]/g)).map((match) => match[0]);
+function extractHangulChars(value) {
+  return Array.from(String(value || "").replace(/[^가-힣]/g, ""));
 }
 
 function makeGameWordSet(pairs) {
   const words = new Set();
   pairs.forEach((pair) => {
-    words.add(pair.hanjaWord);
+    words.add(pair.gameWord);
     words.add([...pair.chars].reverse().join(""));
   });
   return words;
