@@ -1184,7 +1184,7 @@ textarea {
 }
 
 .appleCell.removed,
-.appleCell:disabled {
+.appleCell[aria-disabled="true"] {
   border-color: #d9efff;
   background: #eef8ff;
   color: transparent;
@@ -1193,7 +1193,7 @@ textarea {
 }
 
 .appleCell.removed::after,
-.appleCell:disabled::after {
+.appleCell[aria-disabled="true"]::after {
   background: #eef8ff;
 }
 

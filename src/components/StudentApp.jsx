@@ -1491,15 +1491,16 @@ function WordAppleGame({ hanja, lesson, onExit }) {
         {puzzle.cells.flat().map((cell) => {
           const selected = selection.includes(cell.id);
           return (
-            <button
+            <span
               className={`appleCell ${selected ? "selected" : ""} ${removed[cell.id] ? "removed" : ""}`}
-              disabled={isOver || removed[cell.id]}
+              aria-disabled={isOver || removed[cell.id]}
               data-apple-cell-id={cell.id}
               key={cell.id}
-              type="button"
+              role="button"
+              tabIndex={-1}
             >
               {cell.char}
-            </button>
+            </span>
           );
         })}
       </div>
