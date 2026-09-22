@@ -1202,9 +1202,9 @@ function WordChainGame({ hanja, lesson, onExit }) {
       <div className="chainArena">
         <div className="chainSpace" aria-label="꼬리물기 공간">
           {decoys.map((item) => (
-            <span className="chainOrb decoy" key={item.id} style={{ left: `${item.x}%`, top: `${item.y}%` }} aria-label="방해 구슬" />
+            <span className="chainOrb decoy" key={item.id} style={{ left: `${item.x}%`, top: `${item.y}%` }}>{item.char}</span>
           ))}
-          {orb ? <span className="chainOrb targetOrb" style={{ left: `${orb.x}%`, top: `${orb.y}%` }} aria-label="정답 구슬" /> : null}
+          {orb ? <span className="chainOrb targetOrb" style={{ left: `${orb.x}%`, top: `${orb.y}%` }}>{orb.char}</span> : null}
           <div className="chainWorm" style={{ left: `${head.x}%`, top: `${head.y}%` }}>
             {tail.map((item, index) => (
               <span
