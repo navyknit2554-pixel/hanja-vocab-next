@@ -522,6 +522,8 @@ const GAME_OFFSETS = [
 ];
 const RUNNER_LANES = 3;
 const RUNNER_TICK_MS = 95;
+const RUNNER_BASE_PROGRESS_STEP = 2.4;
+const RUNNER_MAX_PROGRESS_STEP = 4.2;
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -820,7 +822,7 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
     if (!currentRound || isOver || resolvingRef.current) return undefined;
     const timer = window.setInterval(() => {
       setProgress((previous) => {
-        const next = Math.min(100, previous + 2.4);
+        const next = Math.min(100, previous + getRunnerProgressStep(scoreRef.current));
         if (next >= 100) window.setTimeout(resolveRunnerRound, 0);
         return next;
       });
@@ -996,6 +998,11 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
       <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
     </section>
   );
+}
+
+function getRunnerProgressStep(score) {
+  const speedBonus = Math.floor(Math.max(0, Number(score || 0)) / 300) * 0.18;
+  return Math.min(RUNNER_MAX_PROGRESS_STEP, RUNNER_BASE_PROGRESS_STEP + speedBonus);
 }
 
 function CrosswordBattleGame({ hanja, lesson, onExit }) {
