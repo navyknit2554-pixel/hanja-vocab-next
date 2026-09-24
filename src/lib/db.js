@@ -189,6 +189,23 @@ async function ensureSchema(db) {
       created_at timestamptz not null default now()
     )
   `;
+  await db`
+    create table if not exists student_push_subscriptions (
+      id uuid primary key default gen_random_uuid(),
+      student_id uuid not null references students(id) on delete cascade,
+      endpoint text not null unique,
+      subscription jsonb not null,
+      user_agent text not null default '',
+      enabled boolean not null default true,
+      last_notified_day integer not null default 0,
+      last_notified_at timestamptz,
+      last_seen_at timestamptz not null default now(),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `;
+  await db`alter table student_push_subscriptions add column if not exists last_notified_day integer not null default 0`;
+  await db`alter table student_push_subscriptions add column if not exists last_notified_at timestamptz`;
   await db`alter table student_game_scores add column if not exists game_type text not null default 'block'`;
   await db`create index if not exists students_teacher_login_idx on students (teacher_id, login_id, password)`;
   await db`create unique index if not exists students_teacher_legacy_idx on students (teacher_id, legacy_id) where legacy_id <> ''`;
@@ -197,4 +214,5 @@ async function ensureSchema(db) {
   await db`create index if not exists student_game_scores_lesson_idx on student_game_scores (level, day, score desc)`;
   await db`create index if not exists student_game_scores_type_lesson_idx on student_game_scores (game_type, level, day, score desc)`;
   await db`create index if not exists student_game_scores_student_idx on student_game_scores (student_id, created_at desc)`;
+  await db`create index if not exists student_push_subscriptions_student_idx on student_push_subscriptions (student_id, enabled)`;
 }

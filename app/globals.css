@@ -460,6 +460,55 @@ textarea {
   box-shadow: 0 7px 0 #b7eaa8;
 }
 
+.notificationPrompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 14px 0;
+  border: 2px solid #d9f7c8;
+  border-radius: 18px;
+  padding: 14px;
+  background: #fbfff7;
+}
+
+.notificationPrompt.enabled {
+  border-color: #bdeead;
+  background: #f4fff0;
+}
+
+.notificationPrompt div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.notificationPrompt span {
+  color: var(--green-dark);
+  font-size: .86rem;
+  font-weight: 1000;
+}
+
+.notificationPrompt strong {
+  color: var(--ink);
+  font-size: 1.08rem;
+  font-weight: 1000;
+}
+
+.notificationPrompt p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .92rem;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.notificationPrompt .btn {
+  min-height: 46px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
 .gameMenuGrid {
   display: grid;
   gap: 12px;
@@ -2877,6 +2926,14 @@ textarea {
 
   .leaderboardHeader {
     grid-template-columns: 1fr;
+  }
+
+  .notificationPrompt {
+    grid-template-columns: 1fr;
+  }
+
+  .notificationPrompt .btn {
+    width: 100%;
   }
 
   .testBuilderForm,

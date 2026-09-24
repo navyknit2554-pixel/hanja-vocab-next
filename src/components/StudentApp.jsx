@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Mascot } from "./Mascot";
 
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+
 export function StudentApp() {
   const [login, setLogin] = useState({ teacherCode: "master", loginId: "", password: "" });
   const [status, setStatus] = useState("확인하는 중...");
@@ -22,6 +24,10 @@ export function StudentApp() {
     loadToday();
     preloadImages(["/characters/correct.png", "/characters/wrong.png", "/characters/levelup.png"]);
   }, []);
+
+  useEffect(() => {
+    if (payload?.student) clearAppBadge();
+  }, [payload?.student?.id, payload?.student?.current_day, payload?.lock?.day]);
 
   const lessonItems = useMemo(() => buildLessonItems(payload?.hanja || []), [payload]);
   const quizItems = useMemo(() => buildQuizItems(lessonItems), [lessonItems]);
@@ -216,6 +222,7 @@ export function StudentApp() {
           <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
           {levelUpNotice ? <LevelUpOverlay level={levelUpNotice.level} /> : null}
           <GradeLeaderboard leaderboard={payload.leaderboard} />
+          {stage === "home" ? <StudyNotificationPrompt /> : null}
           {payload.lock ? (
             <>
               {stage === "home" && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
@@ -343,6 +350,91 @@ function LevelUpOverlay({ level }) {
   );
 }
 
+function StudyNotificationPrompt() {
+  const [state, setState] = useState("checking");
+  const [message, setMessage] = useState("다음 일차가 열리면 초록이가 알려드릴게요.");
+
+  useEffect(() => {
+    if (!isPushNotificationSupported()) {
+      setState("unsupported");
+      setMessage("홈 화면에 추가한 iPhone 앱에서 알림을 켤 수 있어요.");
+      return;
+    }
+    if (!VAPID_PUBLIC_KEY) {
+      setState("setup");
+      setMessage("운영 서버에 알림 키를 등록하면 사용할 수 있어요.");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setState("blocked");
+      setMessage("기기 설정에서 알림 허용을 다시 켜야 해요.");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      setState("enabled");
+      setMessage("다음 일차가 열리면 알림을 받을 수 있어요.");
+      return;
+    }
+    setState("ready");
+  }, []);
+
+  async function enableNotifications() {
+    if (!isPushNotificationSupported()) return;
+    if (!VAPID_PUBLIC_KEY) {
+      setState("setup");
+      setMessage("운영 서버에 알림 키가 아직 등록되지 않았어요.");
+      return;
+    }
+    setState("saving");
+    setMessage("알림을 준비하고 있어요.");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setState(permission === "denied" ? "blocked" : "ready");
+        setMessage(permission === "denied" ? "기기 설정에서 알림 허용을 다시 켜야 해요." : "버튼을 눌러 다시 알림을 켤 수 있어요.");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      const readyRegistration = await navigator.serviceWorker.ready;
+      const subscription = await getOrCreatePushSubscription(readyRegistration || registration);
+      const response = await fetch("/api/student/push-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || "알림 설정에 실패했습니다.");
+      await clearAppBadge();
+      setState("enabled");
+      setMessage("좋아요! 다음 일차가 열리면 초록이가 알려드릴게요.");
+    } catch (error) {
+      setState("ready");
+      setMessage(error?.message || "알림 설정에 실패했습니다.");
+    }
+  }
+
+  if (state === "unsupported") return null;
+
+  return (
+    <article className={`notificationPrompt ${state === "enabled" ? "enabled" : ""}`}>
+      <div>
+        <span>학습 알림</span>
+        <strong>{state === "enabled" ? "알림 켜짐" : "다음 일차 알림 받기"}</strong>
+        <p>{message}</p>
+      </div>
+      <button
+        className="btn secondary"
+        type="button"
+        onClick={enableNotifications}
+        disabled={state === "saving" || state === "enabled" || state === "setup"}
+      >
+        {state === "saving" ? "설정 중" : state === "enabled" ? "켜짐" : "알림 켜기"}
+      </button>
+    </article>
+  );
+}
+
 function LockedLesson({ lock, onRefresh }) {
   const openTime = formatKoreaTime(lock.availableAt);
   return (
@@ -363,6 +455,34 @@ function LockedLesson({ lock, onRefresh }) {
       </div>
     </article>
   );
+}
+
+function isPushNotificationSupported() {
+  return typeof window !== "undefined"
+    && "serviceWorker" in navigator
+    && "PushManager" in window
+    && "Notification" in window;
+}
+
+async function getOrCreatePushSubscription(registration) {
+  const existingSubscription = await registration.pushManager.getSubscription();
+  if (existingSubscription) return existingSubscription;
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+}
+
+async function clearAppBadge() {
+  if (typeof navigator === "undefined" || !navigator.clearAppBadge) return;
+  await navigator.clearAppBadge().catch(() => {});
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((character) => character.charCodeAt(0)));
 }
 
 function LessonStats({ hanja }) {

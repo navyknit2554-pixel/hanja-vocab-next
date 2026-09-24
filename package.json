@@ -9,6 +9,7 @@
     "start": "next start",
     "deploy:check": "node scripts/deploy-check.js",
     "secrets:make": "node scripts/make-secrets.js",
+    "push:keys": "node scripts/make-vapid-keys.js",
     "check:data": "node scripts/check-data.js",
     "clean:example-labels": "node scripts/clean-example-labels.js",
     "import:legacy-students": "node scripts/import-legacy-students.js",
