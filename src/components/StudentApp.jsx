@@ -36,6 +36,8 @@ export function StudentApp() {
   const gameHanja = payload?.gameHanja || payload?.hanja || [];
   const gameLesson = payload?.gameLesson || payload?.lesson || null;
   const canPlayGame = Boolean(gameLesson && gameHanja.length);
+  const isHomeStage = stage === "home";
+  const mascotLevel = Math.floor((Number(payload?.student?.current_day || 1) - 1) / 5) + 1;
 
   async function loadToday() {
     try {
@@ -214,19 +216,23 @@ export function StudentApp() {
       <main className="phonePage">
         <PreloadedFeedbackImages />
         <section className="panel studentHome">
-          <div className="studentTopActions">
-            <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
-          </div>
-          {!payload.lock ? <Mascot variant="wink" level={Math.floor((Number(payload.student.current_day || 1) - 1) / 5) + 1} /> : null}
-          <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
-          <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
+          {isHomeStage ? (
+            <>
+              <div className="studentTopActions">
+                <button className="btn textBtn" type="button" onClick={logout}>로그아웃</button>
+              </div>
+              {!payload.lock ? <Mascot variant="wink" level={mascotLevel} /> : null}
+              <p className="eyebrow">{payload.student.name} · {payload.student.grade} · {payload.student.level}</p>
+              <h1>{payload.lock ? `${payload.lock.day}일차 잠김` : `${payload.student.current_day}일차 학습`}</h1>
+            </>
+          ) : null}
           {levelUpNotice ? <LevelUpOverlay level={levelUpNotice.level} /> : null}
-          <GradeLeaderboard leaderboard={payload.leaderboard} />
-          {stage === "home" ? <StudyNotificationPrompt /> : null}
+          {isHomeStage ? <GradeLeaderboard leaderboard={payload.leaderboard} /> : null}
+          {isHomeStage ? <StudyNotificationPrompt /> : null}
           {payload.lock ? (
             <>
-              {stage === "home" && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
-              {stage === "home" ? <LockedLesson lock={payload.lock} onRefresh={loadToday} /> : null}
+              {isHomeStage && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
+              {isHomeStage ? <LockedLesson lock={payload.lock} onRefresh={loadToday} /> : null}
               {stage !== "home" && canPlayGame ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
@@ -238,9 +244,9 @@ export function StudentApp() {
             </>
           ) : payload.lesson ? (
             <>
-              {stage === "home" && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
-              <LessonStats hanja={payload.hanja} />
-              {stage === "home" ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
+              {isHomeStage && canPlayGame ? <GameLearningButton onOpen={() => startGame("gameMenu")} /> : null}
+              {isHomeStage ? <LessonStats hanja={payload.hanja} /> : null}
+              {isHomeStage ? <HomeLesson hanja={payload.hanja} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
               {stage !== "home" && stage !== "saving" ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
