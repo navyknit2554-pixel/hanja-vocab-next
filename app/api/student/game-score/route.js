@@ -34,7 +34,7 @@ export async function POST(request) {
     const level = String(body.level || student.level || "").trim();
     const day = Number(body.day || student.current_day || 0);
     const gameType = normalizeGameType(body.gameType);
-    const score = clampInteger(body.score, 0, 999999);
+    const score = clampInteger(body.score, 0, 999999999999);
     const clearedWords = clampInteger(body.clearedWords, 0, 9999);
     if (!level || !day) return NextResponse.json({ ok: false, message: "게임 범위를 확인해 주세요." }, { status: 400 });
 

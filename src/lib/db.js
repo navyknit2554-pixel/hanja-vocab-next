@@ -207,6 +207,7 @@ async function ensureSchema(db) {
   await db`alter table student_push_subscriptions add column if not exists last_notified_day integer not null default 0`;
   await db`alter table student_push_subscriptions add column if not exists last_notified_at timestamptz`;
   await db`alter table student_game_scores add column if not exists game_type text not null default 'block'`;
+  await db`alter table student_game_scores alter column score type bigint using score::bigint`;
   await db`create index if not exists students_teacher_login_idx on students (teacher_id, login_id, password)`;
   await db`create unique index if not exists students_teacher_legacy_idx on students (teacher_id, legacy_id) where legacy_id <> ''`;
   await db`create index if not exists curriculum_level_day_idx on curriculum_days (level, day)`;

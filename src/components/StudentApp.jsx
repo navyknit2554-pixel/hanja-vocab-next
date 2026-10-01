@@ -670,6 +670,24 @@ const DEFENSE_TOWER_SLOTS = [
   { x: 74, y: 58 },
   { x: 88, y: 32 }
 ];
+const DEFENSE_DIFFICULTY = {
+  baseSpawn: 1,
+  spawnEveryWaves: 7,
+  pressureWave: 14,
+  pressureSpawnEveryWaves: 4,
+  surgeWave: 30,
+  surgeSpawnEveryWaves: 2,
+  baseHp: 38,
+  hpPerWave: 7,
+  pressureHpPerWave: 8,
+  surgeHpPerWave: 12,
+  baseSpeed: 4.2,
+  speedPerWave: 0.25,
+  pressureSpeedPerWave: 0.18,
+  surgeSpeedPerWave: 0.16,
+  maxSpeedBonus: 20,
+  maxEnemiesOnField: 32
+};
 const DEFENSE_ASSETS = {
   castle: "/defense-assets/castle-blue.svg",
   infantry: "/defense-assets/soldier-blue.svg",
@@ -1313,14 +1331,15 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
 
   function tickDefense() {
     const currentWave = waveRef.current;
-    const spawnCount = 1 + Math.floor(currentWave / 8);
+    const difficulty = getDefenseDifficulty(currentWave);
+    const spawnCount = difficulty.spawnCount;
     const spawned = Array.from({ length: spawnCount }).map((_, index) => ({
       id: enemyIdRef.current++,
-      hp: 38 + (currentWave * 6) + (index * 4),
-      maxHp: 38 + (currentWave * 6) + (index * 4),
+      hp: difficulty.enemyHp + (index * difficulty.enemyHpStep),
+      maxHp: difficulty.enemyHp + (index * difficulty.enemyHpStep),
       progress: -index * 12
     }));
-    const moveSpeed = 4.4 + Math.min(7.5, currentWave * 0.28);
+    const moveSpeed = difficulty.moveSpeed;
     const attackPower = getDefensePower(unitsRef.current, towersRef.current);
     let killed = 0;
     let leaked = 0;
@@ -1343,7 +1362,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
       remainingPower -= damage;
       if (enemy.hp <= 0) killed += 1;
     }
-    const survivors = working.filter((enemy) => enemy.hp > 0).slice(0, 14);
+    const survivors = working.filter((enemy) => enemy.hp > 0).slice(0, DEFENSE_DIFFICULTY.maxEnemiesOnField);
     if (killed) {
       const gainedScore = killed * (25 + currentWave);
       const gainedPoints = killed * 8;
@@ -1413,6 +1432,8 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
         <span><b>{points}</b>P</span>
         <span>성 체력 <b>{health}</b></span>
         <span>공격력 <b>{getDefensePower(units, towers)}</b></span>
+        <span>웨이브 <b>{wave}</b></span>
+        <span>적 <b>{enemies.length}</b></span>
       </div>
       <article className="defensePrompt">
         <span>{round?.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
@@ -2603,6 +2624,32 @@ function getDefensePower(units, towers = []) {
     return total + (unit?.power || 0);
   }, 0);
   return soldierPower + towerPower;
+}
+
+function getDefenseDifficulty(wave) {
+  const currentWave = Math.max(1, Number(wave || 1));
+  const pressure = Math.max(0, currentWave - DEFENSE_DIFFICULTY.pressureWave);
+  const surge = Math.max(0, currentWave - DEFENSE_DIFFICULTY.surgeWave);
+  const spawnCount = DEFENSE_DIFFICULTY.baseSpawn
+    + Math.floor(currentWave / DEFENSE_DIFFICULTY.spawnEveryWaves)
+    + Math.floor(pressure / DEFENSE_DIFFICULTY.pressureSpawnEveryWaves)
+    + Math.floor(surge / DEFENSE_DIFFICULTY.surgeSpawnEveryWaves);
+  const enemyHp = DEFENSE_DIFFICULTY.baseHp
+    + (currentWave * DEFENSE_DIFFICULTY.hpPerWave)
+    + (pressure * DEFENSE_DIFFICULTY.pressureHpPerWave)
+    + (surge * DEFENSE_DIFFICULTY.surgeHpPerWave);
+  const speedBonus = Math.min(
+    DEFENSE_DIFFICULTY.maxSpeedBonus,
+    (currentWave * DEFENSE_DIFFICULTY.speedPerWave)
+      + (pressure * DEFENSE_DIFFICULTY.pressureSpeedPerWave)
+      + (surge * DEFENSE_DIFFICULTY.surgeSpeedPerWave)
+  );
+  return {
+    spawnCount,
+    enemyHp,
+    enemyHpStep: 6 + Math.floor(currentWave / 8),
+    moveSpeed: DEFENSE_DIFFICULTY.baseSpeed + speedBonus
+  };
 }
 
 function getDefensePathPoint(progress) {
