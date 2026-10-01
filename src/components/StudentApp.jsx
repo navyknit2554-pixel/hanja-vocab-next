@@ -670,6 +670,15 @@ const DEFENSE_TOWER_SLOTS = [
   { x: 74, y: 58 },
   { x: 88, y: 32 }
 ];
+const DEFENSE_ASSETS = {
+  castle: "/defense-assets/castle-blue.svg",
+  infantry: "/defense-assets/soldier-blue.svg",
+  archer: "/defense-assets/archer-blue.svg",
+  tower: "/defense-assets/tower-blue.svg",
+  cannon: "/defense-assets/cannon-blue.svg",
+  catapult: "/defense-assets/catapult-blue.svg",
+  enemy: "/defense-assets/enemy-red.svg"
+};
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -1418,7 +1427,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
       </article>
       <div className="defenseBattlefield" aria-label="디펜스 전장">
         <div className="defenseBase">
-          <strong>성</strong>
+          <img src={DEFENSE_ASSETS.castle} alt="" draggable="false" />
           <span style={{ width: `${health}%` }} />
         </div>
         <div className="defenseRoad">
@@ -1427,10 +1436,15 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
             <path className="pathInner" d="M 96 18 C 74 12, 78 46, 58 46 S 36 30, 28 55 S 20 82, 6 76" />
           </svg>
           <div className="defenseAllies" aria-hidden="true">
-            {Array.from({ length: Math.min(5, (units.infantry || 0) + (units.archer || 0)) }).map((_, index) => (
-              <span className={`defenseAlly ally-${index % 5}`} key={`ally-${index}`}>
-                {index < (units.infantry || 0) ? "병" : "궁"}
-              </span>
+            {getDefenseAllies(units, enemies).map((ally, index) => (
+              <img
+                className={`defenseAlly ${ally.type}`}
+                src={DEFENSE_ASSETS[ally.type]}
+                alt=""
+                draggable="false"
+                key={`${ally.type}-${index}`}
+                style={{ "--ally-x": `${ally.x}%`, "--ally-y": `${ally.y}%` }}
+              />
             ))}
           </div>
           {DEFENSE_TOWER_SLOTS.map((slot, index) => {
@@ -1445,7 +1459,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
                 style={{ "--slot-x": `${slot.x}%`, "--slot-y": `${slot.y}%` }}
                 aria-label={tower ? `${tower.name} 설치됨` : `${index + 1}번 설치 위치`}
               >
-                {tower ? tower.name : "+"}
+                {tower ? <img src={DEFENSE_ASSETS[tower.key]} alt="" draggable="false" /> : "+"}
               </button>
             );
           })}
@@ -1459,7 +1473,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
                 "--enemy-hp": `${Math.max(10, (enemy.hp / enemy.maxHp) * 100)}%`
               }}
             >
-              적
+              <img src={DEFENSE_ASSETS.enemy} alt="" draggable="false" />
             </span>
           ))}
         </div>
@@ -2612,6 +2626,23 @@ function getDefensePathPoint(progress) {
     };
   }
   return points[points.length - 1];
+}
+
+function getDefenseAllies(units, enemies) {
+  const enemyFront = Math.max(35, ...((enemies || []).map((enemy) => Number(enemy.progress || 0))));
+  const meetPoint = clampNumber(enemyFront + 10, 58, 94);
+  const allies = [];
+  const infantryCount = Math.min(4, Number(units?.infantry || 0));
+  const archerCount = Math.min(3, Number(units?.archer || 0));
+  for (let index = 0; index < infantryCount; index += 1) {
+    const point = getDefensePathPoint(clampNumber(meetPoint + (index * 3), 62, 96));
+    allies.push({ type: "infantry", x: point.x, y: point.y + (index % 2 ? 5 : -4) });
+  }
+  for (let index = 0; index < archerCount; index += 1) {
+    const point = getDefensePathPoint(clampNumber(meetPoint + 14 + (index * 4), 72, 98));
+    allies.push({ type: "archer", x: point.x, y: point.y + 10 + (index % 2 ? -3 : 4) });
+  }
+  return allies.slice(0, 7);
 }
 
 function buildAppleWordPuzzle(hanja) {

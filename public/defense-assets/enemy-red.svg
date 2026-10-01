@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="enemy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb3c6"/>
+      <stop offset="1" stop-color="#ff3d68"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="113" rx="36" ry="9" fill="#ffb3c6" opacity=".5"/>
+  <path d="M39 58c-8-22 5-42 25-42s33 20 25 42l9 39H30z" fill="url(#enemy)" stroke="#9d1431" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M44 24 32 9M84 24 96 9" stroke="#9d1431" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="54" cy="51" r="5" fill="#9d1431"/>
+  <circle cx="74" cy="51" r="5" fill="#9d1431"/>
+  <path d="M52 72c8 7 17 7 25 0" fill="none" stroke="#9d1431" stroke-width="5" stroke-linecap="round"/>
+  <path d="M32 84 16 70M96 84l16-14M49 99l-8 14M79 99l8 14" stroke="#9d1431" stroke-width="7" stroke-linecap="round"/>
+</svg>

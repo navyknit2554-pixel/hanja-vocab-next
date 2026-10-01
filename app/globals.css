@@ -604,18 +604,24 @@ textarea {
   display: grid;
   place-items: center;
   gap: 8px;
-  border: 2px solid #bdeead;
+  border: 2px solid #bddcff;
   border-radius: 18px;
-  background: #f4fff0;
-  color: var(--green-dark);
+  background: #f3f9ff;
+  color: #1452c9;
   font-weight: 1000;
+}
+
+.defenseBase img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
 }
 
 .defenseBase span {
   width: 80%;
   height: 9px;
   border-radius: 999px;
-  background: var(--green);
+  background: #2f7dff;
 }
 
 .defenseRoad {
@@ -667,18 +673,11 @@ textarea {
   position: absolute;
   left: var(--enemy-x);
   top: var(--enemy-y);
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  border: 2px solid #ffc8d8;
-  border-radius: 50% 50% 45% 45%;
-  background: linear-gradient(180deg, #fff 0%, #ffddeb 100%);
-  color: #c73866;
-  font-size: .82rem;
-  font-weight: 1000;
+  width: 54px;
+  height: 54px;
+  display: block;
   transform: translate(-50%, -50%);
-  box-shadow: 0 5px 0 rgba(255, 174, 201, .45);
+  filter: drop-shadow(0 6px 0 rgba(255, 88, 124, .22));
 }
 
 .defenseEnemy::after {
@@ -692,52 +691,40 @@ textarea {
   background: linear-gradient(90deg, var(--pink) var(--enemy-hp), #ffe5ee var(--enemy-hp));
 }
 
+.defenseEnemy img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .defenseAllies {
   position: absolute;
-  left: 3%;
-  bottom: 14%;
-  width: 120px;
-  height: 82px;
+  inset: 0;
   pointer-events: none;
 }
 
 .defenseAlly {
   position: absolute;
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 2px solid #bdeead;
-  border-radius: 16px 16px 18px 18px;
-  background: linear-gradient(180deg, #fff 0%, #dfffce 100%);
-  color: var(--green-dark);
-  font-size: .82rem;
-  font-weight: 1000;
-  box-shadow: 0 5px 0 rgba(115, 214, 80, .32);
+  left: var(--ally-x);
+  top: var(--ally-y);
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 6px 0 rgba(47, 125, 255, .2));
 }
 
-.defenseAlly::before {
-  content: "";
-  position: absolute;
-  top: -7px;
-  width: 18px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--green);
+.defenseAlly.archer {
+  width: 48px;
+  height: 48px;
 }
-
-.defenseAlly.ally-0 { left: 0; bottom: 0; }
-.defenseAlly.ally-1 { left: 34px; bottom: 22px; }
-.defenseAlly.ally-2 { left: 68px; bottom: 2px; }
-.defenseAlly.ally-3 { left: 18px; bottom: 44px; }
-.defenseAlly.ally-4 { left: 82px; bottom: 42px; }
 
 .defenseTowerSlot {
   position: absolute;
   left: var(--slot-x);
   top: var(--slot-y);
-  width: 54px;
-  height: 46px;
+  width: 58px;
+  height: 54px;
   display: grid;
   place-items: center;
   border: 2px dashed #bcd7ee;
@@ -759,10 +746,16 @@ textarea {
 
 .defenseTowerSlot.filled {
   border-style: solid;
-  border-color: #ffd77c;
-  background: linear-gradient(180deg, #fff6d2 0%, #ffd66a 100%);
+  border-color: #9dccff;
+  background: linear-gradient(180deg, #f8fcff 0%, #cfe9ff 100%);
   color: var(--ink);
-  box-shadow: 0 5px 0 rgba(230, 183, 40, .35);
+  box-shadow: 0 5px 0 rgba(47, 125, 255, .2);
+}
+
+.defenseTowerSlot img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
 }
 
 .defenseShop {

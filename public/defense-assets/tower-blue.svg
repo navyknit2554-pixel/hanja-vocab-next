@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="tower" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eaf7ff"/>
+      <stop offset="1" stop-color="#6bb9ff"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="113" rx="38" ry="8" fill="#9bc8ff" opacity=".45"/>
+  <path d="M37 42h54l-8 68H45z" fill="url(#tower)" stroke="#174b9f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M32 41h64L84 23H44z" fill="#1d66df" stroke="#173f93" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="53" y="60" width="22" height="18" rx="4" fill="#dff2ff" stroke="#174b9f" stroke-width="4"/>
+  <path d="M49 92h30M43 110h42" stroke="#174b9f" stroke-width="5" stroke-linecap="round"/>
+  <path d="M64 19v-9M54 16h20" stroke="#ffd65f" stroke-width="5" stroke-linecap="round"/>
+</svg>
