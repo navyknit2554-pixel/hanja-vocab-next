@@ -657,11 +657,18 @@ const RUNNER_TICK_MS = 95;
 const RUNNER_BASE_PROGRESS_STEP = 2.4;
 const RUNNER_MAX_PROGRESS_STEP = 4.2;
 const DEFENSE_UNITS = [
-  { key: "infantry", name: "병사1", role: "근접보병", cost: 40, power: 12 },
-  { key: "archer", name: "병사2", role: "궁사", cost: 70, power: 22 },
-  { key: "tower", name: "망루", role: "화살", cost: 110, power: 36 },
-  { key: "cannon", name: "포탑", role: "대포", cost: 170, power: 58 },
-  { key: "catapult", name: "투석기", role: "광역", cost: 240, power: 88 }
+  { key: "infantry", name: "병사1", role: "근접보병", cost: 35, power: 10, kind: "soldier" },
+  { key: "archer", name: "병사2", role: "궁사", cost: 60, power: 18, kind: "soldier" },
+  { key: "tower", name: "망루", role: "화살", cost: 95, power: 30, kind: "tower" },
+  { key: "cannon", name: "포탑", role: "대포", cost: 145, power: 48, kind: "tower" },
+  { key: "catapult", name: "투석기", role: "투석", cost: 210, power: 72, kind: "tower" }
+];
+const DEFENSE_TOWER_SLOTS = [
+  { x: 24, y: 30 },
+  { x: 43, y: 68 },
+  { x: 60, y: 24 },
+  { x: 74, y: 58 },
+  { x: 88, y: 32 }
 ];
 
 function WordBlockGame({ hanja, lesson, onExit }) {
@@ -1153,6 +1160,8 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
   const [wave, setWave] = useState(1);
   const [enemies, setEnemies] = useState([]);
   const [units, setUnits] = useState(() => makeDefenseUnitState());
+  const [towers, setTowers] = useState(() => Array(DEFENSE_TOWER_SLOTS.length).fill(null));
+  const [selectedTowerKey, setSelectedTowerKey] = useState("");
   const [status, setStatus] = useState("");
   const [isOver, setIsOver] = useState(false);
   const [leaderboard, setLeaderboard] = useState(null);
@@ -1163,6 +1172,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
   const healthRef = useRef(100);
   const unitsRef = useRef(units);
   const enemiesRef = useRef([]);
+  const towersRef = useRef([]);
   const savedRef = useRef(false);
   const enemyIdRef = useRef(1);
 
@@ -1173,6 +1183,10 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
   useEffect(() => {
     enemiesRef.current = enemies;
   }, [enemies]);
+
+  useEffect(() => {
+    towersRef.current = towers;
+  }, [towers]);
 
   useEffect(() => {
     if (questions.length < 4) return;
@@ -1215,7 +1229,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
   function resetDefense() {
     const firstRound = makeDefenseRound(questions);
     setRound(firstRound);
-    setPoints(80);
+    setPoints(130);
     setScore(0);
     scoreRef.current = 0;
     setHealth(100);
@@ -1226,7 +1240,10 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
     setEnemies([]);
     enemiesRef.current = [];
     setUnits(makeDefenseUnitState());
-    setStatus("정답을 맞혀 포인트를 모으세요.");
+    setTowers(Array(DEFENSE_TOWER_SLOTS.length).fill(null));
+    towersRef.current = Array(DEFENSE_TOWER_SLOTS.length).fill(null);
+    setSelectedTowerKey("");
+    setStatus("정답을 맞혀 병사와 타워를 준비하세요.");
     setIsOver(false);
     setSaveState("idle");
     savedRef.current = false;
@@ -1237,7 +1254,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
     if (!round || isOver) return;
     const correct = choice === round.answer;
     if (correct) {
-      const gainedPoints = 35 + Math.min(35, Math.floor(waveRef.current / 2) * 5);
+      const gainedPoints = 45 + Math.min(45, Math.floor(waveRef.current / 3) * 5);
       const gainedScore = 70 + (waveRef.current * 5);
       setPoints((previous) => previous + gainedPoints);
       scoreRef.current += gainedScore;
@@ -1247,35 +1264,55 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
       setRound(makeDefenseRound(questions, round.answer));
       return;
     }
-    const nextHealth = Math.max(0, healthRef.current - 8);
+    const nextHealth = Math.max(0, healthRef.current - 4);
     healthRef.current = nextHealth;
     setHealth(nextHealth);
-    setStatus(`${round.answer}을 골라야 했어요. 성 체력 -8`);
+    setStatus(`${round.answer}을 골라야 했어요. 성 체력 -4`);
     setRound(makeDefenseRound(questions, round.answer));
     if (nextHealth <= 0) setIsOver(true);
   }
 
   function buyUnit(unit) {
     if (isOver || points < unit.cost) return;
+    if (unit.kind === "tower") {
+      setSelectedTowerKey(unit.key);
+      setStatus(`${unit.name} 설치할 자리를 골라주세요.`);
+      return;
+    }
     setPoints((previous) => previous - unit.cost);
     setUnits((previous) => ({
       ...previous,
       [unit.key]: Number(previous[unit.key] || 0) + 1
     }));
-    setStatus(`${unit.name} ${unit.role} 배치!`);
+    setStatus(`${unit.name} ${unit.role} 출격!`);
+  }
+
+  function placeTower(slotIndex) {
+    if (isOver || !selectedTowerKey || towers[slotIndex]) return;
+    const unit = DEFENSE_UNITS.find((item) => item.key === selectedTowerKey);
+    if (!unit || points < unit.cost) return;
+    setPoints((previous) => previous - unit.cost);
+    setTowers((previous) => {
+      const next = [...previous];
+      next[slotIndex] = unit.key;
+      towersRef.current = next;
+      return next;
+    });
+    setSelectedTowerKey("");
+    setStatus(`${unit.name} ${slotIndex + 1}번 위치에 설치!`);
   }
 
   function tickDefense() {
     const currentWave = waveRef.current;
-    const spawnCount = 1 + Math.floor(currentWave / 5);
+    const spawnCount = 1 + Math.floor(currentWave / 8);
     const spawned = Array.from({ length: spawnCount }).map((_, index) => ({
       id: enemyIdRef.current++,
-      hp: 46 + (currentWave * 9) + (index * 6),
-      maxHp: 46 + (currentWave * 9) + (index * 6),
-      progress: -index * 9
+      hp: 38 + (currentWave * 6) + (index * 4),
+      maxHp: 38 + (currentWave * 6) + (index * 4),
+      progress: -index * 12
     }));
-    const moveSpeed = 8 + Math.min(12, currentWave * 0.55);
-    const attackPower = getDefensePower(unitsRef.current);
+    const moveSpeed = 4.4 + Math.min(7.5, currentWave * 0.28);
+    const attackPower = getDefensePower(unitsRef.current, towersRef.current);
     let killed = 0;
     let leaked = 0;
     const working = [...enemiesRef.current, ...spawned]
@@ -1306,7 +1343,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
       setPoints((previous) => previous + gainedPoints);
     }
     if (leaked) {
-      const nextHealth = Math.max(0, healthRef.current - (leaked * 12));
+      const nextHealth = Math.max(0, healthRef.current - (leaked * 8));
       healthRef.current = nextHealth;
       setHealth(nextHealth);
       if (nextHealth <= 0) setIsOver(true);
@@ -1366,7 +1403,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
         <span><b>{score}</b>점</span>
         <span><b>{points}</b>P</span>
         <span>성 체력 <b>{health}</b></span>
-        <span>공격력 <b>{getDefensePower(units)}</b></span>
+        <span>공격력 <b>{getDefensePower(units, towers)}</b></span>
       </div>
       <article className="defensePrompt">
         <span>{round?.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
@@ -1385,12 +1422,40 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
           <span style={{ width: `${health}%` }} />
         </div>
         <div className="defenseRoad">
+          <svg className="defensePathSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path className="pathOuter" d="M 96 18 C 74 12, 78 46, 58 46 S 36 30, 28 55 S 20 82, 6 76" />
+            <path className="pathInner" d="M 96 18 C 74 12, 78 46, 58 46 S 36 30, 28 55 S 20 82, 6 76" />
+          </svg>
+          <div className="defenseAllies" aria-hidden="true">
+            {Array.from({ length: Math.min(5, (units.infantry || 0) + (units.archer || 0)) }).map((_, index) => (
+              <span className={`defenseAlly ally-${index % 5}`} key={`ally-${index}`}>
+                {index < (units.infantry || 0) ? "병" : "궁"}
+              </span>
+            ))}
+          </div>
+          {DEFENSE_TOWER_SLOTS.map((slot, index) => {
+            const tower = towers[index] ? DEFENSE_UNITS.find((unit) => unit.key === towers[index]) : null;
+            return (
+              <button
+                className={`defenseTowerSlot ${tower ? "filled" : ""} ${selectedTowerKey && !tower ? "selectable" : ""}`}
+                type="button"
+                key={`${slot.x}-${slot.y}`}
+                onClick={() => placeTower(index)}
+                disabled={isOver || !selectedTowerKey || Boolean(tower)}
+                style={{ "--slot-x": `${slot.x}%`, "--slot-y": `${slot.y}%` }}
+                aria-label={tower ? `${tower.name} 설치됨` : `${index + 1}번 설치 위치`}
+              >
+                {tower ? tower.name : "+"}
+              </button>
+            );
+          })}
           {enemies.map((enemy) => (
             <span
               className="defenseEnemy"
               key={enemy.id}
               style={{
-                "--enemy-left": `${clampNumber(enemy.progress, 0, 96)}%`,
+                "--enemy-x": `${getDefensePathPoint(enemy.progress).x}%`,
+                "--enemy-y": `${getDefensePathPoint(enemy.progress).y}%`,
                 "--enemy-hp": `${Math.max(10, (enemy.hp / enemy.maxHp) * 100)}%`
               }}
             >
@@ -1404,7 +1469,9 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
           <button className="defenseUnitCard" type="button" key={unit.key} onClick={() => buyUnit(unit)} disabled={isOver || points < unit.cost}>
             <span>{unit.name}</span>
             <strong>{unit.role}</strong>
-            <small>{unit.cost}P · 공격 {unit.power} · 보유 {units[unit.key] || 0}</small>
+            <small>
+              {unit.cost}P · 공격 {unit.power} · {unit.kind === "tower" ? "설치" : `보유 ${units[unit.key] || 0}`}
+            </small>
           </button>
         ))}
       </section>
@@ -2513,8 +2580,38 @@ function makeDefenseUnitState() {
   return Object.fromEntries(DEFENSE_UNITS.map((unit) => [unit.key, 0]));
 }
 
-function getDefensePower(units) {
-  return DEFENSE_UNITS.reduce((total, unit) => total + (Number(units?.[unit.key] || 0) * unit.power), 6);
+function getDefensePower(units, towers = []) {
+  const soldierPower = DEFENSE_UNITS
+    .filter((unit) => unit.kind === "soldier")
+    .reduce((total, unit) => total + (Number(units?.[unit.key] || 0) * unit.power), 8);
+  const towerPower = (towers || []).reduce((total, key) => {
+    const unit = DEFENSE_UNITS.find((item) => item.key === key);
+    return total + (unit?.power || 0);
+  }, 0);
+  return soldierPower + towerPower;
+}
+
+function getDefensePathPoint(progress) {
+  const value = clampNumber(Number(progress || 0), 0, 100);
+  const points = [
+    { p: 0, x: 96, y: 18 },
+    { p: 18, x: 78, y: 26 },
+    { p: 38, x: 61, y: 47 },
+    { p: 58, x: 41, y: 39 },
+    { p: 78, x: 27, y: 62 },
+    { p: 100, x: 7, y: 76 }
+  ];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const current = points[index];
+    const next = points[index + 1];
+    if (value > next.p) continue;
+    const ratio = (value - current.p) / (next.p - current.p);
+    return {
+      x: current.x + ((next.x - current.x) * ratio),
+      y: current.y + ((next.y - current.y) * ratio)
+    };
+  }
+  return points[points.length - 1];
 }
 
 function buildAppleWordPuzzle(hanja) {
