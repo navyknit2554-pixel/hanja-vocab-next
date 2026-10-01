@@ -202,7 +202,7 @@ export function StudentApp() {
       setStage("home");
       return;
     }
-    if (stage === "game" || stage === "runner" || stage === "crossword" || stage === "apple") {
+    if (stage === "game" || stage === "runner" || stage === "crossword" || stage === "apple" || stage === "defense") {
       setStage("gameMenu");
       return;
     }
@@ -236,11 +236,12 @@ export function StudentApp() {
               {stage !== "home" && canPlayGame ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
-              {canPlayGame && stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} /> : null}
+              {canPlayGame && stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} /> : null}
               {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "defense" ? <WordDefenseGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
             </>
           ) : payload.lesson ? (
             <>
@@ -265,11 +266,12 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
-              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} /> : null}
+              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} /> : null}
               {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "defense" ? <WordDefenseGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -508,7 +510,7 @@ function GameLearningButton({ onOpen }) {
   );
 }
 
-function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame }) {
+function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame, onDefenseGame }) {
   return (
     <section className="gameMenuGrid" aria-label="게임 선택">
       <button className="gameMenuCard" type="button" onClick={onBlockGame}>
@@ -526,6 +528,10 @@ function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame }) {
       <button className="gameMenuCard apple" type="button" onClick={onAppleGame}>
         <span>초록이 풍선 단어</span>
         <strong>글자를 드래그해 배운 어휘를 찾아요</strong>
+      </button>
+      <button className="gameMenuCard defense" type="button" onClick={onDefenseGame}>
+        <span>초록이 어휘 디펜스</span>
+        <strong>정답 포인트로 병사와 타워를 세워 적을 막아요</strong>
       </button>
     </section>
   );
@@ -650,6 +656,13 @@ const RUNNER_LANES = 3;
 const RUNNER_TICK_MS = 95;
 const RUNNER_BASE_PROGRESS_STEP = 2.4;
 const RUNNER_MAX_PROGRESS_STEP = 4.2;
+const DEFENSE_UNITS = [
+  { key: "infantry", name: "병사1", role: "근접보병", cost: 40, power: 12 },
+  { key: "archer", name: "병사2", role: "궁사", cost: 70, power: 22 },
+  { key: "tower", name: "망루", role: "화살", cost: 110, power: 36 },
+  { key: "cannon", name: "포탑", role: "대포", cost: 170, power: 58 },
+  { key: "catapult", name: "투석기", role: "광역", cost: 240, power: 88 }
+];
 
 function WordBlockGame({ hanja, lesson, onExit }) {
   const pairs = useMemo(() => buildGamePairs(hanja), [hanja]);
@@ -1129,6 +1142,283 @@ function WordRunnerGame({ hanja, lesson, onExit }) {
 function getRunnerProgressStep(score) {
   const speedBonus = Math.floor(Math.max(0, Number(score || 0)) / 300) * 0.18;
   return Math.min(RUNNER_MAX_PROGRESS_STEP, RUNNER_BASE_PROGRESS_STEP + speedBonus);
+}
+
+function WordDefenseGame({ hanja, lesson, onExit }) {
+  const questions = useMemo(() => buildRunnerQuestions(hanja), [hanja]);
+  const [round, setRound] = useState(null);
+  const [points, setPoints] = useState(80);
+  const [score, setScore] = useState(0);
+  const [health, setHealth] = useState(100);
+  const [wave, setWave] = useState(1);
+  const [enemies, setEnemies] = useState([]);
+  const [units, setUnits] = useState(() => makeDefenseUnitState());
+  const [status, setStatus] = useState("");
+  const [isOver, setIsOver] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+  const scoreRef = useRef(0);
+  const waveRef = useRef(1);
+  const clearedRef = useRef(0);
+  const healthRef = useRef(100);
+  const unitsRef = useRef(units);
+  const enemiesRef = useRef([]);
+  const savedRef = useRef(false);
+  const enemyIdRef = useRef(1);
+
+  useEffect(() => {
+    unitsRef.current = units;
+  }, [units]);
+
+  useEffect(() => {
+    enemiesRef.current = enemies;
+  }, [enemies]);
+
+  useEffect(() => {
+    if (questions.length < 4) return;
+    resetDefense();
+  }, [questions]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      if (!lesson?.level || !lesson?.day) return;
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=defense&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && data.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson?.level, lesson?.day]);
+
+  useEffect(() => {
+    if (!round || isOver) return undefined;
+    const timer = window.setInterval(() => {
+      tickDefense();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [round, isOver]);
+
+  useEffect(() => {
+    if (isOver && !savedRef.current) {
+      savedRef.current = true;
+      saveDefenseScore(scoreRef.current, clearedRef.current);
+    }
+  }, [isOver]);
+
+  function resetDefense() {
+    const firstRound = makeDefenseRound(questions);
+    setRound(firstRound);
+    setPoints(80);
+    setScore(0);
+    scoreRef.current = 0;
+    setHealth(100);
+    healthRef.current = 100;
+    setWave(1);
+    waveRef.current = 1;
+    clearedRef.current = 0;
+    setEnemies([]);
+    enemiesRef.current = [];
+    setUnits(makeDefenseUnitState());
+    setStatus("정답을 맞혀 포인트를 모으세요.");
+    setIsOver(false);
+    setSaveState("idle");
+    savedRef.current = false;
+    enemyIdRef.current = 1;
+  }
+
+  function answerDefense(choice) {
+    if (!round || isOver) return;
+    const correct = choice === round.answer;
+    if (correct) {
+      const gainedPoints = 35 + Math.min(35, Math.floor(waveRef.current / 2) * 5);
+      const gainedScore = 70 + (waveRef.current * 5);
+      setPoints((previous) => previous + gainedPoints);
+      scoreRef.current += gainedScore;
+      clearedRef.current += 1;
+      setScore(scoreRef.current);
+      setStatus(`${round.answer} 정답! +${gainedPoints}P`);
+      setRound(makeDefenseRound(questions, round.answer));
+      return;
+    }
+    const nextHealth = Math.max(0, healthRef.current - 8);
+    healthRef.current = nextHealth;
+    setHealth(nextHealth);
+    setStatus(`${round.answer}을 골라야 했어요. 성 체력 -8`);
+    setRound(makeDefenseRound(questions, round.answer));
+    if (nextHealth <= 0) setIsOver(true);
+  }
+
+  function buyUnit(unit) {
+    if (isOver || points < unit.cost) return;
+    setPoints((previous) => previous - unit.cost);
+    setUnits((previous) => ({
+      ...previous,
+      [unit.key]: Number(previous[unit.key] || 0) + 1
+    }));
+    setStatus(`${unit.name} ${unit.role} 배치!`);
+  }
+
+  function tickDefense() {
+    const currentWave = waveRef.current;
+    const spawnCount = 1 + Math.floor(currentWave / 5);
+    const spawned = Array.from({ length: spawnCount }).map((_, index) => ({
+      id: enemyIdRef.current++,
+      hp: 46 + (currentWave * 9) + (index * 6),
+      maxHp: 46 + (currentWave * 9) + (index * 6),
+      progress: -index * 9
+    }));
+    const moveSpeed = 8 + Math.min(12, currentWave * 0.55);
+    const attackPower = getDefensePower(unitsRef.current);
+    let killed = 0;
+    let leaked = 0;
+    const working = [...enemiesRef.current, ...spawned]
+      .map((enemy) => ({ ...enemy, progress: enemy.progress + moveSpeed }))
+      .filter((enemy) => {
+        if (enemy.progress >= 100) {
+          leaked += 1;
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => b.progress - a.progress);
+
+    let remainingPower = attackPower;
+    for (const enemy of working) {
+      if (remainingPower <= 0) break;
+      const damage = Math.min(enemy.hp, remainingPower);
+      enemy.hp -= damage;
+      remainingPower -= damage;
+      if (enemy.hp <= 0) killed += 1;
+    }
+    const survivors = working.filter((enemy) => enemy.hp > 0).slice(0, 14);
+    if (killed) {
+      const gainedScore = killed * (25 + currentWave);
+      const gainedPoints = killed * 8;
+      scoreRef.current += gainedScore;
+      setScore(scoreRef.current);
+      setPoints((previous) => previous + gainedPoints);
+    }
+    if (leaked) {
+      const nextHealth = Math.max(0, healthRef.current - (leaked * 12));
+      healthRef.current = nextHealth;
+      setHealth(nextHealth);
+      if (nextHealth <= 0) setIsOver(true);
+    }
+    waveRef.current = currentWave + 1;
+    setWave(waveRef.current);
+    enemiesRef.current = survivors;
+    setEnemies(survivors);
+  }
+
+  async function saveDefenseScore(finalScore, finalClearedWords) {
+    if (!lesson?.level || !lesson?.day || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "defense",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalClearedWords
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || "점수를 저장하지 못했습니다.");
+      setLeaderboard(data.leaderboard);
+      setSaveState("saved");
+    } catch (error) {
+      setStatus(error.message || "점수를 저장하지 못했습니다.");
+      setSaveState("idle");
+    }
+  }
+
+  if (questions.length < 4) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="study" small label="디펜스 준비" />
+        <h2>초록이 어휘 디펜스</h2>
+        <p className="mutedText">이 게임에 사용할 어휘가 아직 부족합니다. 4개 이상의 어휘가 필요해요.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard defenseGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>초록이 어휘 디펜스</span>
+          <h2>{lesson?.day || ""}일차 게임</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>나가기</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span><b>{points}</b>P</span>
+        <span>성 체력 <b>{health}</b></span>
+        <span>공격력 <b>{getDefensePower(units)}</b></span>
+      </div>
+      <article className="defensePrompt">
+        <span>{round?.type === "blank" ? "문장 빈칸" : "뜻 고르기"}</span>
+        <strong>{round?.prompt}</strong>
+        <div className="defenseChoices">
+          {round?.choices.map((choice) => (
+            <button className="btn secondary" type="button" key={choice} onClick={() => answerDefense(choice)} disabled={isOver}>
+              {choice}
+            </button>
+          ))}
+        </div>
+      </article>
+      <div className="defenseBattlefield" aria-label="디펜스 전장">
+        <div className="defenseBase">
+          <strong>성</strong>
+          <span style={{ width: `${health}%` }} />
+        </div>
+        <div className="defenseRoad">
+          {enemies.map((enemy) => (
+            <span
+              className="defenseEnemy"
+              key={enemy.id}
+              style={{
+                "--enemy-left": `${clampNumber(enemy.progress, 0, 96)}%`,
+                "--enemy-hp": `${Math.max(10, (enemy.hp / enemy.maxHp) * 100)}%`
+              }}
+            >
+              적
+            </span>
+          ))}
+        </div>
+      </div>
+      <section className="defenseShop" aria-label="유닛 구매">
+        {DEFENSE_UNITS.map((unit) => (
+          <button className="defenseUnitCard" type="button" key={unit.key} onClick={() => buyUnit(unit)} disabled={isOver || points < unit.cost}>
+            <span>{unit.name}</span>
+            <strong>{unit.role}</strong>
+            <small>{unit.cost}P · 공격 {unit.power} · 보유 {units[unit.key] || 0}</small>
+          </button>
+        ))}
+      </section>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      {isOver ? (
+        <div className="gameOverPanel defenseOver" role="status">
+          <strong>방어 실패</strong>
+          <p>{score}점 · {clearedRef.current}개 어휘 정답 · {wave}웨이브</p>
+          <button className="btn primary" type="button" onClick={resetDefense}>다시 하기</button>
+        </div>
+      ) : null}
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
 }
 
 function CrosswordBattleGame({ hanja, lesson, onExit }) {
@@ -2205,6 +2495,26 @@ function makeRunnerHighLanes() {
   if (Math.random() > 0.42) return [];
   const lanes = shuffle([0, 1, 2]).slice(0, Math.random() > 0.7 ? 2 : 1);
   return lanes;
+}
+
+function makeDefenseRound(questions, avoidWord = "") {
+  const pool = questions.filter((item) => item.word !== avoidWord);
+  const source = pool.length ? pool : questions;
+  const answer = source[Math.floor(Math.random() * source.length)];
+  const distractors = shuffle(questions.filter((item) => item.word !== answer.word)).slice(0, 3);
+  return {
+    ...answer,
+    answer: answer.word,
+    choices: shuffle([answer, ...distractors]).map((item) => item.word)
+  };
+}
+
+function makeDefenseUnitState() {
+  return Object.fromEntries(DEFENSE_UNITS.map((unit) => [unit.key, 0]));
+}
+
+function getDefensePower(units) {
+  return DEFENSE_UNITS.reduce((total, unit) => total + (Number(units?.[unit.key] || 0) * unit.power), 6);
 }
 
 function buildAppleWordPuzzle(hanja) {

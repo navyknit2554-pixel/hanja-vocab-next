@@ -544,6 +544,12 @@ textarea {
   box-shadow: 0 6px 0 #efd788;
 }
 
+.gameMenuCard.defense {
+  border-color: #ffc9d9;
+  background: linear-gradient(180deg, #fff8fb 0%, #ffe0ea 100%);
+  box-shadow: 0 6px 0 #efb8ca;
+}
+
 .gameMenuCard span {
   color: var(--green-dark);
   font-weight: 1000;
@@ -552,6 +558,159 @@ textarea {
 .gameMenuCard strong {
   font-size: 1.12rem;
   line-height: 1.35;
+}
+
+.defenseGameCard {
+  display: grid;
+  gap: 14px;
+}
+
+.defensePrompt {
+  display: grid;
+  gap: 10px;
+  border: 2px solid #ffd3df;
+  border-radius: 18px;
+  padding: 14px;
+  background: #fff8fb;
+}
+
+.defensePrompt span {
+  color: var(--pink);
+  font-weight: 1000;
+}
+
+.defensePrompt strong {
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+
+.defenseChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.defenseBattlefield {
+  position: relative;
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 138px;
+}
+
+.defenseBase {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border: 2px solid #bdeead;
+  border-radius: 18px;
+  background: #f4fff0;
+  color: var(--green-dark);
+  font-weight: 1000;
+}
+
+.defenseBase span {
+  width: 80%;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.defenseRoad {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.78), rgba(255,255,255,.28)),
+    repeating-linear-gradient(90deg, #eaf7ff 0 18px, #dff3ff 18px 36px);
+}
+
+.defenseRoad::before {
+  content: "적군 진입";
+  position: absolute;
+  right: 14px;
+  top: 10px;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 1000;
+}
+
+.defenseEnemy {
+  position: absolute;
+  left: var(--enemy-left);
+  top: 58%;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffd3df;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--pink);
+  font-size: .82rem;
+  font-weight: 1000;
+  transform: translate(-50%, -50%);
+}
+
+.defenseEnemy::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -9px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pink) var(--enemy-hp), #ffe5ee var(--enemy-hp));
+}
+
+.defenseShop {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.defenseUnitCard {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  border: 2px solid #d9f7c8;
+  border-radius: 16px;
+  background: #fbfff7;
+  color: var(--ink);
+  padding: 10px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.defenseUnitCard:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.defenseUnitCard span {
+  color: var(--green-dark);
+  font-size: .86rem;
+  font-weight: 1000;
+}
+
+.defenseUnitCard strong {
+  font-size: .98rem;
+}
+
+.defenseUnitCard small {
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.defenseOver {
+  position: static;
+  transform: none;
+  margin-top: 4px;
 }
 
 .stageNavigation {
@@ -2934,6 +3093,22 @@ textarea {
 
   .notificationPrompt .btn {
     width: 100%;
+  }
+
+  .defenseBattlefield {
+    grid-template-columns: 1fr;
+  }
+
+  .defenseBase {
+    min-height: 70px;
+  }
+
+  .defenseRoad {
+    min-height: 120px;
+  }
+
+  .defenseShop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .testBuilderForm,
