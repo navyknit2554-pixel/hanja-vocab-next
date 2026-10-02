@@ -680,6 +680,13 @@ textarea {
   filter: drop-shadow(0 6px 0 rgba(255, 88, 124, .22));
 }
 
+.defenseEnemy.giant {
+  width: 76px;
+  height: 76px;
+  z-index: 2;
+  filter: drop-shadow(0 8px 0 rgba(163, 22, 50, .26));
+}
+
 .defenseEnemy::after {
   content: "";
   position: absolute;
@@ -689,6 +696,14 @@ textarea {
   height: 5px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--pink) var(--enemy-hp), #ffe5ee var(--enemy-hp));
+}
+
+.defenseEnemy.giant::after {
+  left: 8px;
+  right: 8px;
+  bottom: -11px;
+  height: 7px;
+  background: linear-gradient(90deg, #c5193d var(--enemy-hp), #ffdce5 var(--enemy-hp));
 }
 
 .defenseEnemy img {

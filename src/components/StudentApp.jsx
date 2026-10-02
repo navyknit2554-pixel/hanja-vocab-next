@@ -686,7 +686,13 @@ const DEFENSE_DIFFICULTY = {
   pressureSpeedPerWave: 0.18,
   surgeSpeedPerWave: 0.16,
   maxSpeedBonus: 20,
-  maxEnemiesOnField: 32
+  maxEnemiesOnField: 32,
+  giantScoreThreshold: 3000,
+  giantBaseChance: 0.08,
+  giantChancePerScoreStep: 0.035,
+  giantScoreStep: 2500,
+  giantMaxChance: 0.32,
+  giantHpMultiplier: 2
 };
 const DEFENSE_ASSETS = {
   castle: "/defense-assets/castle-blue.svg",
@@ -695,7 +701,8 @@ const DEFENSE_ASSETS = {
   tower: "/defense-assets/tower-blue.svg",
   cannon: "/defense-assets/cannon-blue.svg",
   catapult: "/defense-assets/catapult-blue.svg",
-  enemy: "/defense-assets/enemy-red.svg"
+  enemy: "/defense-assets/enemy-red.svg",
+  giant: "/defense-assets/giant-red.svg"
 };
 
 function WordBlockGame({ hanja, lesson, onExit }) {
@@ -1333,15 +1340,22 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
     const currentWave = waveRef.current;
     const difficulty = getDefenseDifficulty(currentWave);
     const spawnCount = difficulty.spawnCount;
-    const spawned = Array.from({ length: spawnCount }).map((_, index) => ({
-      id: enemyIdRef.current++,
-      hp: difficulty.enemyHp + (index * difficulty.enemyHpStep),
-      maxHp: difficulty.enemyHp + (index * difficulty.enemyHpStep),
-      progress: -index * 12
-    }));
+    const giantChance = getDefenseGiantChance(scoreRef.current);
+    const spawned = Array.from({ length: spawnCount }).map((_, index) => {
+      const isGiant = giantChance > 0 && Math.random() < giantChance && index % 2 === 0;
+      const baseHp = difficulty.enemyHp + (index * difficulty.enemyHpStep);
+      const hp = isGiant ? Math.round(baseHp * DEFENSE_DIFFICULTY.giantHpMultiplier) : baseHp;
+      return {
+        id: enemyIdRef.current++,
+        hp,
+        maxHp: hp,
+        type: isGiant ? "giant" : "enemy",
+        progress: -index * 12
+      };
+    });
     const moveSpeed = difficulty.moveSpeed;
     const attackPower = getDefensePower(unitsRef.current, towersRef.current);
-    let killed = 0;
+    let killedValue = 0;
     let leaked = 0;
     const working = [...enemiesRef.current, ...spawned]
       .map((enemy) => ({ ...enemy, progress: enemy.progress + moveSpeed }))
@@ -1360,12 +1374,12 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
       const damage = Math.min(enemy.hp, remainingPower);
       enemy.hp -= damage;
       remainingPower -= damage;
-      if (enemy.hp <= 0) killed += 1;
+      if (enemy.hp <= 0) killedValue += enemy.type === "giant" ? 2 : 1;
     }
     const survivors = working.filter((enemy) => enemy.hp > 0).slice(0, DEFENSE_DIFFICULTY.maxEnemiesOnField);
-    if (killed) {
-      const gainedScore = killed * (25 + currentWave);
-      const gainedPoints = killed * 8;
+    if (killedValue) {
+      const gainedScore = killedValue * (25 + currentWave);
+      const gainedPoints = killedValue * 8;
       scoreRef.current += gainedScore;
       setScore(scoreRef.current);
       setPoints((previous) => previous + gainedPoints);
@@ -1486,7 +1500,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
           })}
           {enemies.map((enemy) => (
             <span
-              className="defenseEnemy"
+              className={`defenseEnemy ${enemy.type === "giant" ? "giant" : ""}`}
               key={enemy.id}
               style={{
                 "--enemy-x": `${getDefensePathPoint(enemy.progress).x}%`,
@@ -1494,7 +1508,7 @@ function WordDefenseGame({ hanja, lesson, onExit }) {
                 "--enemy-hp": `${Math.max(10, (enemy.hp / enemy.maxHp) * 100)}%`
               }}
             >
-              <img src={DEFENSE_ASSETS.enemy} alt="" draggable="false" />
+              <img src={DEFENSE_ASSETS[enemy.type === "giant" ? "giant" : "enemy"]} alt="" draggable="false" />
             </span>
           ))}
         </div>
@@ -2650,6 +2664,16 @@ function getDefenseDifficulty(wave) {
     enemyHpStep: 6 + Math.floor(currentWave / 8),
     moveSpeed: DEFENSE_DIFFICULTY.baseSpeed + speedBonus
   };
+}
+
+function getDefenseGiantChance(score) {
+  const currentScore = Number(score || 0);
+  if (currentScore < DEFENSE_DIFFICULTY.giantScoreThreshold) return 0;
+  const scoreSteps = Math.floor((currentScore - DEFENSE_DIFFICULTY.giantScoreThreshold) / DEFENSE_DIFFICULTY.giantScoreStep);
+  return Math.min(
+    DEFENSE_DIFFICULTY.giantMaxChance,
+    DEFENSE_DIFFICULTY.giantBaseChance + (scoreSteps * DEFENSE_DIFFICULTY.giantChancePerScoreStep)
+  );
 }
 
 function getDefensePathPoint(progress) {
