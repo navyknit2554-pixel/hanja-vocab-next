@@ -85,6 +85,7 @@ async function getLicenseAdmin(licenseKey) {
     teacher = updated[0];
   }
   if (teacher.license_status === "revoked") throw new Error("폐기된 라이선스입니다.");
+  if (teacher.license_status === "expired") throw new Error("만료된 라이선스입니다.");
   const expiresAt = teacher.license_expires_at || inspected.description.expiresAt;
   if (expiresAt && new Date(expiresAt).getTime() < Date.now()) throw new Error("만료된 라이선스입니다.");
   if (!inspected.ok) throw new Error("만료된 라이선스입니다.");

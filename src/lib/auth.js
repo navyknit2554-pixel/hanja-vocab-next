@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 const cookieName = "chologi_v2_student";
 const adminCookie = "chologi_v2_admin";
@@ -77,6 +77,14 @@ export function inspectLicenseKey(licenseKey) {
   };
 }
 
+export function createLicenseKey(expiresAt) {
+  const expiryDate = expiresAt ? new Date(expiresAt) : defaultLicenseExpiry();
+  const exp36 = Math.floor(expiryDate.getTime() / 1000).toString(36);
+  const nonce = randomBytes(8).toString("base64url");
+  const signature = createHmac("sha256", licenseSecret()).update(`${exp36}.${nonce}`).digest("base64url").slice(0, 22);
+  return `HANJA-${exp36}-${nonce}-${signature}`;
+}
+
 function sign(value, secret) {
   return createHmac("sha256", secret).update(value).digest("base64url");
 }
@@ -91,6 +99,12 @@ function studentSessionSecret() {
 
 function licenseSecret() {
   return process.env.HANJA_LICENSE_SECRET || process.env.ADMIN_SESSION_SECRET || "hanja-license-dev-secret";
+}
+
+function defaultLicenseExpiry() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 1);
+  return date;
 }
 
 function safeEqual(left, right) {

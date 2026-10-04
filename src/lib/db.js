@@ -57,6 +57,7 @@ async function ensureSchema(db) {
       license_original_expires_at timestamptz,
       license_owner text not null default '',
       license_note text not null default '',
+      license_student_limit integer not null default 0,
       license_revoked_at timestamptz,
       license_restored_at timestamptz,
       created_at timestamptz not null default now(),
@@ -68,6 +69,7 @@ async function ensureSchema(db) {
   await db`alter table teachers add column if not exists license_original_expires_at timestamptz`;
   await db`alter table teachers add column if not exists license_owner text not null default ''`;
   await db`alter table teachers add column if not exists license_note text not null default ''`;
+  await db`alter table teachers add column if not exists license_student_limit integer not null default 0`;
   await db`alter table teachers add column if not exists license_revoked_at timestamptz`;
   await db`alter table teachers add column if not exists license_restored_at timestamptz`;
   await db`

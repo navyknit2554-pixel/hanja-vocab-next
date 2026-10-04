@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mascot } from "./Mascot";
 
 const emptyStudent = { name: "", loginId: "", password: "", phone: "", grade: "초1", level: "초급", currentDay: 1 };
+const emptyLicenseForm = { teacherCode: "", owner: "", studentLimit: 0, expiresAt: "", status: "active", note: "" };
 const choiceMarks = ["①", "②", "③", "④", "⑤"];
 const gradeFilterOptions = ["초등부", "중등부", "고등부", "초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
 
@@ -17,6 +18,10 @@ export function AdminApp() {
   const [studentForm, setStudentForm] = useState(emptyStudent);
   const [studentStatus, setStudentStatus] = useState("");
   const [editingStudentId, setEditingStudentId] = useState("");
+  const [licenseForm, setLicenseForm] = useState(emptyLicenseForm);
+  const [licenseData, setLicenseData] = useState(null);
+  const [licenseStatus, setLicenseStatus] = useState("");
+  const [issuedLicenseKey, setIssuedLicenseKey] = useState("");
   const [progressLevel, setProgressLevel] = useState("초급");
   const [progressData, setProgressData] = useState(null);
   const [progressStatus, setProgressStatus] = useState("");
@@ -46,6 +51,13 @@ export function AdminApp() {
 
   useEffect(() => {
     if (admin) loadStudents();
+  }, [admin]);
+
+  useEffect(() => {
+    if (admin) {
+      setLicenseForm((current) => ({ ...current, teacherCode: admin.role === "master" ? current.teacherCode : admin.teacherCode }));
+      loadLicense(admin.role === "master" ? licenseForm.teacherCode : admin.teacherCode);
+    }
   }, [admin]);
 
   useEffect(() => {
@@ -111,6 +123,60 @@ export function AdminApp() {
       setStudents([]);
       setStudentStatus(error.message || "학생 목록을 불러오지 못했습니다.");
     }
+  }
+
+  async function loadLicense(targetTeacherCode = licenseForm.teacherCode) {
+    if (!admin) return;
+    const teacherCode = admin.role === "master" ? String(targetTeacherCode || "master").trim() : admin.teacherCode;
+    setLicenseStatus("라이선스 정보를 불러오는 중...");
+    try {
+      const query = teacherCode ? `?teacherCode=${encodeURIComponent(teacherCode)}` : "";
+      const response = await fetch(`/api/admin/license${query}`, { cache: "no-store" });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "라이선스 정보를 불러오지 못했습니다.");
+      applyLicenseData(data.license);
+      setIssuedLicenseKey("");
+      setLicenseStatus("라이선스 정보를 불러왔습니다.");
+    } catch (error) {
+      setLicenseData(null);
+      setLicenseStatus(error.message || "라이선스 정보를 불러오지 못했습니다.");
+    }
+  }
+
+  async function saveLicense(issueNewKey = false) {
+    setLicenseStatus(issueNewKey ? "새 라이선스를 발급하는 중..." : "라이선스를 저장하는 중...");
+    try {
+      const response = await fetch("/api/admin/license", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...licenseForm, issueNewKey })
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "라이선스를 저장하지 못했습니다.");
+      applyLicenseData(data.license);
+      setIssuedLicenseKey(data.issuedKey || "");
+      setLicenseStatus(issueNewKey ? "새 라이선스를 발급했습니다." : "라이선스를 저장했습니다.");
+      await loadStudents();
+    } catch (error) {
+      setLicenseStatus(error.message || "라이선스를 저장하지 못했습니다.");
+    }
+  }
+
+  function applyLicenseData(license) {
+    setLicenseData(license || null);
+    if (!license) return;
+    setLicenseForm({
+      teacherCode: license.code || "",
+      owner: license.license_owner || "",
+      studentLimit: Number(license.license_student_limit || 0),
+      expiresAt: dateInputValue(license.license_expires_at),
+      status: license.license_status || "active",
+      note: license.license_note || ""
+    });
   }
 
   async function loadProgress() {
@@ -363,6 +429,10 @@ export function AdminApp() {
     setLoginStatus("");
     setStudents([]);
     setStudentStatus("");
+    setLicenseForm(emptyLicenseForm);
+    setLicenseData(null);
+    setLicenseStatus("");
+    setIssuedLicenseKey("");
     setProgressData(null);
     setProgressStatus("");
     setLessonData(null);
@@ -431,6 +501,7 @@ export function AdminApp() {
         <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")} type="button">학습도</button>
         <button className={view === "wrongWords" ? "active" : ""} onClick={() => setView("wrongWords")} type="button">오답 모니터링</button>
         <button className={view === "test" ? "active" : ""} onClick={() => setView("test")} type="button">테스트지</button>
+        <button className={view === "license" ? "active" : ""} onClick={() => setView("license")} type="button">라이선스</button>
         {admin.role === "master" ? <button className={view === "content" ? "active" : ""} onClick={() => setView("content")} type="button">한자·어휘 관리</button> : null}
       </nav>
       {view === "students" ? (
@@ -466,6 +537,19 @@ export function AdminApp() {
           status={testStatus}
           onGenerate={generateTestPaper}
           onPrint={printTestPaper}
+        />
+      ) : null}
+      {view === "license" ? (
+        <LicensePanel
+          admin={admin}
+          form={licenseForm}
+          setForm={setLicenseForm}
+          license={licenseData}
+          status={licenseStatus}
+          issuedKey={issuedLicenseKey}
+          onLoad={loadLicense}
+          onSave={() => saveLicense(false)}
+          onIssue={() => saveLicense(true)}
         />
       ) : null}
       {view === "content" && admin.role === "master" ? (
@@ -613,6 +697,49 @@ function CurriculumIndexPanel({ level, currentDay, days, status, onSelectDay, on
         ))}
         {!days.length ? <p className="statusText">표시할 일차별 한자 구성이 없습니다.</p> : null}
       </div>
+    </section>
+  );
+}
+
+function LicensePanel({ admin, form, setForm, license, status, issuedKey, onLoad, onSave, onIssue }) {
+  const isMaster = admin?.role === "master";
+  const limit = Number(form.studentLimit || 0);
+  const studentCount = Number(license?.student_count || 0);
+  const limitLabel = limit > 0 ? `${studentCount} / ${limit}명 사용 중` : `${studentCount}명 사용 중 · 제한 없음`;
+
+  return (
+    <section className="panel licensePanel">
+      <div className="sectionHeader">
+        <div>
+          <h2>라이선스 관리</h2>
+          <p>발급 키와 허용 학생 수를 관리합니다.</p>
+        </div>
+        <button className="btn secondary" type="button" onClick={() => onLoad(form.teacherCode)}>조회</button>
+      </div>
+      <div className="licenseSummary">
+        <strong>{license?.code || form.teacherCode || admin?.teacherCode}</strong>
+        <span>{licenseStatusLabel(license?.license_status || form.status)} · {limitLabel}</span>
+        <small>0명으로 설정하면 학생 수 제한 없이 사용할 수 있습니다.</small>
+      </div>
+      <div className="studentFormGrid">
+        <label>강사 코드<input value={form.teacherCode} disabled={!isMaster} onChange={(event) => setForm({ ...form, teacherCode: event.target.value })} placeholder="예: t_xxxxx 또는 지점 코드" /></label>
+        <label>소유자<input value={form.owner} disabled={!isMaster} onChange={(event) => setForm({ ...form, owner: event.target.value })} placeholder="학원명 또는 강사명" /></label>
+        <label>허용 학생 수<input type="number" min="0" max="99999" value={form.studentLimit} disabled={!isMaster} onChange={(event) => setForm({ ...form, studentLimit: Number(event.target.value) })} /></label>
+        <label>만료일<input type="date" value={form.expiresAt} disabled={!isMaster} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} /></label>
+        <label>상태<select value={form.status} disabled={!isMaster} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="active">활성</option><option value="expired">만료</option><option value="revoked">폐기</option></select></label>
+        <label>메모<input value={form.note} disabled={!isMaster} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="계약/결제/관리 메모" /></label>
+      </div>
+      {issuedKey ? (
+        <label className="issuedLicenseKey">
+          새로 발급된 라이선스 키
+          <textarea readOnly value={issuedKey} onFocus={(event) => event.target.select()} />
+        </label>
+      ) : null}
+      <div className="editorActions">
+        {isMaster ? <button className="btn secondary" type="button" onClick={onSave}>설정 저장</button> : null}
+        {isMaster ? <button className="btn primary" type="button" onClick={onIssue}>새 라이선스 발급</button> : null}
+      </div>
+      {status ? <p className="statusText">{status}</p> : null}
     </section>
   );
 }
@@ -963,6 +1090,19 @@ function countVocab(hanjaItems) {
 function passwordFromPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
   return digits.startsWith("010") ? digits.slice(3) : digits;
+}
+
+function dateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function licenseStatusLabel(status) {
+  if (status === "revoked") return "폐기";
+  if (status === "expired") return "만료";
+  return "활성";
 }
 
 function buildProgressMap(progress) {

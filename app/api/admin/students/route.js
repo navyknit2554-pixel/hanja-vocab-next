@@ -51,6 +51,7 @@ export async function POST(request) {
       return NextResponse.json({ ok: false, message: "이름, 아이디, 비밀번호를 입력해 주세요." }, { status: 400 });
     }
     const db = await sql();
+    await assertStudentLicenseLimit(db, teacher.id, student.loginId);
     await db`
       insert into students (teacher_id, name, login_id, password, phone, grade, level, current_day)
       values (${teacher.id}, ${student.name}, ${student.loginId}, ${student.password}, ${student.phone}, ${student.grade}, ${student.level}, ${student.currentDay})
@@ -128,6 +129,33 @@ async function studentForAdmin(db, admin, studentId) {
     throw Object.assign(new Error("자기 학생만 관리할 수 있습니다."), { status: 403 });
   }
   return student;
+}
+
+async function assertStudentLicenseLimit(db, teacherId, loginId) {
+  const existing = await db`
+    select id
+    from students
+    where teacher_id = ${teacherId}
+      and login_id = ${loginId}
+    limit 1
+  `;
+  if (existing[0]) return;
+
+  const rows = await db`
+    select
+      greatest(coalesce(t.license_student_limit, 0), 0)::int as student_limit,
+      coalesce(count(s.id), 0)::int as student_count
+    from teachers t
+    left join students s on s.teacher_id = t.id
+    where t.id = ${teacherId}
+    group by t.id
+    limit 1
+  `;
+  const limit = Number(rows[0]?.student_limit || 0);
+  const count = Number(rows[0]?.student_count || 0);
+  if (limit > 0 && count >= limit) {
+    throw Object.assign(new Error(`라이선스 허용 학생 수(${limit}명)를 초과했습니다.`), { status: 403 });
+  }
 }
 
 function normalizeStudent(body) {
