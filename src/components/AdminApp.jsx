@@ -404,7 +404,7 @@ export function AdminApp() {
       setReplacement({
         target: data.target || hanja,
         candidates: data.candidates || [],
-        status: data.candidates?.length ? "교체할 한자를 선택해 주세요." : "동일한 음의 교체 후보가 아직 없습니다.",
+        status: data.candidates?.length ? "이 난이도에서 아직 쓰이지 않은 한자를 선택해 주세요." : "동일한 음이면서 이 난이도에서 아직 쓰이지 않은 후보가 없습니다.",
         loading: false
       });
     } catch (error) {
@@ -730,7 +730,7 @@ function LessonHanjaOverview({ lessonData, level, day, replacement, onFindReplac
           <div className="miniSectionHeader">
             <div>
               <h2>{replacement.target.character} 교체 후보</h2>
-              <p>음 {replacement.target.sound}의 다른 뜻 한자 중 어휘가 확보된 후보입니다.</p>
+              <p>음 {replacement.target.sound}의 다른 뜻 한자 중 이 난이도에서 아직 쓰이지 않은 후보입니다.</p>
             </div>
             <button className="btn textBtn" type="button" onClick={onCloseReplacement}>닫기</button>
           </div>

@@ -18,12 +18,14 @@ export async function GET(request) {
     const target = await getTargetHanja(db, hanjaId);
     if (!target) return NextResponse.json({ ok: false, message: "교체할 한자를 찾지 못했습니다." }, { status: 404 });
 
-    const lessonCharacters = await db`
-      select character
-      from hanja_items
-      where curriculum_day_id = ${target.curriculum_day_id}
+    const usedLevelCharacters = await db`
+      select h.character
+      from hanja_items h
+      join curriculum_days c on c.id = h.curriculum_day_id
+      where c.level = ${target.level}
+        and h.id <> ${target.id}
     `;
-    const usedCharacters = new Set(lessonCharacters.map((item) => item.character));
+    const usedCharacters = new Set(usedLevelCharacters.map((item) => item.character));
 
     const rows = await db`
       select
@@ -86,15 +88,16 @@ export async function POST(request) {
     }
 
     const duplicateRows = await db`
-      select id
-      from hanja_items
-      where curriculum_day_id = ${target.curriculum_day_id}
-        and character = ${source.character}
-        and id <> ${target.id}
+      select h.id, c.day
+      from hanja_items h
+      join curriculum_days c on c.id = h.curriculum_day_id
+      where c.level = ${target.level}
+        and h.character = ${source.character}
+        and h.id <> ${target.id}
       limit 1
     `;
     if (duplicateRows[0]) {
-      return NextResponse.json({ ok: false, message: "이 일차에 이미 같은 한자가 있습니다." }, { status: 409 });
+      return NextResponse.json({ ok: false, message: `${target.level} ${duplicateRows[0].day}일차에 이미 같은 한자가 있습니다.` }, { status: 409 });
     }
 
     await db.begin(async (tx) => {
