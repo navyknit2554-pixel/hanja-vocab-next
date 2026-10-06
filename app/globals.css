@@ -206,6 +206,12 @@ textarea {
   font-size: .88rem;
 }
 
+.btn.compactBtn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: .8rem;
+}
+
 .btn:disabled {
   opacity: .65;
   cursor: wait;
@@ -2450,7 +2456,7 @@ textarea {
 
 .lessonHanjaChip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 2px 10px;
   align-items: center;
   border: 2px solid #eef5ff;
@@ -2459,10 +2465,20 @@ textarea {
   background: #fff;
 }
 
+.lessonHanjaChip.needsReplacement {
+  border-color: #ff5b88;
+  background: linear-gradient(180deg, #fff, #fff8fb);
+}
+
 .lessonHanjaChip b {
   grid-row: span 2;
   font-size: 2rem;
   line-height: 1;
+}
+
+.lessonHanjaChip .compactBtn {
+  grid-column: 3;
+  grid-row: 1 / span 2;
 }
 
 .lessonHanjaChip span,
@@ -2474,6 +2490,53 @@ textarea {
 }
 
 .lessonHanjaChip small {
+  color: var(--green-dark);
+}
+
+.replacementPanel {
+  display: grid;
+  gap: 12px;
+  border: 2px solid #d8f7ca;
+  border-radius: 18px;
+  padding: 14px;
+  background: #fbfff8;
+}
+
+.replacementList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.replacementCandidate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: center;
+  text-align: left;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.replacementCandidate b {
+  grid-row: span 2;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.replacementCandidate span,
+.replacementCandidate small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.replacementCandidate small {
   color: var(--green-dark);
 }
 
@@ -3204,6 +3267,7 @@ textarea {
   .metaGrid,
   .vocabEditorList,
   .vocabFields,
+  .replacementList,
   .studentFormGrid,
   .studentRow {
     grid-template-columns: 1fr;
