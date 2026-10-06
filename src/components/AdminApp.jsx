@@ -1206,7 +1206,8 @@ function parseJsonResponse(text) {
   try {
     return JSON.parse(text);
   } catch {
-    return { message: "서버 응답을 읽지 못했습니다. 터미널 오류 메시지를 확인해 주세요." };
+    const preview = String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+    return { message: preview ? `서버 응답을 읽지 못했습니다: ${preview}` : "서버 응답을 읽지 못했습니다. 터미널 오류 메시지를 확인해 주세요." };
   }
 }
 

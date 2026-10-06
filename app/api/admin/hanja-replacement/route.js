@@ -82,7 +82,7 @@ export async function POST(request) {
     const db = await sql();
     const target = await getTargetHanja(db, targetHanjaId);
     if (!target) return NextResponse.json({ ok: false, message: "한자 정보를 찾지 못했습니다." }, { status: 404 });
-    if (newCharacter) return replaceWithNewHanja({ db, target, newCharacter, newMeaning });
+    if (newCharacter) return await replaceWithNewHanja({ db, target, newCharacter, newMeaning });
 
     const source = await getTargetHanja(db, sourceHanjaId);
     if (!source) return NextResponse.json({ ok: false, message: "한자 정보를 찾지 못했습니다." }, { status: 404 });
