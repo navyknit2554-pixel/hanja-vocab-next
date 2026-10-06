@@ -556,6 +556,12 @@ textarea {
   box-shadow: 0 6px 0 #efb8ca;
 }
 
+.gameMenuCard.shooter {
+  border-color: #b9d9ff;
+  background: linear-gradient(180deg, #f8fbff 0%, #dcecff 100%);
+  box-shadow: 0 6px 0 #b7d3f1;
+}
+
 .gameMenuCard span {
   color: var(--green-dark);
   font-weight: 1000;
@@ -1267,6 +1273,232 @@ textarea {
 .gameControls .btn {
   min-height: 54px;
   padding-inline: 6px;
+}
+
+.shooterGameCard {
+  background: linear-gradient(180deg, #ffffff 0%, #f2f8ff 100%);
+}
+
+.shooterGameCard .gameScoreBar {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.shooterPrompt {
+  display: grid;
+  gap: 8px;
+  border: 2px solid #cfe7ff;
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8fcff;
+}
+
+.shooterPrompt span {
+  color: #2f75bd;
+  font-weight: 1000;
+}
+
+.shooterPrompt strong {
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+
+.shooterField {
+  position: relative;
+  width: min(100%, 560px);
+  height: 430px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 2px solid #cfe7ff;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.7) 0%, rgba(255,255,255,0) 42%),
+    linear-gradient(180deg, #bfe3ff 0%, #f4fbff 100%);
+  box-shadow: inset 0 -8px 0 rgba(159, 211, 245, .5);
+  touch-action: manipulation;
+}
+
+.shooterField::before {
+  content: "";
+  position: absolute;
+  inset: -80px 0 0;
+  background:
+    radial-gradient(circle at 20% 22%, rgba(255,255,255,.85) 0 22px, transparent 23px),
+    radial-gradient(circle at 75% 34%, rgba(255,255,255,.72) 0 28px, transparent 29px),
+    radial-gradient(circle at 45% 58%, rgba(255,255,255,.58) 0 18px, transparent 19px);
+  animation: shooterSkyFlow 7s linear infinite;
+}
+
+.shooterCloud {
+  position: absolute;
+  width: 82px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  filter: blur(.2px);
+}
+
+.shooterCloud::before,
+.shooterCloud::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.shooterCloud::before {
+  width: 34px;
+  height: 34px;
+  left: 14px;
+  top: -15px;
+}
+
+.shooterCloud::after {
+  width: 42px;
+  height: 42px;
+  right: 12px;
+  top: -20px;
+}
+
+.shooterCloud.cloud-a {
+  left: 8%;
+  top: 18%;
+}
+
+.shooterCloud.cloud-b {
+  right: 9%;
+  top: 48%;
+  transform: scale(.8);
+}
+
+.shooterEnemy {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  min-height: 46px;
+  margin-left: -43px;
+  border: 2px solid #ffbccd;
+  border-radius: 999px 999px 14px 14px;
+  background: linear-gradient(180deg, #fff7fa 0%, #ffd8e4 100%);
+  box-shadow: 0 5px 0 #efb2c4;
+  color: var(--ink);
+  font-weight: 1000;
+  transition: top .08s linear;
+}
+
+.shooterEnemy.answer {
+  border-color: #99dfff;
+  background: linear-gradient(180deg, #f7fdff 0%, #c9efff 100%);
+  box-shadow: 0 5px 0 #9bd4ed;
+}
+
+.shooterEnemy::before,
+.shooterEnemy::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  width: 22px;
+  height: 10px;
+  background: inherit;
+  border: 2px solid currentColor;
+  border-color: inherit;
+  border-radius: 999px;
+}
+
+.shooterEnemy::before {
+  left: -16px;
+}
+
+.shooterEnemy::after {
+  right: -16px;
+}
+
+.shooterEnemy span {
+  position: relative;
+  z-index: 1;
+}
+
+.shooterEnemy small {
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  color: #2f75bd;
+  font-size: .78rem;
+}
+
+.shooterMissile {
+  position: absolute;
+  z-index: 2;
+  width: 8px;
+  height: 28px;
+  margin-left: -4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff 0%, #40b4ff 72%, #ffde59 100%);
+  box-shadow: 0 0 12px rgba(64, 180, 255, .55);
+  transition: top .08s linear;
+}
+
+.shooterPlane {
+  position: absolute;
+  z-index: 4;
+  bottom: 22px;
+  width: 72px;
+  height: 56px;
+  margin-left: -36px;
+  transition: left .12s ease;
+}
+
+.shooterPlane span {
+  position: absolute;
+  inset: 8px 16px 0;
+  border-radius: 22px 22px 12px 12px;
+  background: linear-gradient(180deg, #69d85e 0%, #1aa446 100%);
+  box-shadow: 0 6px 0 #138338;
+}
+
+.shooterPlane span::before,
+.shooterPlane span::after {
+  content: "";
+  position: absolute;
+  bottom: 10px;
+  width: 30px;
+  height: 14px;
+  border-radius: 999px;
+  background: #2f75bd;
+}
+
+.shooterPlane span::before {
+  left: -22px;
+  transform: rotate(-18deg);
+}
+
+.shooterPlane span::after {
+  right: -22px;
+  transform: rotate(18deg);
+}
+
+.shooterHitText {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  border: 2px solid #d8f7ca;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  padding: 10px 18px;
+  color: var(--green-dark);
+  font-size: 1.25rem;
+  font-weight: 1000;
+  animation: shooterHitPop .65s ease both;
 }
 
 .gameLeaderboard {
@@ -2189,6 +2421,30 @@ textarea {
     opacity: 0;
     top: 330px;
     transform: translateX(-50%) scale(1.65);
+  }
+}
+
+@keyframes shooterSkyFlow {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(170px);
+  }
+}
+
+@keyframes shooterHitPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.72);
+  }
+  20%, 74% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.18);
   }
 }
 
@@ -3400,6 +3656,10 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .shooterGameCard .gameScoreBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .gameHeroAction {
     grid-template-columns: 1fr;
   }
@@ -3410,6 +3670,10 @@ textarea {
 
   .runnerTrack {
     min-height: 350px;
+  }
+
+  .shooterField {
+    height: 370px;
   }
 
   .crosswordBattle {

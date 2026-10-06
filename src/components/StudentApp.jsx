@@ -202,7 +202,7 @@ export function StudentApp() {
       setStage("home");
       return;
     }
-    if (stage === "game" || stage === "runner" || stage === "crossword" || stage === "apple" || stage === "defense") {
+    if (stage === "game" || stage === "runner" || stage === "crossword" || stage === "apple" || stage === "defense" || stage === "shooter") {
       setStage("gameMenu");
       return;
     }
@@ -236,12 +236,13 @@ export function StudentApp() {
               {stage !== "home" && canPlayGame ? (
                 <StageNavigation stage={stage} onPrev={goPreviousStage} onHome={goHome} />
               ) : null}
-              {canPlayGame && stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} /> : null}
+              {canPlayGame && stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} onShooterGame={() => startGame("shooter")} /> : null}
               {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "defense" ? <WordDefenseGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "shooter" ? <WordShooterGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
             </>
           ) : payload.lesson ? (
             <>
@@ -266,12 +267,13 @@ export function StudentApp() {
               {stage === "quiz" && currentQuiz ? (
                 <QuizCard quiz={currentQuiz} feedback={feedback} index={quizIndex} total={quizQueue.length} onAnswer={answerQuiz} />
               ) : null}
-              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} /> : null}
+              {stage === "gameMenu" ? <GameMenu onBlockGame={() => startGame("game")} onRunnerGame={() => startGame("runner")} onCrosswordGame={() => startGame("crossword")} onAppleGame={() => startGame("apple")} onDefenseGame={() => startGame("defense")} onShooterGame={() => startGame("shooter")} /> : null}
               {canPlayGame && stage === "game" ? <WordBlockGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "runner" ? <WordRunnerGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "crossword" ? <CrosswordBattleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "apple" ? <WordAppleGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {canPlayGame && stage === "defense" ? <WordDefenseGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
+              {canPlayGame && stage === "shooter" ? <WordShooterGame hanja={gameHanja} lesson={gameLesson} onExit={goHome} /> : null}
               {stage === "saving" ? <LoadingLesson /> : null}
               {stage === "done" ? <DoneCard stats={stats} status={status} onCards={startCards} onQuiz={() => startQuiz()} /> : null}
             </>
@@ -510,7 +512,7 @@ function GameLearningButton({ onOpen }) {
   );
 }
 
-function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame, onDefenseGame }) {
+function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame, onDefenseGame, onShooterGame }) {
   return (
     <section className="gameMenuGrid" aria-label="게임 선택">
       <button className="gameMenuCard" type="button" onClick={onBlockGame}>
@@ -532,6 +534,10 @@ function GameMenu({ onBlockGame, onRunnerGame, onCrosswordGame, onAppleGame, onD
       <button className="gameMenuCard defense" type="button" onClick={onDefenseGame}>
         <span>초록이 어휘 디펜스</span>
         <strong>정답 포인트로 병사와 타워를 세워 적을 막아요</strong>
+      </button>
+      <button className="gameMenuCard shooter" type="button" onClick={onShooterGame}>
+        <span>어휘 비행단</span>
+        <strong>자동 미사일로 정답 어휘 비행기를 격추해요</strong>
       </button>
     </section>
   );
@@ -2344,6 +2350,270 @@ function WordChainGame({ hanja, lesson, onExit }) {
   );
 }
 
+function WordShooterGame({ hanja, lesson, onExit }) {
+  const questions = useMemo(() => buildRunnerQuestions(hanja), [hanja]);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+  const [status, setStatus] = useState("");
+  const [score, setScore] = useState(0);
+  const [clearedWords, setClearedWords] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [power, setPower] = useState(1);
+  const [planeX, setPlaneX] = useState(50);
+  const [enemies, setEnemies] = useState([]);
+  const [missiles, setMissiles] = useState([]);
+  const [prompt, setPrompt] = useState(null);
+  const [hitWord, setHitWord] = useState("");
+  const [isOver, setIsOver] = useState(false);
+  const scoreRef = useRef(0);
+  const clearedRef = useRef(0);
+  const livesRef = useRef(3);
+  const powerRef = useRef(1);
+  const planeXRef = useRef(50);
+  const promptRef = useRef(null);
+  const enemiesRef = useRef([]);
+  const missilesRef = useRef([]);
+  const isOverRef = useRef(false);
+  const spawnTickRef = useRef(0);
+  const missileTickRef = useRef(0);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadLeaderboard() {
+      try {
+        const response = await fetch(`/api/student/game-score?gameType=shooter&level=${encodeURIComponent(lesson.level)}&day=${lesson.day}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!ignore && response.ok) setLeaderboard(data.leaderboard);
+      } catch {
+        if (!ignore) setStatus("게임 랭킹을 불러오지 못했습니다.");
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      ignore = true;
+    };
+  }, [lesson.day, lesson.level]);
+
+  useEffect(() => {
+    if (questions.length >= 4) restartShooterGame();
+  }, [questions]);
+
+  useEffect(() => {
+    if (questions.length < 4 || isOver) return undefined;
+    const timer = window.setInterval(tickShooterGame, 80);
+    return () => window.clearInterval(timer);
+  }, [questions, isOver]);
+
+  function restartShooterGame() {
+    const nextPrompt = pickShooterPrompt(questions);
+    scoreRef.current = 0;
+    clearedRef.current = 0;
+    livesRef.current = 3;
+    powerRef.current = 1;
+    planeXRef.current = 50;
+    enemiesRef.current = [];
+    missilesRef.current = [];
+    promptRef.current = nextPrompt;
+    isOverRef.current = false;
+    spawnTickRef.current = 0;
+    missileTickRef.current = 0;
+    setScore(0);
+    setClearedWords(0);
+    setLives(3);
+    setPower(1);
+    setPlaneX(50);
+    setEnemies([]);
+    setMissiles([]);
+    setPrompt(nextPrompt);
+    setHitWord("");
+    setIsOver(false);
+    setSaveState("idle");
+    setStatus("");
+  }
+
+  function movePlane(delta) {
+    if (isOverRef.current) return;
+    const next = Math.max(12, Math.min(88, planeXRef.current + delta));
+    planeXRef.current = next;
+    setPlaneX(next);
+  }
+
+  function tickShooterGame() {
+    if (isOverRef.current) return;
+    spawnTickRef.current += 1;
+    missileTickRef.current += 1;
+    const spawnRate = Math.max(12, 25 - Math.floor(scoreRef.current / 600));
+    if (spawnTickRef.current >= spawnRate || enemiesRef.current.length < 2) {
+      spawnTickRef.current = 0;
+      enemiesRef.current = [...enemiesRef.current, makeShooterEnemy(questions, promptRef.current, scoreRef.current)];
+    }
+    if (missileTickRef.current >= 4) {
+      missileTickRef.current = 0;
+      missilesRef.current = [...missilesRef.current, {
+        id: `m-${Date.now()}-${Math.random()}`,
+        x: planeXRef.current,
+        y: 78,
+        damage: powerRef.current
+      }];
+    }
+
+    const speed = 1.1 + Math.min(2.2, scoreRef.current / 1800);
+    let nextMissiles = missilesRef.current.map((missile) => ({ ...missile, y: missile.y - 5.6 })).filter((missile) => missile.y > 0);
+    let nextEnemies = enemiesRef.current.map((enemy) => ({ ...enemy, y: enemy.y + speed }));
+    const exploded = new Set();
+
+    nextMissiles = nextMissiles.filter((missile) => {
+      const target = nextEnemies.find((enemy) => !exploded.has(enemy.id) && Math.abs(enemy.x - missile.x) < 8 && Math.abs(enemy.y - missile.y) < 7);
+      if (!target) return true;
+      target.hp -= missile.damage;
+      if (target.hp <= 0) {
+        exploded.add(target.id);
+        handleShooterEnemyDestroyed(target);
+      }
+      return false;
+    });
+    nextEnemies = nextEnemies.filter((enemy) => !exploded.has(enemy.id));
+    const missed = nextEnemies.filter((enemy) => enemy.y >= 91);
+    if (missed.length) {
+      const wrongMisses = missed.filter((enemy) => enemy.word !== promptRef.current?.word).length;
+      const correctMisses = missed.length - wrongMisses;
+      const damage = correctMisses ? 2 : 1;
+      livesRef.current = Math.max(0, livesRef.current - damage);
+      setLives(livesRef.current);
+      nextEnemies = nextEnemies.filter((enemy) => enemy.y < 91);
+      if (livesRef.current <= 0) {
+        finishShooterGame();
+        return;
+      }
+    }
+    enemiesRef.current = nextEnemies;
+    missilesRef.current = nextMissiles;
+    setEnemies(nextEnemies);
+    setMissiles(nextMissiles);
+  }
+
+  function handleShooterEnemyDestroyed(enemy) {
+    if (!promptRef.current) return;
+    if (enemy.word === promptRef.current.word) {
+      const nextScore = scoreRef.current + 120 + (powerRef.current * 15);
+      scoreRef.current = nextScore;
+      clearedRef.current += 1;
+      powerRef.current = Math.min(9, powerRef.current + 1);
+      const nextPrompt = pickShooterPrompt(questions, promptRef.current.word);
+      promptRef.current = nextPrompt;
+      setScore(nextScore);
+      setClearedWords(clearedRef.current);
+      setPower(powerRef.current);
+      setPrompt(nextPrompt);
+      setHitWord(enemy.word);
+      window.setTimeout(() => setHitWord(""), 650);
+    } else {
+      scoreRef.current = Math.max(0, scoreRef.current - 40);
+      livesRef.current = Math.max(0, livesRef.current - 1);
+      setScore(scoreRef.current);
+      setLives(livesRef.current);
+      if (livesRef.current <= 0) finishShooterGame();
+    }
+  }
+
+  function finishShooterGame() {
+    if (isOverRef.current) return;
+    isOverRef.current = true;
+    setIsOver(true);
+    saveShooterScore(scoreRef.current, clearedRef.current);
+  }
+
+  async function saveShooterScore(finalScore, finalClearedWords) {
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/student/game-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameType: "shooter",
+          level: lesson.level,
+          day: lesson.day,
+          score: finalScore,
+          clearedWords: finalClearedWords
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setLeaderboard(data.leaderboard);
+        setSaveState("saved");
+      } else {
+        throw new Error(data.message || "점수 저장 실패");
+      }
+    } catch {
+      setSaveState("idle");
+      setStatus("점수를 저장하지 못했습니다.");
+    }
+  }
+
+  if (questions.length < 4) {
+    return (
+      <article className="wordGameCard">
+        <Mascot variant="book" small label="게임 준비" />
+        <h2>어휘 비행단</h2>
+        <p className="mutedText">이 게임에 사용할 어휘가 아직 부족합니다. 4개 이상의 어휘가 필요해요.</p>
+        <button className="btn secondary" type="button" onClick={onExit}>홈으로</button>
+      </article>
+    );
+  }
+
+  return (
+    <section className="wordGameCard shooterGameCard">
+      <div className="gameHeader">
+        <div>
+          <span>자동 슈팅</span>
+          <h2>{lesson?.day || ""}일차 어휘 비행단</h2>
+        </div>
+        <button className="btn textBtn" type="button" onClick={onExit}>홈</button>
+      </div>
+      <div className="gameScoreBar">
+        <span><b>{score}</b>점</span>
+        <span>격추 {clearedWords}개</span>
+        <span>위력 Lv.{power}</span>
+        <span>기체 {lives}</span>
+      </div>
+      <article className="shooterPrompt">
+        <span>{prompt?.type === "blank" ? "빈칸 어휘 격추" : "뜻에 맞는 어휘 격추"}</span>
+        <strong>{prompt?.prompt || "정답 어휘를 찾아요"}</strong>
+      </article>
+      <div className="shooterField" aria-label="어휘 비행단">
+        <span className="shooterCloud cloud-a" aria-hidden="true" />
+        <span className="shooterCloud cloud-b" aria-hidden="true" />
+        {enemies.map((enemy) => (
+          <div className={`shooterEnemy ${enemy.word === prompt?.word ? "answer" : ""}`} key={enemy.id} style={{ left: `${enemy.x}%`, top: `${enemy.y}%` }}>
+            <span>{enemy.word}</span>
+            <small>{enemy.hp}</small>
+          </div>
+        ))}
+        {missiles.map((missile) => (
+          <i className="shooterMissile" key={missile.id} style={{ left: `${missile.x}%`, top: `${missile.y}%` }} />
+        ))}
+        <div className="shooterPlane" style={{ left: `${planeX}%` }} aria-label="초록이 비행기">
+          <span />
+        </div>
+        {hitWord ? <div className="shooterHitText">{hitWord} 격추!</div> : null}
+        {isOver ? (
+          <div className="gameOverPanel" role="status">
+            <strong>비행 종료</strong>
+            <p>{score}점 · {clearedWords}개 어휘 격추</p>
+            <button className="btn primary" type="button" onClick={restartShooterGame}>다시 하기</button>
+          </div>
+        ) : null}
+      </div>
+      <div className="runnerControls">
+        <button className="btn secondary" type="button" onClick={() => movePlane(-9)}>◀ 왼쪽</button>
+        <button className="btn secondary" type="button" onClick={() => movePlane(9)}>오른쪽 ▶</button>
+      </div>
+      {status ? <p className="gameStatus">{status}</p> : null}
+      <GameLeaderboard leaderboard={leaderboard} saveState={saveState} />
+    </section>
+  );
+}
+
 function GameLeaderboard({ leaderboard, saveState }) {
   const scopes = leaderboard?.scopes || [];
   const [activeScopeKey, setActiveScopeKey] = useState("all");
@@ -2611,6 +2881,28 @@ function makeRunnerHighLanes() {
   if (Math.random() > 0.42) return [];
   const lanes = shuffle([0, 1, 2]).slice(0, Math.random() > 0.7 ? 2 : 1);
   return lanes;
+}
+
+function pickShooterPrompt(questions, previousWord = "") {
+  const pool = questions.filter((item) => item.word !== previousWord);
+  const source = pool.length ? pool : questions;
+  return source[Math.floor(Math.random() * source.length)];
+}
+
+function makeShooterEnemy(questions, prompt, score) {
+  const useAnswer = !prompt || Math.random() < 0.42;
+  const source = useAnswer
+    ? prompt
+    : shuffle(questions.filter((item) => item.word !== prompt?.word))[0] || prompt;
+  const baseHp = 1 + Math.floor(Math.max(0, Number(score || 0)) / 480);
+  const isAnswer = source?.word === prompt?.word;
+  return {
+    id: `e-${Date.now()}-${Math.random()}`,
+    word: source?.word || "",
+    x: 14 + Math.random() * 72,
+    y: -8,
+    hp: Math.max(1, baseHp + (isAnswer ? Math.floor(baseHp / 2) : 0))
+  };
 }
 
 function makeDefenseRound(questions, avoidWord = "") {
