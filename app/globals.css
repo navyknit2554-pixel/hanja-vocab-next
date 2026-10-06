@@ -2540,6 +2540,32 @@ textarea {
   color: var(--green-dark);
 }
 
+.manualReplacementForm {
+  display: grid;
+  grid-template-columns: .8fr .7fr .9fr auto;
+  gap: 10px;
+  align-items: end;
+  border-top: 2px solid #d8f7ca;
+  padding-top: 12px;
+}
+
+.manualReplacementForm strong,
+.manualReplacementForm p {
+  margin: 0;
+}
+
+.manualReplacementForm strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.manualReplacementForm p {
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;
@@ -3269,6 +3295,7 @@ textarea {
   .vocabFields,
   .replacementList,
   .studentFormGrid,
+  .manualReplacementForm,
   .studentRow {
     grid-template-columns: 1fr;
   }

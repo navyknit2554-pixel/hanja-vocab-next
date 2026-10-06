@@ -35,7 +35,7 @@ export function AdminApp() {
   const [curriculumIndex, setCurriculumIndex] = useState([]);
   const [curriculumStatus, setCurriculumStatus] = useState("");
   const [savingId, setSavingId] = useState("");
-  const [replacement, setReplacement] = useState({ target: null, candidates: [], status: "", loading: false });
+  const [replacement, setReplacement] = useState({ target: null, candidates: [], status: "", loading: false, manual: { character: "", meaning: "" } });
   const [testForm, setTestForm] = useState({ level: "초급", startDay: 1, endDay: 5, questionCount: 20 });
   const [testPaper, setTestPaper] = useState(null);
   const [testStatus, setTestStatus] = useState("");
@@ -394,7 +394,7 @@ export function AdminApp() {
   }
 
   async function loadReplacementCandidates(hanja) {
-    setReplacement({ target: hanja, candidates: [], status: "같은 음의 다른 한자를 찾는 중...", loading: true });
+    setReplacement({ target: hanja, candidates: [], status: "같은 음의 다른 한자를 찾는 중...", loading: true, manual: { character: "", meaning: "" } });
     try {
       const response = await fetch(`/api/admin/hanja-replacement?hanjaId=${encodeURIComponent(hanja.id)}`, { cache: "no-store" });
       const text = await response.text();
@@ -405,10 +405,11 @@ export function AdminApp() {
         target: data.target || hanja,
         candidates: data.candidates || [],
         status: data.candidates?.length ? "이 난이도에서 아직 쓰이지 않은 한자를 선택해 주세요." : "동일한 음이면서 이 난이도에서 아직 쓰이지 않은 후보가 없습니다.",
-        loading: false
+        loading: false,
+        manual: { character: "", meaning: "" }
       });
     } catch (error) {
-      setReplacement({ target: hanja, candidates: [], status: error.message || "교체 후보를 불러오지 못했습니다.", loading: false });
+      setReplacement({ target: hanja, candidates: [], status: error.message || "교체 후보를 불러오지 못했습니다.", loading: false, manual: { character: "", meaning: "" } });
     }
   }
 
@@ -425,13 +426,46 @@ export function AdminApp() {
       const data = parseJsonResponse(text);
       if (handleExpiredAdmin(response, data)) return;
       if (!response.ok) throw new Error(data.message || "한자를 교체하지 못했습니다.");
-      setReplacement({ target: null, candidates: [], status: "", loading: false });
+      closeReplacement();
       setStatus(data.message || "한자를 교체했습니다.");
       await loadLesson();
       await loadCurriculumIndex();
     } catch (error) {
       setReplacement((current) => ({ ...current, status: error.message || "한자를 교체하지 못했습니다.", loading: false }));
     }
+  }
+
+  async function replaceWithNewHanja(event) {
+    event.preventDefault();
+    if (!replacement.target) return;
+    const character = String(replacement.manual?.character || "").trim();
+    const meaning = String(replacement.manual?.meaning || "").trim();
+    setReplacement((current) => ({ ...current, status: `${character || "새 한자"} 어휘를 가져오며 교체하는 중...`, loading: true }));
+    try {
+      const response = await fetch("/api/admin/hanja-replacement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetHanjaId: replacement.target.id, newCharacter: character, newMeaning: meaning })
+      });
+      const text = await response.text();
+      const data = parseJsonResponse(text);
+      if (handleExpiredAdmin(response, data)) return;
+      if (!response.ok) throw new Error(data.message || "새 한자로 교체하지 못했습니다.");
+      closeReplacement();
+      setStatus(data.message || "새 한자로 교체했습니다.");
+      await loadLesson();
+      await loadCurriculumIndex();
+    } catch (error) {
+      setReplacement((current) => ({ ...current, status: error.message || "새 한자로 교체하지 못했습니다.", loading: false }));
+    }
+  }
+
+  function updateReplacementManual(patch) {
+    setReplacement((current) => ({ ...current, manual: { ...current.manual, ...patch } }));
+  }
+
+  function closeReplacement() {
+    setReplacement({ target: null, candidates: [], status: "", loading: false, manual: { character: "", meaning: "" } });
   }
 
   async function generateTestPaper(event) {
@@ -629,7 +663,9 @@ export function AdminApp() {
                 replacement={replacement}
                 onFindReplacement={loadReplacementCandidates}
                 onReplaceHanja={replaceHanja}
-                onCloseReplacement={() => setReplacement({ target: null, candidates: [], status: "", loading: false })}
+                onReplaceWithNewHanja={replaceWithNewHanja}
+                onUpdateReplacementManual={updateReplacementManual}
+                onCloseReplacement={closeReplacement}
               />
               <button className="btn primary" type="button" onClick={importDictionary} disabled={loading}>
                 {loading ? "가져오는 중..." : "현재 일차 국어원 어휘·뜻·용례 가져오기"}
@@ -696,7 +732,17 @@ export function AdminApp() {
   );
 }
 
-function LessonHanjaOverview({ lessonData, level, day, replacement, onFindReplacement, onReplaceHanja, onCloseReplacement }) {
+function LessonHanjaOverview({
+  lessonData,
+  level,
+  day,
+  replacement,
+  onFindReplacement,
+  onReplaceHanja,
+  onReplaceWithNewHanja,
+  onUpdateReplacementManual,
+  onCloseReplacement
+}) {
   const hanja = lessonData?.hanja || [];
 
   return (
@@ -744,6 +790,15 @@ function LessonHanjaOverview({ lessonData, level, day, replacement, onFindReplac
               </button>
             ))}
           </div>
+          <form className="manualReplacementForm" onSubmit={onReplaceWithNewHanja}>
+            <div>
+              <strong>새 한자로 직접 교체</strong>
+              <p>음은 {replacement.target.sound}(으)로 유지하고, 입력한 한자의 어휘를 바로 가져옵니다.</p>
+            </div>
+            <label>새 한자<input maxLength="1" value={replacement.manual?.character || ""} onChange={(event) => onUpdateReplacementManual({ character: event.target.value })} placeholder="예: 宇" /></label>
+            <label>뜻<input value={replacement.manual?.meaning || ""} onChange={(event) => onUpdateReplacementManual({ meaning: event.target.value })} placeholder="예: 집" /></label>
+            <button className="btn primary" type="submit" disabled={replacement.loading}>새 한자로 교체</button>
+          </form>
         </section>
       ) : null}
     </div>
